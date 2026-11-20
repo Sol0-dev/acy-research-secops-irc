@@ -280,6 +280,14 @@ export default function App() {
     else root.classList.remove('dark');
   }, [isDark]);
 
+  const isAcyLab =
+    workspace.activeBuffer.kind === 'channel' &&
+    ['#unauth-lab', '#unauthlab'].includes(workspace.activeBuffer.id);
+
+  useEffect(() => {
+    document.title = isAcyLab ? 'acy-research | #unauth-lab' : 'secops.irc // mesh';
+  }, [isAcyLab]);
+
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [workspace.activeBuffer, workspace.channels, workspace.dmThreads]);
@@ -1416,9 +1424,36 @@ export default function App() {
             #
           </button>
 
-          <h1 className="font-mono text-base sm:text-lg font-medium tracking-tight shrink-0">
-            {headerTitle}
-          </h1>
+          {isAcyLab ? (
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span className="w-8 h-8 rounded-lg bg-[#18181b] dark:bg-[#f4f4f5] text-[#fafafa] dark:text-[#0c0c0e] flex items-center justify-center shadow-sm">
+                <svg
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                >
+                  <polygon points="12 2 21 7 21 17 12 22 3 17 3 7 12 2" />
+                  <circle cx="12" cy="12" r="3" />
+                  <line x1="12" y1="2" x2="12" y2="9" />
+                  <line x1="21" y1="17" x2="14.6" y2="13.5" />
+                  <line x1="3" y1="17" x2="9.4" y2="13.5" />
+                </svg>
+              </span>
+              <span className="font-mono font-semibold tracking-tight text-base sm:text-lg">
+                acy-research
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[13px] font-mono font-medium bg-[#f4f4f5] dark:bg-[#141417] text-[#52525b] dark:text-[#a1a1aa] border border-[#e5e5e5] dark:border-[#1a1a1e]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
+                acy v4.1
+              </span>
+            </div>
+          ) : (
+            <h1 className="font-mono text-base sm:text-lg font-medium tracking-tight shrink-0">
+              {headerTitle}
+            </h1>
+          )}
 
           {headerSubtitle && (
             <>
