@@ -24,6 +24,7 @@ interface AdminPanelProps {
     reportId: string;
     decision: string;
   }) => Promise<{ ok: boolean; error?: string }>;
+  onOpenAgentPortal: () => void;
   onClose: () => void;
 }
 
@@ -45,6 +46,7 @@ export default function AdminPanel({
   onUnlock,
   onSaveGoal,
   onReviewReport,
+  onOpenAgentPortal,
   onClose,
 }: AdminPanelProps) {
   const [username, setUsername] = useState('');
@@ -63,6 +65,7 @@ export default function AdminPanel({
     channelId: string;
     nodeId: string;
   } | null>(null);
+  const [graphFocusChannelId, setGraphFocusChannelId] = useState<string | null>(null);
 
   const downloadFile = async (kind: 'docx' | 'graph', id: string, filename: string) => {
     setDownloadNotice('');
@@ -113,6 +116,27 @@ export default function AdminPanel({
   const th = 'text-left py-1 pr-3 text-[9px] uppercase tracking-wider text-[#71717a] font-normal';
   const td = 'py-1 pr-3 align-top text-[10px] text-[#d4d4d8]';
 
+  const focusedGraph = graphFocusChannelId
+    ? snapshot?.graphs.find((graph) => graph.channelId === graphFocusChannelId) ?? null
+    : null;
+  const focusedSelectedNode =
+    focusedGraph && selectedGraph?.channelId === focusedGraph.channelId
+      ? focusedGraph.nodes.find((node) => node.id === selectedGraph.nodeId) ?? null
+      : null;
+  const focusedContributors: Array<[string, number]> = [];
+  if (focusedGraph) {
+    const counts = new Map<string, number>();
+    for (const item of [...focusedGraph.nodes, ...focusedGraph.edges]) {
+      counts.set(item.createdBy, (counts.get(item.createdBy) ?? 0) + 1);
+    }
+    focusedContributors.push(
+      ...Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
+    );
+  }
+  const focusedKinds = focusedGraph
+    ? Array.from(new Set(focusedGraph.nodes.map((node) => node.kind)))
+    : [];
+
   return (
     <div className="fixed inset-0 z-[60] bg-[#050506] text-[#f4f4f5] font-mono text-xs flex flex-col">
       <header className="border-b border-[#2a2a30] px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shrink-0">
@@ -123,13 +147,23 @@ export default function AdminPanel({
             <span className="text-[10px] text-[#71717a]">workspace v{snapshot.version}</span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-[10px] text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-2 py-1"
-        >
-          close
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenAgentPortal}
+            className="text-[10px] text-[#4ade80] hover:text-[#f4f4f5] border border-[#4ade80]/40 px-2 py-1"
+            title="Return to the live IRC portal used by agents"
+          >
+            agent portal →
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[10px] text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-2 py-1"
+          >
+            close
+          </button>
+        </div>
       </header>
 
       {!snapshot ? (
@@ -195,6 +229,119 @@ export default function AdminPanel({
               read-only: no code, file, or backend-mutation controls are exposed here.
             </div>
           </form>
+        </div>
+      ) : focusedGraph ? (
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="border-b border-[#2a2a30] px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setGraphFocusChannelId(null);
+                  setSelectedGraph(null);
+                }}
+                className="text-[10px] text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-1.5 py-0.5"
+              >
+                &larr; oversight
+              </button>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
+              <span className="text-[11px] text-[#f4f4f5] truncate">
+                knowledge graph // {focusedGraph.channelId}
+              </span>
+              <span className="text-[10px] text-[#71717a]">
+                {focusedGraph.nodes.length} nodes · {focusedGraph.edges.length} edges
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                void downloadFile(
+                  'graph',
+                  focusedGraph.channelId,
+                  `graph-${focusedGraph.channelId.replace(/^#/, '')}.json`
+                )
+              }
+              className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+            >
+              download json
+            </button>
+          </div>
+
+          <div className="flex-1 flex min-h-0">
+            <div className="flex-1 min-w-0 bg-[#050506]">
+              <GraphView
+                nodes={focusedGraph.nodes}
+                edges={focusedGraph.edges}
+                isDark
+                selectedNodeId={
+                  selectedGraph?.channelId === focusedGraph.channelId
+                    ? selectedGraph.nodeId
+                    : null
+                }
+                onSelectNode={(nodeId) =>
+                  setSelectedGraph((current) =>
+                    current?.channelId === focusedGraph.channelId &&
+                    current.nodeId === nodeId
+                      ? null
+                      : { channelId: focusedGraph.channelId, nodeId }
+                  )
+                }
+              />
+            </div>
+
+            <aside className="w-64 shrink-0 border-l border-[#2a2a30] p-3 overflow-y-auto space-y-3 text-[10px]">
+              <div className="space-y-1">
+                <div className="text-[9px] uppercase tracking-wider text-[#71717a]">
+                  node intel
+                </div>
+                {!focusedSelectedNode ? (
+                  <div className="text-[#52525b]">click a node to inspect it.</div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="text-[#f4f4f5]">
+                      [{focusedSelectedNode.kind}] {focusedSelectedNode.label}
+                    </div>
+                    {focusedSelectedNode.notes && (
+                      <div className="text-[#a1a1aa] whitespace-pre-wrap">
+                        {focusedSelectedNode.notes}
+                      </div>
+                    )}
+                    <div className="text-[#71717a]">
+                      by {focusedSelectedNode.createdBy} · {focusedSelectedNode.time}
+                      {focusedSelectedNode.updatedBy
+                        ? ` · updated by ${focusedSelectedNode.updatedBy} at ${focusedSelectedNode.updatedTime}`
+                        : ''}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1 border-t border-[#2a2a30] pt-2">
+                <div className="text-[9px] uppercase tracking-wider text-[#71717a]">
+                  contributors
+                </div>
+                {focusedContributors.length === 0 ? (
+                  <div className="text-[#52525b]">none yet</div>
+                ) : (
+                  focusedContributors.map(([nick, count]) => (
+                    <div key={nick} className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[#a1a1aa]">{nick}</span>
+                      <span className="text-[#71717a]">{count}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="space-y-1 border-t border-[#2a2a30] pt-2">
+                <div className="text-[9px] uppercase tracking-wider text-[#71717a]">legend</div>
+                {focusedKinds.map((kind) => (
+                  <div key={kind} className="text-[#a1a1aa]">
+                    {kind}
+                  </div>
+                ))}
+              </div>
+            </aside>
+          </div>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
@@ -497,21 +644,35 @@ export default function AdminPanel({
                         <span>
                           {graph.channelId} · {graph.nodes.length} nodes · {graph.edges.length} edges
                         </span>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            void downloadFile(
-                              'graph',
-                              graph.channelId,
-                              `graph-${graph.channelId.replace(/^#/, '')}.json`
-                            );
-                          }}
-                          className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
-                        >
-                          download json
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setGraphFocusChannelId(graph.channelId);
+                              setSelectedGraph(null);
+                            }}
+                            className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+                          >
+                            open panel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              void downloadFile(
+                                'graph',
+                                graph.channelId,
+                                `graph-${graph.channelId.replace(/^#/, '')}.json`
+                              );
+                            }}
+                            className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+                          >
+                            download json
+                          </button>
+                        </div>
                       </summary>
                       <div className="pt-2 space-y-2">
                         <div className="h-[360px] border border-[#2a2a30] overflow-hidden bg-[#050506]">
@@ -668,17 +829,44 @@ export default function AdminPanel({
                         <th className={th}>role</th>
                         <th className={th}>type</th>
                         <th className={th}>programs</th>
+                        <th className={th}>graphs</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {snapshot.agents.map((agent) => (
-                        <tr key={agent.nick} className="border-b border-[#16161a]">
-                          <td className={td}>{agent.nick}</td>
-                          <td className={td}>{agent.role}</td>
-                          <td className={td}>{agent.isUser ? 'operator' : 'agent'}</td>
-                          <td className={td}>{agent.programs.join(', ') || '—'}</td>
-                        </tr>
-                      ))}
+                      {snapshot.agents.map((agent) => {
+                        const accessibleGraphs = agent.programs.filter((program) =>
+                          snapshot.graphs.some((graph) => graph.channelId === program)
+                        );
+                        return (
+                          <tr key={agent.nick} className="border-b border-[#16161a]">
+                            <td className={td}>{agent.nick}</td>
+                            <td className={td}>{agent.role}</td>
+                            <td className={td}>{agent.isUser ? 'operator' : 'agent'}</td>
+                            <td className={td}>{agent.programs.join(', ') || '—'}</td>
+                            <td className={td}>
+                              {accessibleGraphs.length === 0 ? (
+                                '—'
+                              ) : (
+                                <div className="flex flex-wrap gap-1">
+                                  {accessibleGraphs.map((program) => (
+                                    <button
+                                      key={program}
+                                      type="button"
+                                      onClick={() => {
+                                        setGraphFocusChannelId(program);
+                                        setSelectedGraph(null);
+                                      }}
+                                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+                                    >
+                                      {program} graph
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

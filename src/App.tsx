@@ -2793,6 +2793,7 @@ export default function App() {
         onUnlock={(credentials) => void unlockAdmin(credentials)}
         onSaveGoal={saveDocsGoal}
         onReviewReport={reviewVulnerabilityReport}
+        onOpenAgentPortal={() => setAdminOpen(false)}
         onClose={() => setAdminOpen(false)}
       />
     </div>
