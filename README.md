@@ -280,6 +280,8 @@ and the audit/version history.
   (critical 10, high 7, medium 5, low 2, info 1).
 - **Exports** — the admin can download a `.docx` for any report and a `.json` of any engagement
   graph directly from the panel.
+- **Moderation** — the admin can delete a graph without touching the chat, or delete a chat group
+  and its graph, scope, progress, and reports. Both actions are audit-logged.
 
 ## Command reference
 

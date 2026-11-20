@@ -425,6 +425,94 @@ app.post('/api/admin/agent-session', async (req, res) => {
   }
 });
 
+app.post('/api/admin/graph/delete', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const channelId = String(req.body?.channelId ?? '');
+  try {
+    const state = structuredClone(getState());
+    const channel = state.channels.find((item) => item.id === channelId && item.isEngagement);
+    if (!channel) return res.status(404).json({ error: 'engagement not found' });
+    if (!state.graphs[channelId]) return res.status(404).json({ error: 'graph not found' });
+    delete state.graphs[channelId];
+
+    const time = new Date().toTimeString().slice(0, 5);
+    const lobby = state.channels.find((item) => item.id === '#lobby');
+    if (lobby) {
+      lobby.messages = [
+        ...lobby.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: `admin deleted the knowledge graph for ${channelId}`,
+        },
+      ];
+    }
+
+    const version = await persistState(state, 'admin.graph.delete', 'admin', { channelId });
+    return res.json({ ok: true, channelId, version });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/channel/delete', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const channelId = String(req.body?.channelId ?? '');
+  try {
+    const state = structuredClone(getState());
+    const channel = state.channels.find((item) => item.id === channelId && item.isEngagement);
+    if (!channel) return res.status(404).json({ error: 'engagement not found' });
+
+    state.channels = state.channels.filter((item) => item.id !== channelId);
+    delete state.graphs[channelId];
+    delete state.scopes[channelId];
+    delete state.progress[channelId];
+    delete state.reports[channelId];
+
+    for (const agent of Object.values(state.agents)) {
+      if (!agent.programs?.includes(channelId)) continue;
+      agent.programs = agent.programs.filter((id) => id !== channelId);
+      agent.task = agent.programs.length
+        ? `[${agent.role}] active on ${agent.programs.join(', ')}`
+        : agent.role === 'unassigned'
+          ? 'connected in #lobby — role unassigned'
+          : `role: ${agent.role} — standing by`;
+    }
+    for (const account of Object.values(state.accounts)) {
+      if (account.programs?.includes(channelId)) {
+        account.programs = account.programs.filter((id) => id !== channelId);
+      }
+    }
+    if (state.activeBuffer.kind === 'channel' && state.activeBuffer.id === channelId) {
+      state.activeBuffer = { kind: 'channel', id: '#lobby' };
+    }
+
+    const time = new Date().toTimeString().slice(0, 5);
+    const lobby = state.channels.find((item) => item.id === '#lobby');
+    if (lobby) {
+      lobby.messages = [
+        ...lobby.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: `admin deleted chat group ${channelId} and its graph, scope, progress, and reports`,
+        },
+      ];
+    }
+
+    const version = await persistState(state, 'admin.channel.delete', 'admin', { channelId });
+    return res.json({ ok: true, channelId, version });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/state', (req, res) => {
   const state = getState();
   const user = resolveUser(req, state);

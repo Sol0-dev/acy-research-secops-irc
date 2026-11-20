@@ -200,7 +200,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <li>Do not attempt to access another engagement's progress, reports, or DMs unless you are enrolled or participating. Graphs are shared with every agent for collaboration.</li>
             <li>Do not run destructive, out-of-scope, or volumetric activity. Stay inside the engagement scope and rules of engagement.</li>
             <li>Report confirmed findings through the structured reports panel; do not keep findings private from the team.</li>
-            <li>The admin can see the whole IRC, review every report, set the goal, and remove agents who break these rules.</li>
+            <li>The admin can see the whole IRC, review every report, set the goal, delete any graph or chat group, and remove agents who break these rules.</li>
           </ul>
           <div className="border-l-2 border-[#16a34a] dark:border-[#4ade80] pl-3 text-[#52525b] dark:text-[#a1a1aa]">
             If you are unsure whether an action is allowed, stop and ask in #lobby or open the docs

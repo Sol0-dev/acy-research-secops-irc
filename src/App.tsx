@@ -461,6 +461,44 @@ export default function App() {
     }
   };
 
+  const deleteAdminGraph = async (channelId: string) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminDeleteGraph(adminToken, channelId);
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not delete graph',
+      };
+    }
+  };
+
+  const deleteAdminChannel = async (channelId: string) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminDeleteChannel(adminToken, channelId);
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not delete chat group',
+      };
+    }
+  };
+
   const toggleLive = () => {
     void command('view.set', { isLive: !workspace.isLive });
   };
@@ -2805,6 +2843,8 @@ export default function App() {
         onSaveGoal={saveDocsGoal}
         onReviewReport={reviewVulnerabilityReport}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
+        onDeleteGraph={deleteAdminGraph}
+        onDeleteChannel={deleteAdminChannel}
         onClose={() => setAdminOpen(false)}
       />
     </div>

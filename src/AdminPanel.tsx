@@ -25,6 +25,8 @@ interface AdminPanelProps {
     decision: string;
   }) => Promise<{ ok: boolean; error?: string }>;
   onOpenAgentPortal: () => void;
+  onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
+  onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onClose: () => void;
 }
 
@@ -47,6 +49,8 @@ export default function AdminPanel({
   onSaveGoal,
   onReviewReport,
   onOpenAgentPortal,
+  onDeleteGraph,
+  onDeleteChannel,
   onClose,
 }: AdminPanelProps) {
   const [username, setUsername] = useState('');
@@ -58,6 +62,9 @@ export default function AdminPanel({
   const [reviewBusy, setReviewBusy] = useState('');
   const [reviewNotice, setReviewNotice] = useState('');
   const [reviewError, setReviewError] = useState('');
+  const [pendingDelete, setPendingDelete] = useState('');
+  const [deleteNotice, setDeleteNotice] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const [downloadNotice, setDownloadNotice] = useState('');
   const [downloadError, setDownloadError] = useState('');
   const [selectedGraph, setSelectedGraph] = useState<{
@@ -110,6 +117,23 @@ export default function AdminPanel({
     setReviewBusy('');
     if (!result.ok) setReviewError(result.error || 'could not review report');
     else setReviewNotice(`report marked ${decision}`);
+  };
+
+  const confirmDelete = async (kind: 'graph' | 'channel', channelId: string) => {
+    setDeleteNotice('');
+    setDeleteError('');
+    const result =
+      kind === 'graph' ? await onDeleteGraph(channelId) : await onDeleteChannel(channelId);
+    if (!result.ok) {
+      setDeleteError(result.error || 'delete failed');
+      return;
+    }
+    setPendingDelete('');
+    setDeleteNotice(
+      kind === 'graph'
+        ? `graph deleted: ${channelId}`
+        : `chat group deleted: ${channelId}`
+    );
   };
 
   const th = 'text-left py-1 pr-3 text-[9px] uppercase tracking-wider text-[#71717a] font-normal';
@@ -653,6 +677,44 @@ export default function AdminPanel({
                           >
                             download json
                           </button>
+                          {pendingDelete === `graph:${graph.channelId}` ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  void confirmDelete('graph', graph.channelId);
+                                }}
+                                className="px-1.5 py-0.5 border border-[#f87171] text-[9px] text-[#f87171]"
+                              >
+                                confirm delete
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  setPendingDelete('');
+                                }}
+                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa]"
+                              >
+                                cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setPendingDelete(`graph:${graph.channelId}`);
+                              }}
+                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#f87171] hover:border-[#f87171]"
+                            >
+                              delete graph
+                            </button>
+                          )}
                         </div>
                       </summary>
                       <div className="pt-2 space-y-2">
@@ -702,6 +764,8 @@ export default function AdminPanel({
                 })}
               </div>
             )}
+            {deleteNotice && <div className="text-[10px] text-[#4ade80]">{deleteNotice}</div>}
+            {deleteError && <div className="text-[10px] text-[#f87171]">{deleteError}</div>}
           </section>
 
           <section className="space-y-2">
@@ -740,19 +804,51 @@ export default function AdminPanel({
                         <td className={td}>{engagement.reports}</td>
                         <td className={td}>{engagement.messages}</td>
                         <td className={td}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void downloadFile(
-                                'graph',
-                                engagement.id,
-                                `graph-${engagement.id.replace(/^#/, '')}.json`
-                              )
-                            }
-                            className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
-                          >
-                            graph json
-                          </button>
+                          <div className="flex flex-wrap gap-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void downloadFile(
+                                  'graph',
+                                  engagement.id,
+                                  `graph-${engagement.id.replace(/^#/, '')}.json`
+                                )
+                              }
+                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+                            >
+                              graph json
+                            </button>
+                            {pendingDelete === `channel:${engagement.id}` ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void confirmDelete('channel', engagement.id)
+                                  }
+                                  className="px-1.5 py-0.5 border border-[#f87171] text-[9px] text-[#f87171]"
+                                >
+                                  confirm delete
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingDelete('')}
+                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa]"
+                                >
+                                  cancel
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPendingDelete(`channel:${engagement.id}`)
+                                }
+                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#f87171] hover:border-[#f87171]"
+                              >
+                                delete group
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

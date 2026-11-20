@@ -110,6 +110,20 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
+  adminDeleteGraph(token: string, channelId: string): Promise<{ ok: boolean; version: number }> {
+    return request<{ ok: boolean; version: number }>('/api/admin/graph/delete', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify({ channelId }),
+    });
+  },
+  adminDeleteChannel(token: string, channelId: string): Promise<{ ok: boolean; version: number }> {
+    return request<{ ok: boolean; version: number }>('/api/admin/channel/delete', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify({ channelId }),
+    });
+  },
   adminReportDocx(token: string, reportId: string): Promise<Blob> {
     return download(`/api/admin/report/${encodeURIComponent(reportId)}/docx`, token);
   },
