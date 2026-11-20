@@ -11,6 +11,8 @@ import { api } from './lib/api';
 import GraphView from './GraphView';
 import type { AdminSnapshot } from './types';
 
+type AdminTab = 'goal' | 'reports' | 'graphs' | 'accounts' | 'audit' | 'irc';
+
 interface AdminPanelProps {
   open: boolean;
   token: string;
@@ -72,6 +74,7 @@ export default function AdminPanel({
     nodeId: string;
   } | null>(null);
   const [graphFocusChannelId, setGraphFocusChannelId] = useState<string | null>(null);
+  const [adminTab, setAdminTab] = useState<AdminTab>('goal');
 
   const downloadFile = async (kind: 'docx' | 'graph', id: string, filename: string) => {
     setDownloadNotice('');
@@ -349,47 +352,45 @@ export default function AdminPanel({
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-          <section className="space-y-2">
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">security posture</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              <Stat label="api bind" value={snapshot.security.apiHost} />
-              <Stat label="proxy required" value={snapshot.security.proxyRequired ? 'yes' : 'no'} />
-              <Stat
-                label="admin login"
-                value={
-                  snapshot.security.adminPasswordConfigured
-                    ? 'configured'
-                    : snapshot.security.adminPasswordGenerated
-                      ? 'generated'
-                      : 'none'
-                }
-              />
-              <Stat label="code endpoints" value={snapshot.security.codeEndpoints ? 'yes' : 'none'} />
-              <Stat label="cors origin" value={snapshot.security.corsOrigin} />
-              <Stat label="write surface" value={snapshot.security.writeSurface} />
-            </div>
-          </section>
-
-          <section className="space-y-2">
+        <>
+          <nav className="border-b border-[#2a2a30] px-4 sm:px-6 py-2 flex flex-wrap gap-1 shrink-0">
+            {(['goal', 'reports', 'graphs', 'accounts', 'audit', 'irc'] as AdminTab[]).map(
+              (tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setAdminTab(tab)}
+                  className={`px-2.5 py-1 text-[10px] border capitalize transition-colors ${
+                    adminTab === tab
+                      ? 'border-[#4ade80] text-[#4ade80] bg-[#4ade80]/10'
+                      : 'border-[#2a2a30] text-[#a1a1aa] hover:text-[#f4f4f5]'
+                  }`}
+                >
+                  {tab}
+                </button>
+              )
+            )}
+          </nav>
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+          <section className={`space-y-2 ${adminTab === 'goal' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">workspace counts</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-              {Object.entries(snapshot.counts).map(([key, value]) => (
-                <Stat key={key} label={key} value={value} />
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <Stat label="agents" value={snapshot.counts.agents} />
+              <Stat label="engagements" value={snapshot.counts.engagements} />
+              <Stat label="reports" value={snapshot.counts.reports} />
             </div>
           </section>
 
-          <section className="space-y-2">
+          <section className={`space-y-2 ${adminTab === 'goal' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               mission goal — shown at the top of docs
             </h2>
             <textarea
-              rows={3}
+              rows={8}
               value={goalInput}
               onChange={(event) => setGoalInput(event.target.value)}
               placeholder="e.g. Find and report real, in-scope vulnerabilities without touching out-of-scope assets."
-              className="w-full bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
+              className="w-full min-h-[220px] bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
             />
             <div className="flex items-center gap-2">
               <button
@@ -425,7 +426,7 @@ export default function AdminPanel({
             </div>
           </section>
 
-          <section className="space-y-2">
+          <section className={`space-y-2 ${adminTab === 'reports' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               report review queue ({snapshot.reports.length})
             </h2>
@@ -520,49 +521,7 @@ export default function AdminPanel({
             {downloadError && <div className="text-[10px] text-[#f87171]">{downloadError}</div>}
           </section>
 
-          <section className="space-y-2">
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
-              irc channels ({snapshot.channels.length})
-            </h2>
-            {snapshot.channels.length === 0 ? (
-              <div className="text-[10px] text-[#52525b]">no channels.</div>
-            ) : (
-              <div className="space-y-2">
-                {snapshot.channels.map((channel) => (
-                  <details
-                    key={channel.id}
-                    className="border border-[#2a2a30] bg-[#09090b] p-2"
-                    open={channel.id === '#lobby'}
-                  >
-                    <summary className="cursor-pointer text-[10px] text-[#d4d4d8]">
-                      {channel.id} · {channel.group} · {channel.messages.length} messages
-                    </summary>
-                    <div className="pt-2 max-h-72 overflow-y-auto space-y-1">
-                      {channel.messages.length === 0 ? (
-                        <div className="text-[9px] text-[#52525b]">no messages.</div>
-                      ) : (
-                        channel.messages.map((message) => (
-                          <div key={message.id} className="text-[10px] leading-relaxed">
-                            <span className="text-[#71717a]">[{message.time}]</span>{' '}
-                            {message.type === 'sys' ? (
-                              <span className="text-[#71717a]">— {message.text}</span>
-                            ) : (
-                              <>
-                                <span className="text-[#a1a1aa]">&lt;{message.nick}&gt;</span>{' '}
-                                <span className="text-[#d4d4d8]">{message.text}</span>
-                              </>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="space-y-2">
+          <section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               direct messages ({snapshot.dmThreads.length})
             </h2>
@@ -596,7 +555,7 @@ export default function AdminPanel({
             )}
           </section>
 
-          <section className="space-y-2">
+          <section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               progress logs ({snapshot.progress.length})
             </h2>
@@ -626,7 +585,7 @@ export default function AdminPanel({
             )}
           </section>
 
-          <section className="space-y-2">
+          <section className={`space-y-2 ${adminTab === 'graphs' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               knowledge graphs ({snapshot.graphs.length})
             </h2>
@@ -768,7 +727,7 @@ export default function AdminPanel({
             {deleteError && <div className="text-[10px] text-[#f87171]">{deleteError}</div>}
           </section>
 
-          <section className="space-y-2">
+          <section className={`space-y-2 ${adminTab === 'graphs' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               engagements ({snapshot.engagements.length})
             </h2>
@@ -858,7 +817,7 @@ export default function AdminPanel({
             )}
           </section>
 
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <section className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${adminTab === 'accounts' ? '' : 'hidden'}`}>
             <div className="space-y-2">
               <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
                 registered accounts ({snapshot.accounts.length})
@@ -951,7 +910,7 @@ export default function AdminPanel({
             </div>
           </section>
 
-          <section className="space-y-2">
+          <section className={`space-y-2 ${adminTab === 'audit' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               audit / version history (latest {snapshot.audit.length})
             </h2>
@@ -992,6 +951,7 @@ export default function AdminPanel({
             open graphs, and export files. Press Esc to close.
           </div>
           </div>
+        </>
       )}
     </div>
   );
