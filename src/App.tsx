@@ -566,7 +566,7 @@ export default function App() {
       roleCreateDescription.trim()
     );
     if (!changed) {
-      setRoleCreateError('could not create that role — it may already exist on this agent');
+      setRoleCreateError('could not create that role - it may already exist on this agent');
       return;
     }
     setRoleCreateOpen(false);
@@ -692,7 +692,7 @@ export default function App() {
     const fallback = Object.keys(workspace.graphs).sort()[0] ?? '';
     const targetId = workspace.graphs[activeId] ? activeId : fallback;
     if (!targetId) {
-      return 'no engagement graphs exist yet — create a chat group first';
+      return 'no engagement graphs exist yet - create a chat group first';
     }
     setGraphChannelId(targetId);
     setGraphContributor(normalizeHandle(contributor || session?.userNick || ''));
@@ -710,7 +710,7 @@ export default function App() {
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
     const channel = workspace.channels.find((item) => item.id === targetId);
     if (!channel || !channel.isEngagement) {
-      return 'progress logs are attached to engagement channels — open a bug bounty or pentest first';
+      return 'progress logs are attached to engagement channels - open a bug bounty or pentest first';
     }
     setProgressChannelId(targetId);
     setProgressContributor(normalizeHandle(contributor || session?.userNick || ''));
@@ -728,7 +728,7 @@ export default function App() {
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
     const channel = workspace.channels.find((item) => item.id === targetId);
     if (!channel || !channel.isEngagement) {
-      return 'vulnerability reports are attached to engagement channels — open a bug bounty or pentest first';
+      return 'vulnerability reports are attached to engagement channels - open a bug bounty or pentest first';
     }
     setReportsChannelId(targetId);
     setReportsContributor(normalizeHandle(contributor || session?.userNick || ''));
@@ -797,7 +797,7 @@ export default function App() {
       switchTo: true,
     });
     if (!createdId) {
-      setProgError('could not create engagement — check the central API connection and fields');
+      setProgError('could not create engagement - check the central API connection and fields');
       return;
     }
     setAddProgramModalOpen(false);
@@ -1107,7 +1107,7 @@ export default function App() {
         setSelectedAgentNick(key);
         const programs = target.programs.length ? target.programs.join(', ') : 'none';
         await postNotice(
-          `${target.nick} [role: ${target.role} · ${target.model}] — ${target.task} · enrolled: ${programs}`
+          `${target.nick} [role: ${target.role} · ${target.model}] - ${target.task} · enrolled: ${programs}`
         );
       } else if (cmd === '/nick') {
         if (!arg) {
@@ -1978,7 +1978,7 @@ export default function App() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
                   <span className="font-medium text-[11px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
-                    start here — docs + a chat group for every agent
+                    start here - docs + a chat group for every agent
                   </span>
                 </div>
                 <p className="text-[11px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
@@ -2004,7 +2004,7 @@ export default function App() {
                   <span className="text-[10px] text-[#71717a]">
                     {workspace.channels.some((channel) => channel.isEngagement)
                       ? 'or open an existing engagement from the left sidebar'
-                      : 'you are not enrolled in a chat group yet — create one or ask an agent to enroll you'}
+                      : 'you are not enrolled in a chat group yet - create one or ask an agent to enroll you'}
                   </span>
                 </div>
               </div>
@@ -2014,7 +2014,7 @@ export default function App() {
                 return (
                   <div key={message.id} className="flex items-baseline gap-3 text-[#71717a]">
                     <span className="shrink-0 select-none">[{message.time}]</span>
-                    <span>— {message.text}</span>
+                    <span>- {message.text}</span>
                   </div>
                 );
               }
@@ -2106,7 +2106,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={openRoleCreate}
-                title="Create a custom role — anyone can create any role for any agent"
+                title="Create a custom role - anyone can create any role for any agent"
                 className="text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
               >
                 + role
@@ -2814,7 +2814,7 @@ export default function App() {
             <div className="pt-2 border-t border-[#e5e5e5] dark:border-[#1a1a1e] flex items-center justify-between text-[11px] text-[#71717a]">
               <span>
                 {Object.keys(workspace.accounts).length === 0
-                  ? 'no seeded accounts — register the first handle'
+                  ? 'no seeded accounts - register the first handle'
                   : 'accounts are created explicitly'}
               </span>
               {session?.isAuthenticated && (

@@ -258,7 +258,7 @@ export default function GraphPanel({
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] bg-white/40 dark:bg-[#09090b] h-[420px] sm:h-[500px] overflow-hidden">
             {graph.nodes.length === 0 ? (
               <div className="h-full flex items-center justify-center p-8 text-center font-mono text-[11px] text-[#71717a] leading-relaxed">
-                the graph is empty — each agent creates intel here.
+                the graph is empty - each agent creates intel here.
                 <br />
                 add a node on the right, or run <code className="mx-1">/node target &lt;asset&gt;</code> in
                 this engagement.
@@ -296,7 +296,7 @@ export default function GraphPanel({
             <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1.5">
               <div className="text-[10px] uppercase tracking-wider text-[#71717a]">legend</div>
               {kindLegend.length === 0 ? (
-                <span className="text-[10px] text-[#71717a]">—</span>
+                <span className="text-[10px] text-[#71717a]">-</span>
               ) : (
                 kindLegend.map((kind) => (
                   <div key={kind} className="flex items-center gap-1.5">

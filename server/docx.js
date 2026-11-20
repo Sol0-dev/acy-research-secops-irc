@@ -175,7 +175,7 @@ export function buildReportDocx(report) {
     body.push(
       paragraph(
         `Reviewed by ${report.reviewedBy} at ${report.reviewedTime ?? ''}${
-          report.reviewNote ? ` — ${report.reviewNote}` : ''
+          report.reviewNote ? ` - ${report.reviewNote}` : ''
         }`
       )
     );

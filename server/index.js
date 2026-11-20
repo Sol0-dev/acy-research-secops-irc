@@ -94,7 +94,7 @@ app.use((req, res, next) => {
   if (!req.path.startsWith('/api')) return next();
   if (req.get('x-secops-proxy') === PROXY_TOKEN) return next();
   return res.status(403).json({
-    error: 'direct backend access is disabled — use the web console',
+    error: 'direct backend access is disabled - use the web console',
   });
 });
 
@@ -315,7 +315,7 @@ app.post('/api/admin/report/review', async (req, res) => {
       author: 'admin',
       status: decision === 'valid' ? 'ok' : decision === 'invalid' ? 'failed' : 'note',
       kind: 'progress',
-      text: `admin marked report "${report.title}" as ${decision}${note ? ` — ${note}` : ''}`,
+      text: `admin marked report "${report.title}" as ${decision}${note ? ` - ${note}` : ''}`,
     });
 
     const channel = state.channels.find((item) => item.id === channelId);
@@ -326,7 +326,7 @@ app.post('/api/admin/report/review', async (req, res) => {
           id: `ch-${crypto.randomBytes(6).toString('hex')}`,
           type: 'sys',
           time,
-          text: `admin review: report "${report.title}" marked ${decision}${note ? ` — ${note}` : ''}`,
+          text: `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}`,
         },
       ];
     }
@@ -408,7 +408,7 @@ app.post('/api/admin/agent-session', async (req, res) => {
       online: true,
       isUser: true,
       model: 'hidden admin operator',
-      task: 'hidden admin session — full agent capabilities',
+      task: 'hidden admin session - full agent capabilities',
       rate: 'manual / interactive',
       programs: Array.from(new Set([...(existing?.programs ?? []), ...engagements])),
     };
@@ -480,8 +480,8 @@ app.post('/api/admin/channel/delete', async (req, res) => {
       agent.task = agent.programs.length
         ? `[${agent.role}] active on ${agent.programs.join(', ')}`
         : agent.role === 'unassigned'
-          ? 'connected in #lobby — role unassigned'
-          : `role: ${agent.role} — standing by`;
+          ? 'connected in #lobby - role unassigned'
+          : `role: ${agent.role} - standing by`;
     }
     for (const account of Object.values(state.accounts)) {
       if (account.programs?.includes(channelId)) {
@@ -617,7 +617,7 @@ async function start() {
   const { seeded } = await initDb();
   console.log(`[db] workspace ${seeded ? 'seeded' : 'loaded'} from ${process.env.DB_NAME ?? 'secops_irc'}`);
   if (ADMIN_PASSWORD_GENERATED) {
-    console.log(`[admin] no ADMIN_PASSWORD set — generated credentials: ${ADMIN_USERNAME} / ${EFFECTIVE_ADMIN_PASSWORD}`);
+    console.log(`[admin] no ADMIN_PASSWORD set - generated credentials: ${ADMIN_USERNAME} / ${EFFECTIVE_ADMIN_PASSWORD}`);
   }
   app.listen(PORT, HOST, () => {
     console.log(`[api] listening on http://${HOST}:${PORT} (proxy-only)`);

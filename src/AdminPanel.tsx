@@ -35,7 +35,7 @@ interface AdminPanelProps {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="border border-[#2a2a30] bg-[#09090b] px-2.5 py-2">
-      <div className="text-[9px] uppercase tracking-wider text-[#71717a]">{label}</div>
+      <div className="text-[11px] uppercase tracking-wider text-[#71717a]">{label}</div>
       <div className="text-sm text-[#f4f4f5] pt-0.5">{value}</div>
     </div>
   );
@@ -75,6 +75,7 @@ export default function AdminPanel({
   } | null>(null);
   const [graphFocusChannelId, setGraphFocusChannelId] = useState<string | null>(null);
   const [adminTab, setAdminTab] = useState<AdminTab>('goal');
+  const [adminGraphChannelId, setAdminGraphChannelId] = useState('');
 
   const downloadFile = async (kind: 'docx' | 'graph', id: string, filename: string) => {
     setDownloadNotice('');
@@ -110,6 +111,16 @@ export default function AdminPanel({
     setGoalError('');
   }, [snapshot]);
 
+  useEffect(() => {
+    if (!snapshot) return;
+    if (
+      !adminGraphChannelId ||
+      !snapshot.graphs.some((graph) => graph.channelId === adminGraphChannelId)
+    ) {
+      setAdminGraphChannelId(snapshot.graphs[0]?.channelId ?? '');
+    }
+  }, [snapshot, adminGraphChannelId]);
+
   if (!open) return null;
 
   const reviewReport = async (channelId: string, reportId: string, decision: string) => {
@@ -139,8 +150,8 @@ export default function AdminPanel({
     );
   };
 
-  const th = 'text-left py-1 pr-3 text-[9px] uppercase tracking-wider text-[#71717a] font-normal';
-  const td = 'py-1 pr-3 align-top text-[10px] text-[#d4d4d8]';
+  const th = 'text-left py-1 pr-3 text-[11px] uppercase tracking-wider text-[#71717a] font-normal';
+  const td = 'py-1 pr-3 align-top text-xs text-[#d4d4d8]';
 
   const focusedGraph = graphFocusChannelId
     ? snapshot?.graphs.find((graph) => graph.channelId === graphFocusChannelId) ?? null
@@ -163,21 +174,30 @@ export default function AdminPanel({
     ? Array.from(new Set(focusedGraph.nodes.map((node) => node.kind)))
     : [];
 
+  const adminGraph =
+    snapshot?.graphs.find((graph) => graph.channelId === adminGraphChannelId) ??
+    snapshot?.graphs[0] ??
+    null;
+  const adminGraphNode =
+    adminGraph && selectedGraph?.channelId === adminGraph.channelId
+      ? adminGraph.nodes.find((node) => node.id === selectedGraph.nodeId) ?? null
+      : null;
+
   return (
-    <div className="fixed inset-0 z-[60] bg-[#050506] text-[#f4f4f5] font-mono text-xs flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-[#050506] text-[#f4f4f5] font-mono text-sm flex flex-col">
       <header className="border-b border-[#2a2a30] px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
           <span className="font-medium tracking-tight truncate">hidden admin // oversight</span>
           {snapshot && (
-            <span className="text-[10px] text-[#71717a]">workspace v{snapshot.version}</span>
+            <span className="text-xs text-[#71717a]">workspace v{snapshot.version}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onOpenAgentPortal}
-            className="text-[10px] text-[#4ade80] hover:text-[#f4f4f5] border border-[#4ade80]/40 px-2 py-1"
+            className="text-xs text-[#4ade80] hover:text-[#f4f4f5] border border-[#4ade80]/40 px-2 py-1"
             title="Return to the live IRC portal used by agents"
           >
             agent portal →
@@ -185,7 +205,7 @@ export default function AdminPanel({
           <button
             type="button"
             onClick={onClose}
-            className="text-[10px] text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-2 py-1"
+            className="text-xs text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-2 py-1"
           >
             close
           </button>
@@ -202,10 +222,10 @@ export default function AdminPanel({
             }}
             className="w-full max-w-sm border border-[#2a2a30] bg-[#09090b] p-4 space-y-3"
           >
-            <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <div className="text-xs uppercase tracking-wider text-[#71717a]">
               admin login
             </div>
-            <p className="text-[10px] text-[#71717a] leading-relaxed">
+            <p className="text-xs text-[#71717a] leading-relaxed">
               Enter the hidden admin username and password.
             </p>
             <input
@@ -215,7 +235,7 @@ export default function AdminPanel({
               onChange={(event) => setUsername(event.target.value)}
               autoComplete="off"
               placeholder="admin username"
-              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
+              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-sm text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
             />
             <input
               type="password"
@@ -223,17 +243,17 @@ export default function AdminPanel({
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
               placeholder="admin password"
-              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
+              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-sm text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
             />
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-3 py-1.5 border border-[#2a2a30] text-[10px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+              className="w-full px-3 py-1.5 border border-[#2a2a30] text-xs text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
             >
               {loading ? 'unlocking…' : 'unlock oversight'}
             </button>
-            {error && <div className="text-[10px] text-[#f87171] leading-relaxed">{error}</div>}
-            <div className="text-[9px] text-[#52525b] leading-relaxed">
+            {error && <div className="text-xs text-[#f87171] leading-relaxed">{error}</div>}
+            <div className="text-[11px] text-[#52525b] leading-relaxed">
               read-only: no code, file, or backend-mutation controls are exposed here.
             </div>
           </form>
@@ -248,15 +268,15 @@ export default function AdminPanel({
                   setGraphFocusChannelId(null);
                   setSelectedGraph(null);
                 }}
-                className="text-[10px] text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-1.5 py-0.5"
+                className="text-xs text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-1.5 py-0.5"
               >
                 &larr; oversight
               </button>
               <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
-              <span className="text-[11px] text-[#f4f4f5] truncate">
+              <span className="text-sm text-[#f4f4f5] truncate">
                 knowledge graph // {focusedGraph.channelId}
               </span>
-              <span className="text-[10px] text-[#71717a]">
+              <span className="text-xs text-[#71717a]">
                 {focusedGraph.nodes.length} nodes · {focusedGraph.edges.length} edges
               </span>
             </div>
@@ -269,7 +289,7 @@ export default function AdminPanel({
                   `graph-${focusedGraph.channelId.replace(/^#/, '')}.json`
                 )
               }
-              className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+              className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
             >
               download json
             </button>
@@ -297,9 +317,9 @@ export default function AdminPanel({
               />
             </div>
 
-            <aside className="w-64 shrink-0 border-l border-[#2a2a30] p-3 overflow-y-auto space-y-3 text-[10px]">
+            <aside className="w-64 shrink-0 border-l border-[#2a2a30] p-3 overflow-y-auto space-y-3 text-xs">
               <div className="space-y-1">
-                <div className="text-[9px] uppercase tracking-wider text-[#71717a]">
+                <div className="text-[11px] uppercase tracking-wider text-[#71717a]">
                   node intel
                 </div>
                 {!focusedSelectedNode ? (
@@ -325,7 +345,7 @@ export default function AdminPanel({
               </div>
 
               <div className="space-y-1 border-t border-[#2a2a30] pt-2">
-                <div className="text-[9px] uppercase tracking-wider text-[#71717a]">
+                <div className="text-[11px] uppercase tracking-wider text-[#71717a]">
                   contributors
                 </div>
                 {focusedContributors.length === 0 ? (
@@ -341,7 +361,7 @@ export default function AdminPanel({
               </div>
 
               <div className="space-y-1 border-t border-[#2a2a30] pt-2">
-                <div className="text-[9px] uppercase tracking-wider text-[#71717a]">legend</div>
+                <div className="text-[11px] uppercase tracking-wider text-[#71717a]">legend</div>
                 {focusedKinds.map((kind) => (
                   <div key={kind} className="text-[#a1a1aa]">
                     {kind}
@@ -354,26 +374,33 @@ export default function AdminPanel({
       ) : (
         <>
           <nav className="border-b border-[#2a2a30] px-4 sm:px-6 py-2 flex flex-wrap gap-1 shrink-0">
-            {(['goal', 'reports', 'graphs', 'accounts', 'audit', 'irc'] as AdminTab[]).map(
-              (tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setAdminTab(tab)}
-                  className={`px-2.5 py-1 text-[10px] border capitalize transition-colors ${
-                    adminTab === tab
-                      ? 'border-[#4ade80] text-[#4ade80] bg-[#4ade80]/10'
-                      : 'border-[#2a2a30] text-[#a1a1aa] hover:text-[#f4f4f5]'
-                  }`}
-                >
-                  {tab}
-                </button>
-              )
-            )}
+            {(
+              [
+                ['goal', 'Goal'],
+                ['reports', 'Reports'],
+                ['graphs', 'Graphs'],
+                ['accounts', 'Accounts'],
+                ['audit', 'Audit logs'],
+                ['irc', 'IRC'],
+              ] as Array<[AdminTab, string]>
+            ).map(([tab, label]) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setAdminTab(tab)}
+                className={`px-2.5 py-1 text-[11px] border transition-colors ${
+                  adminTab === tab
+                    ? 'border-[#4ade80] text-[#4ade80] bg-[#4ade80]/10'
+                    : 'border-[#2a2a30] text-[#a1a1aa] hover:text-[#f4f4f5]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </nav>
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           <section className={`space-y-2 ${adminTab === 'goal' ? '' : 'hidden'}`}>
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">workspace counts</h2>
+            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">workspace counts</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <Stat label="agents" value={snapshot.counts.agents} />
               <Stat label="engagements" value={snapshot.counts.engagements} />
@@ -382,15 +409,15 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-2 ${adminTab === 'goal' ? '' : 'hidden'}`}>
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
-              mission goal — shown at the top of docs
+            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+              mission goal - shown at the top of docs
             </h2>
             <textarea
               rows={8}
               value={goalInput}
               onChange={(event) => setGoalInput(event.target.value)}
               placeholder="e.g. Find and report real, in-scope vulnerabilities without touching out-of-scope assets."
-              className="w-full min-h-[220px] bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
+              className="w-full min-h-[220px] bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-sm text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
             />
             <div className="flex items-center gap-2">
               <button
@@ -406,32 +433,32 @@ export default function AdminPanel({
                     else setGoalNotice('goal saved and published to the docs header');
                   });
                 }}
-                className="px-3 py-1.5 border border-[#2a2a30] text-[10px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                className="px-3 py-1.5 border border-[#2a2a30] text-xs text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
               >
                 {goalBusy ? 'saving…' : 'save goal'}
               </button>
               <button
                 type="button"
                 onClick={() => setGoalInput('')}
-                className="px-3 py-1.5 border border-[#2a2a30] text-[10px] text-[#71717a] hover:text-[#f87171]"
+                className="px-3 py-1.5 border border-[#2a2a30] text-xs text-[#71717a] hover:text-[#f87171]"
               >
                 clear
               </button>
-              {goalNotice && <span className="text-[10px] text-[#4ade80]">{goalNotice}</span>}
-              {goalError && <span className="text-[10px] text-[#f87171]">{goalError}</span>}
+              {goalNotice && <span className="text-xs text-[#4ade80]">{goalNotice}</span>}
+              {goalError && <span className="text-xs text-[#f87171]">{goalError}</span>}
             </div>
-            <div className="text-[9px] text-[#52525b]">
+            <div className="text-[11px] text-[#52525b]">
               only admin credentials can set this. the goal is stored in the central workspace and
               rendered above the docs content for every agent.
             </div>
           </section>
 
           <section className={`space-y-2 ${adminTab === 'reports' ? '' : 'hidden'}`}>
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
               report review queue ({snapshot.reports.length})
             </h2>
             {snapshot.reports.length === 0 ? (
-              <div className="text-[10px] text-[#52525b]">no reports filed.</div>
+              <div className="text-xs text-[#52525b]">no reports filed.</div>
             ) : (
               <div className="overflow-x-auto border border-[#2a2a30]">
                 <table className="w-full border-collapse">
@@ -452,7 +479,7 @@ export default function AdminPanel({
                         <td className={`${td} max-w-[360px]`}>
                           <div className="truncate">{report.title}</div>
                           {report.reviewNote && (
-                            <div className="text-[9px] text-[#71717a] pt-0.5">
+                            <div className="text-[11px] text-[#71717a] pt-0.5">
                               note: {report.reviewNote}
                             </div>
                           )}
@@ -474,7 +501,7 @@ export default function AdminPanel({
                             {report.review}
                           </span>
                           {report.reviewedBy && (
-                            <div className="text-[9px] text-[#71717a]">
+                            <div className="text-[11px] text-[#71717a]">
                               by {report.reviewedBy} · {report.reviewedTime}
                             </div>
                           )}
@@ -489,7 +516,7 @@ export default function AdminPanel({
                                 onClick={() =>
                                   void reviewReport(report.channelId, report.id, decision)
                                 }
-                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#f4f4f5] disabled:opacity-40"
+                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#f4f4f5] disabled:opacity-40"
                               >
                                 {decision}
                               </button>
@@ -503,7 +530,7 @@ export default function AdminPanel({
                                   `${report.title.replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 60)}.docx`
                                 )
                               }
-                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
                             >
                               docx
                             </button>
@@ -515,31 +542,31 @@ export default function AdminPanel({
                 </table>
               </div>
             )}
-            {reviewNotice && <div className="text-[10px] text-[#4ade80]">{reviewNotice}</div>}
-            {reviewError && <div className="text-[10px] text-[#f87171]">{reviewError}</div>}
-            {downloadNotice && <div className="text-[10px] text-[#4ade80]">{downloadNotice}</div>}
-            {downloadError && <div className="text-[10px] text-[#f87171]">{downloadError}</div>}
+            {reviewNotice && <div className="text-xs text-[#4ade80]">{reviewNotice}</div>}
+            {reviewError && <div className="text-xs text-[#f87171]">{reviewError}</div>}
+            {downloadNotice && <div className="text-xs text-[#4ade80]">{downloadNotice}</div>}
+            {downloadError && <div className="text-xs text-[#f87171]">{downloadError}</div>}
           </section>
 
           <section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
               direct messages ({snapshot.dmThreads.length})
             </h2>
             {snapshot.dmThreads.length === 0 ? (
-              <div className="text-[10px] text-[#52525b]">no direct messages.</div>
+              <div className="text-xs text-[#52525b]">no direct messages.</div>
             ) : (
               <div className="space-y-2">
                 {snapshot.dmThreads.map((thread) => (
                   <details key={thread.id} className="border border-[#2a2a30] bg-[#09090b] p-2">
-                    <summary className="cursor-pointer text-[10px] text-[#d4d4d8]">
+                    <summary className="cursor-pointer text-xs text-[#d4d4d8]">
                       {thread.participants.join(' ↔ ')} · {thread.messages.length} messages
                     </summary>
                     <div className="pt-2 max-h-64 overflow-y-auto space-y-1">
                       {thread.messages.map((message) => (
-                        <div key={message.id} className="text-[10px] leading-relaxed">
+                        <div key={message.id} className="text-xs leading-relaxed">
                           <span className="text-[#71717a]">[{message.time}]</span>{' '}
                           {message.type === 'sys' ? (
-                            <span className="text-[#71717a]">— {message.text}</span>
+                            <span className="text-[#71717a]">- {message.text}</span>
                           ) : (
                             <>
                               <span className="text-[#a1a1aa]">&lt;{message.nick}&gt;</span>{' '}
@@ -556,22 +583,22 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
               progress logs ({snapshot.progress.length})
             </h2>
             {snapshot.progress.length === 0 ? (
-              <div className="text-[10px] text-[#52525b]">no progress logs.</div>
+              <div className="text-xs text-[#52525b]">no progress logs.</div>
             ) : (
               <div className="space-y-2">
                 {snapshot.progress.map((log) => (
                   <details key={log.channelId} className="border border-[#2a2a30] bg-[#09090b] p-2">
-                    <summary className="cursor-pointer text-[10px] text-[#d4d4d8]">
+                    <summary className="cursor-pointer text-xs text-[#d4d4d8]">
                       {log.channelId} · {log.entries.length} entries · head v
-                      {log.headVersion ?? '—'}
+                      {log.headVersion ?? '-'}
                     </summary>
                     <div className="pt-2 max-h-64 overflow-y-auto space-y-1">
                       {log.entries.map((entry) => (
-                        <div key={entry.id} className="text-[10px] leading-relaxed">
+                        <div key={entry.id} className="text-xs leading-relaxed">
                           <span className="text-[#71717a]">v{entry.version} · {entry.time}</span>{' '}
                           <span className="text-[#a1a1aa]">{entry.author}</span>{' '}
                           <span className="text-[#71717a]">[{entry.status}/{entry.kind}]</span>{' '}
@@ -586,153 +613,138 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-2 ${adminTab === 'graphs' ? '' : 'hidden'}`}>
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
               knowledge graphs ({snapshot.graphs.length})
             </h2>
             {snapshot.graphs.length === 0 ? (
-              <div className="text-[10px] text-[#52525b]">no graphs yet.</div>
-            ) : (
-              <div className="space-y-2">
-                {snapshot.graphs.map((graph) => {
-                  const isSelectedGraph = selectedGraph?.channelId === graph.channelId;
-                  const selectedNode = isSelectedGraph
-                    ? graph.nodes.find((node) => node.id === selectedGraph.nodeId) ?? null
-                    : null;
-                  return (
-                    <details
-                      key={graph.channelId}
-                      className="border border-[#2a2a30] bg-[#09090b] p-2"
-                      open
+              <div className="text-xs text-[#52525b]">no graphs yet.</div>
+            ) : adminGraph ? (
+              <div className="space-y-2 border border-[#2a2a30] bg-[#09090b] p-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-xs text-[#a1a1aa]">
+                    <span>show</span>
+                    <select
+                      value={adminGraph.channelId}
+                      onChange={(event) => {
+                        setAdminGraphChannelId(event.target.value);
+                        setSelectedGraph(null);
+                      }}
+                      className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-xs text-[#f4f4f5]"
                     >
-                      <summary className="cursor-pointer text-[10px] text-[#d4d4d8] flex items-center justify-between gap-2">
-                        <span>
-                          {graph.channelId} · {graph.nodes.length} nodes · {graph.edges.length} edges
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              setGraphFocusChannelId(graph.channelId);
-                              setSelectedGraph(null);
-                            }}
-                            className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
-                          >
-                            open panel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              void downloadFile(
-                                'graph',
-                                graph.channelId,
-                                `graph-${graph.channelId.replace(/^#/, '')}.json`
-                              );
-                            }}
-                            className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
-                          >
-                            download json
-                          </button>
-                          {pendingDelete === `graph:${graph.channelId}` ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  void confirmDelete('graph', graph.channelId);
-                                }}
-                                className="px-1.5 py-0.5 border border-[#f87171] text-[9px] text-[#f87171]"
-                              >
-                                confirm delete
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  setPendingDelete('');
-                                }}
-                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa]"
-                              >
-                                cancel
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                setPendingDelete(`graph:${graph.channelId}`);
-                              }}
-                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#f87171] hover:border-[#f87171]"
-                            >
-                              delete graph
-                            </button>
-                          )}
-                        </div>
-                      </summary>
-                      <div className="pt-2 space-y-2">
-                        <div className="h-[360px] border border-[#2a2a30] overflow-hidden bg-[#050506]">
-                          {graph.nodes.length === 0 ? (
-                            <div className="h-full flex items-center justify-center text-[10px] text-[#52525b]">
-                              graph is empty.
-                            </div>
-                          ) : (
-                            <GraphView
-                              nodes={graph.nodes}
-                              edges={graph.edges}
-                              isDark
-                              selectedNodeId={isSelectedGraph ? selectedGraph.nodeId : null}
-                              onSelectNode={(nodeId) =>
-                                setSelectedGraph((current) =>
-                                  current?.channelId === graph.channelId &&
-                                  current.nodeId === nodeId
-                                    ? null
-                                    : { channelId: graph.channelId, nodeId }
-                                )
-                              }
-                            />
-                          )}
-                        </div>
-                        {selectedNode && (
-                          <div className="border border-[#2a2a30] p-2 text-[10px] space-y-1">
-                            <div className="text-[#f4f4f5]">
-                              [{selectedNode.kind}] {selectedNode.label}
-                            </div>
-                            {selectedNode.notes && (
-                              <div className="text-[#a1a1aa] whitespace-pre-wrap">
-                                {selectedNode.notes}
-                              </div>
-                            )}
-                            <div className="text-[#71717a]">
-                              contributed by {selectedNode.createdBy} · {selectedNode.time}
-                              {selectedNode.updatedBy
-                                ? ` · updated by ${selectedNode.updatedBy} at ${selectedNode.updatedTime}`
-                                : ''}
-                            </div>
-                          </div>
-                        )}
+                      {snapshot.graphs.map((graph) => (
+                        <option key={graph.channelId} value={graph.channelId}>
+                          {graph.channelId} · {graph.nodes.length}n / {graph.edges.length}e
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <span className="text-xs text-[#71717a]">
+                    {adminGraph.nodes.length} nodes · {adminGraph.edges.length} edges
+                  </span>
+                  <div className="flex items-center gap-1 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGraphFocusChannelId(adminGraph.channelId);
+                        setSelectedGraph(null);
+                      }}
+                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
+                    >
+                      open panel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void downloadFile(
+                          'graph',
+                          adminGraph.channelId,
+                          `graph-${adminGraph.channelId.replace(/^#/, '')}.json`
+                        )
+                      }
+                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
+                    >
+                      download json
+                    </button>
+                    {pendingDelete === `graph:${adminGraph.channelId}` ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void confirmDelete('graph', adminGraph.channelId)}
+                          className="px-1.5 py-0.5 border border-[#f87171] text-[11px] text-[#f87171]"
+                        >
+                          confirm delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete('')}
+                          className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa]"
+                        >
+                          cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(`graph:${adminGraph.channelId}`)}
+                        className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#f87171] hover:border-[#f87171]"
+                      >
+                        delete graph
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="h-[420px] border border-[#2a2a30] overflow-hidden bg-[#050506]">
+                  {adminGraph.nodes.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-xs text-[#52525b]">
+                      graph is empty.
+                    </div>
+                  ) : (
+                    <GraphView
+                      nodes={adminGraph.nodes}
+                      edges={adminGraph.edges}
+                      isDark
+                      selectedNodeId={adminGraphNode?.id ?? null}
+                      onSelectNode={(nodeId) =>
+                        setSelectedGraph((current) =>
+                          current?.channelId === adminGraph.channelId &&
+                          current.nodeId === nodeId
+                            ? null
+                            : { channelId: adminGraph.channelId, nodeId }
+                        )
+                      }
+                    />
+                  )}
+                </div>
+                {adminGraphNode && (
+                  <div className="border border-[#2a2a30] p-2 text-xs space-y-1">
+                    <div className="text-[#f4f4f5]">
+                      [{adminGraphNode.kind}] {adminGraphNode.label}
+                    </div>
+                    {adminGraphNode.notes && (
+                      <div className="text-[#a1a1aa] whitespace-pre-wrap">
+                        {adminGraphNode.notes}
                       </div>
-                    </details>
-                  );
-                })}
+                    )}
+                    <div className="text-[#71717a]">
+                      contributed by {adminGraphNode.createdBy} · {adminGraphNode.time}
+                      {adminGraphNode.updatedBy
+                        ? ` · updated by ${adminGraphNode.updatedBy} at ${adminGraphNode.updatedTime}`
+                        : ''}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-            {deleteNotice && <div className="text-[10px] text-[#4ade80]">{deleteNotice}</div>}
-            {deleteError && <div className="text-[10px] text-[#f87171]">{deleteError}</div>}
+            ) : null}
+            {deleteNotice && <div className="text-xs text-[#4ade80]">{deleteNotice}</div>}
+            {deleteError && <div className="text-xs text-[#f87171]">{deleteError}</div>}
           </section>
 
           <section className={`space-y-2 ${adminTab === 'graphs' ? '' : 'hidden'}`}>
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
               engagements ({snapshot.engagements.length})
             </h2>
             {snapshot.engagements.length === 0 ? (
-              <div className="text-[10px] text-[#52525b]">none — no seeded engagements.</div>
+              <div className="text-xs text-[#52525b]">none - no seeded engagements.</div>
             ) : (
               <div className="overflow-x-auto border border-[#2a2a30]">
                 <table className="w-full border-collapse">
@@ -755,7 +767,7 @@ export default function AdminPanel({
                         <td className={td}>{engagement.id}</td>
                         <td className={td}>{engagement.group}</td>
                         <td className={td}>{engagement.platform}</td>
-                        <td className={td}>{engagement.enrolled.join(', ') || '—'}</td>
+                        <td className={td}>{engagement.enrolled.join(', ') || '-'}</td>
                         <td className={td}>
                           {engagement.graph.nodes}n / {engagement.graph.edges}e
                         </td>
@@ -773,7 +785,7 @@ export default function AdminPanel({
                                   `graph-${engagement.id.replace(/^#/, '')}.json`
                                 )
                               }
-                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
                             >
                               graph json
                             </button>
@@ -784,14 +796,14 @@ export default function AdminPanel({
                                   onClick={() =>
                                     void confirmDelete('channel', engagement.id)
                                   }
-                                  className="px-1.5 py-0.5 border border-[#f87171] text-[9px] text-[#f87171]"
+                                  className="px-1.5 py-0.5 border border-[#f87171] text-[11px] text-[#f87171]"
                                 >
                                   confirm delete
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setPendingDelete('')}
-                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa]"
+                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa]"
                                 >
                                   cancel
                                 </button>
@@ -802,7 +814,7 @@ export default function AdminPanel({
                                 onClick={() =>
                                   setPendingDelete(`channel:${engagement.id}`)
                                 }
-                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#f87171] hover:border-[#f87171]"
+                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#f87171] hover:border-[#f87171]"
                               >
                                 delete group
                               </button>
@@ -819,11 +831,11 @@ export default function AdminPanel({
 
           <section className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${adminTab === 'accounts' ? '' : 'hidden'}`}>
             <div className="space-y-2">
-              <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
                 registered accounts ({snapshot.accounts.length})
               </h2>
               {snapshot.accounts.length === 0 ? (
-                <div className="text-[10px] text-[#52525b]">none — no seeded accounts.</div>
+                <div className="text-xs text-[#52525b]">none - no seeded accounts.</div>
               ) : (
                 <div className="overflow-x-auto border border-[#2a2a30]">
                   <table className="w-full border-collapse">
@@ -840,8 +852,8 @@ export default function AdminPanel({
                         <tr key={account.nick} className="border-b border-[#16161a]">
                           <td className={td}>{account.nick}</td>
                           <td className={td}>{account.role}</td>
-                          <td className={td}>{account.programs.join(', ') || '—'}</td>
-                          <td className={td}>{account.email || '—'}</td>
+                          <td className={td}>{account.programs.join(', ') || '-'}</td>
+                          <td className={td}>{account.email || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -851,11 +863,11 @@ export default function AdminPanel({
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
                 live agents ({snapshot.agents.length})
               </h2>
               {snapshot.agents.length === 0 ? (
-                <div className="text-[10px] text-[#52525b]">none online.</div>
+                <div className="text-xs text-[#52525b]">none online.</div>
               ) : (
                 <div className="overflow-x-auto border border-[#2a2a30]">
                   <table className="w-full border-collapse">
@@ -878,10 +890,10 @@ export default function AdminPanel({
                             <td className={td}>{agent.nick}</td>
                             <td className={td}>{agent.role}</td>
                             <td className={td}>{agent.isUser ? 'operator' : 'agent'}</td>
-                            <td className={td}>{agent.programs.join(', ') || '—'}</td>
+                            <td className={td}>{agent.programs.join(', ') || '-'}</td>
                             <td className={td}>
                               {accessibleGraphs.length === 0 ? (
-                                '—'
+                                '-'
                               ) : (
                                 <div className="flex flex-wrap gap-1">
                                   {accessibleGraphs.map((program) => (
@@ -892,7 +904,7 @@ export default function AdminPanel({
                                         setGraphFocusChannelId(program);
                                         setSelectedGraph(null);
                                       }}
-                                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+                                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
                                     >
                                       {program} graph
                                     </button>
@@ -911,11 +923,11 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-2 ${adminTab === 'audit' ? '' : 'hidden'}`}>
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
               audit / version history (latest {snapshot.audit.length})
             </h2>
             {snapshot.audit.length === 0 ? (
-              <div className="text-[10px] text-[#52525b]">no audit entries.</div>
+              <div className="text-xs text-[#52525b]">no audit entries.</div>
             ) : (
               <div className="overflow-x-auto border border-[#2a2a30] max-h-96 overflow-y-auto">
                 <table className="w-full border-collapse">
@@ -933,7 +945,7 @@ export default function AdminPanel({
                       <tr key={`${entry.version}-${index}`} className="border-b border-[#16161a]">
                         <td className={td}>{entry.version}</td>
                         <td className={td}>{entry.action}</td>
-                        <td className={td}>{entry.actor || '—'}</td>
+                        <td className={td}>{entry.actor || '-'}</td>
                         <td className={td}>{String(entry.createdAt).replace('T', ' ').slice(0, 19)}</td>
                         <td className={`${td} max-w-[380px] truncate`}>
                           {JSON.stringify(entry.payload)}
@@ -946,8 +958,8 @@ export default function AdminPanel({
             )}
           </section>
 
-          <div className="text-[9px] text-[#52525b] border-t border-[#2a2a30] pt-2">
-            Hidden admin panel — credentials gated. Set the goal, review reports, inspect the IRC,
+          <div className="text-[11px] text-[#52525b] border-t border-[#2a2a30] pt-2">
+            Hidden admin panel - credentials gated. Set the goal, review reports, inspect the IRC,
             open graphs, and export files. Press Esc to close.
           </div>
           </div>

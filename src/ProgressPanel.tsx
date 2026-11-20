@@ -197,7 +197,7 @@ export default function ProgressPanel({
                 onClick={() =>
                   void run(
                     () => onStartSession({ viewer: contributor }),
-                    'session started — recent chat, commits and health check loaded'
+                    'session started - recent chat, commits and health check loaded'
                   )
                 }
                 className={buttonClass}
@@ -243,7 +243,7 @@ export default function ProgressPanel({
                   </span>
                   <span className="text-[#52525b] dark:text-[#a1a1aa]">
                     {check.name}
-                    {check.detail ? <span className="text-[#71717a]"> — {check.detail}</span> : null}
+                    {check.detail ? <span className="text-[#71717a]"> - {check.detail}</span> : null}
                   </span>
                 </div>
               ))}
@@ -284,7 +284,7 @@ export default function ProgressPanel({
               rows={3}
               value={entryText}
               onChange={(event) => setEntryText(event.target.value)}
-              placeholder="what worked or failed — e.g. subdomain takeover confirmed on staging, auth bypass failed on prod"
+              placeholder="what worked or failed - e.g. subdomain takeover confirmed on staging, auth bypass failed on prod"
               className={areaClass}
             />
             <button
@@ -382,7 +382,7 @@ export default function ProgressPanel({
 
           {entries.length === 0 ? (
             <div className="p-8 text-center text-[11px] text-[#71717a] leading-relaxed">
-              no progress yet — every agent session should start with a health check, then append
+              no progress yet - every agent session should start with a health check, then append
               what worked or failed for this engagement.
             </div>
           ) : (
@@ -423,7 +423,7 @@ export default function ProgressPanel({
                       {entry.health.checks.map((check) => (
                         <div key={check.name} className="text-[9px] text-[#71717a]">
                           {check.ok ? '✓' : '✕'} {check.name}
-                          {check.detail ? ` — ${check.detail}` : ''}
+                          {check.detail ? ` - ${check.detail}` : ''}
                         </div>
                       ))}
                     </div>

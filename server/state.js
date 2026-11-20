@@ -158,7 +158,7 @@ export function createInitialState() {
         platform: 'General Mesh',
         isEngagement: false,
         topic:
-          'general coordination · zero pre-created roles — agents create & self-assign roles via /role <role_name>',
+          'general coordination · zero pre-created roles - agents create & self-assign roles via /role <role_name>',
         unread: false,
         messages: [],
       },
@@ -446,7 +446,7 @@ function addUserAgent(state, nick, role, programs = null) {
     model: 'interactive operator / agent',
     task:
       role === 'unassigned'
-        ? 'connected in #lobby — role unassigned'
+        ? 'connected in #lobby - role unassigned'
         : `active session (${role})`,
     rate: 'manual / interactive',
     programs: [...previousPrograms],
@@ -510,7 +510,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       appendChannelMessage(state, '#lobby', {
         type: 'sys',
         time: nowHHMM(),
-        text: `${nick} joined secops.irc (role: unassigned — use /role <role> to declare)`,
+        text: `${nick} joined secops.irc (role: unassigned - use /role <role> to declare)`,
       });
       return { result: { nick }, tokenNick: nick };
     }
@@ -542,7 +542,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       appendChannelMessage(state, '#lobby', {
         type: 'sys',
         time: nowHHMM(),
-        text: `${nick} joined secops.irc (guest session — role: unassigned)`,
+        text: `${nick} joined secops.irc (guest session - role: unassigned)`,
       });
       return { result: { nick }, tokenNick: nick };
     }
@@ -790,8 +790,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         target.programs.length > 0
           ? `[${nextRole}] active on ${target.programs.join(', ')}`
           : nextRole === 'unassigned'
-            ? 'connected in #lobby — role unassigned'
-            : `role claimed: ${nextRole} — ready for engagement assignment`;
+            ? 'connected in #lobby - role unassigned'
+            : `role claimed: ${nextRole} - ready for engagement assignment`;
       if (state.accounts[targetNick]) state.accounts[targetNick].role = nextRole;
 
       const mode = roleModeFlag(nextRole);
@@ -869,7 +869,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
               created: false,
               duplicateTarget: true,
               target: overlap,
-              message: `target ${overlap} already has a graph in ${existing.id} — one target has one graph; contribute there instead`,
+              message: `target ${overlap} already has a graph in ${existing.id} - one target has one graph; contribute there instead`,
             },
           };
         }
@@ -986,8 +986,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       agent.task = agent.programs.length
         ? `[${agent.role}] active on ${agent.programs.join(', ')}`
         : agent.role === 'unassigned'
-          ? 'connected in #lobby — role unassigned'
-          : `role: ${agent.role} — standing by`;
+          ? 'connected in #lobby - role unassigned'
+          : `role: ${agent.role} - standing by`;
       syncAccountPrograms(state, nick);
       appendChannelMessage(state, channelId, {
         type: 'sys',
@@ -1047,7 +1047,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         author: contributor,
         status: 'ok',
         kind: 'progress',
-        text: `added graph node \`${label}\` [${kind}]${node.notes ? ` — ${node.notes}` : ''}`,
+        text: `added graph node \`${label}\` [${kind}]${node.notes ? ` - ${node.notes}` : ''}`,
       });
       return { result: { node, duplicate: false } };
     }
@@ -1122,7 +1122,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         return {
           result: {
             access: false,
-            reason: `${viewerAgent.nick} is not enrolled in ${channel.id} — join the engagement to read its progress log`,
+            reason: `${viewerAgent.nick} is not enrolled in ${channel.id} - join the engagement to read its progress log`,
           },
         };
       }
@@ -1238,7 +1238,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         return {
           result: {
             access: false,
-            reason: `${viewerAgent.nick} is not enrolled in ${channel.id} — join the engagement to read its reports`,
+            reason: `${viewerAgent.nick} is not enrolled in ${channel.id} - join the engagement to read its reports`,
           },
         };
       }
@@ -1343,7 +1343,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         author,
         status: 'ok',
         kind: 'progress',
-        text: `reported vulnerability: ${title} (${severity} · ${cvss}) — ${affectedAsset}`,
+        text: `reported vulnerability: ${title} (${severity} · ${cvss}) - ${affectedAsset}`,
       });
       return { result: { report, node } };
     }

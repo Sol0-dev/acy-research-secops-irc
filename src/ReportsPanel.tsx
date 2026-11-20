@@ -455,7 +455,7 @@ export default function ReportsPanel({
           <nav className="lg:w-64 shrink-0 border-b lg:border-b-0 lg:border-r border-[#e5e5e5] dark:border-[#1a1a1e] p-2 overflow-y-auto font-mono text-[11px] max-h-48 lg:max-h-none">
             {reports.length === 0 ? (
               <div className="p-3 text-[10px] text-[#71717a] leading-relaxed">
-                no reports yet — when an agent confirms a vulnerability, file it here with the full
+                no reports yet - when an agent confirms a vulnerability, file it here with the full
                 summary, classification, reproduction, impact and remediation.
               </div>
             ) : (
@@ -627,7 +627,7 @@ export default function ReportsPanel({
                     {selected.reviewedBy
                       ? ` by ${selected.reviewedBy} · ${selected.reviewedTime ?? ''}`
                       : ' · awaiting admin decision'}
-                    {selected.reviewNote ? ` — ${selected.reviewNote}` : ''}
+                    {selected.reviewNote ? ` - ${selected.reviewNote}` : ''}
                   </div>
                 </div>
               </article>
