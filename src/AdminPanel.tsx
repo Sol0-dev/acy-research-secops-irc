@@ -8,7 +8,7 @@ interface AdminPanelProps {
   snapshot: AdminSnapshot | null;
   error: string;
   loading: boolean;
-  onUnlock: (token: string) => void;
+  onUnlock: (credentials: { username: string; password: string; token?: string }) => void;
   onSaveGoal: (goal: string) => Promise<{ ok: boolean; error?: string }>;
   onReviewReport: (input: {
     channelId: string;
@@ -38,6 +38,8 @@ export default function AdminPanel({
   onReviewReport,
   onClose,
 }: AdminPanelProps) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [token, setToken] = useState('');
   const [goalInput, setGoalInput] = useState('');
   const [goalNotice, setGoalNotice] = useState('');
@@ -122,25 +124,50 @@ export default function AdminPanel({
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (!token.trim()) return;
-              onUnlock(token.trim());
+              if (!token.trim() && (!username.trim() || !password)) return;
+              onUnlock({
+                username: username.trim(),
+                password,
+                token: token.trim() || undefined,
+              });
             }}
             className="w-full max-w-sm border border-[#2a2a30] bg-[#09090b] p-4 space-y-3"
           >
             <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
-              admin token required
+              admin credentials required
             </div>
             <p className="text-[10px] text-[#71717a] leading-relaxed">
               This panel is not part of the normal UI. Enter the server-side{' '}
-              <code className="text-[#f4f4f5]">ADMIN_TOKEN</code>; if it was not configured, the API
-              printed a generated token to its startup log.
+              <code className="text-[#f4f4f5]">ADMIN_USERNAME</code> /{' '}
+              <code className="text-[#f4f4f5]">ADMIN_PASSWORD</code>, or paste the{' '}
+              <code className="text-[#f4f4f5]">ADMIN_TOKEN</code>.
             </p>
             <input
-              type="password"
+              type="text"
               autoFocus
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              autoComplete="off"
+              placeholder="admin username"
+              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="new-password"
+              placeholder="admin password"
+              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
+            />
+            <div className="text-[9px] uppercase tracking-wider text-[#52525b]">
+              or token
+            </div>
+            <input
+              type="password"
               value={token}
               onChange={(event) => setToken(event.target.value)}
-              placeholder="admin token"
+              autoComplete="new-password"
+              placeholder="admin token (optional)"
               className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
             />
             <button
@@ -228,7 +255,7 @@ export default function AdminPanel({
               {goalError && <span className="text-[10px] text-[#f87171]">{goalError}</span>}
             </div>
             <div className="text-[9px] text-[#52525b]">
-              only the admin token can set this. the goal is stored in the central workspace and
+              only admin credentials can set this. the goal is stored in the central workspace and
               rendered above the docs content for every agent.
             </div>
           </section>
@@ -489,8 +516,9 @@ export default function AdminPanel({
           </section>
 
           <div className="text-[9px] text-[#52525b] border-t border-[#2a2a30] pt-2">
-            hidden admin panel — server-token gated. Only the docs goal is writable; there are no
-            code, file, or backend-mutation controls. Press Esc to close.
+            hidden admin panel — credentials/token gated. The admin can set the docs goal, review
+            reports, and export files; there are no code, file, or backend-mutation controls. Press Esc
+            to close.
           </div>
         </div>
       )}

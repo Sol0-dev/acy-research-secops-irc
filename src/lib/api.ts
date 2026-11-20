@@ -76,6 +76,15 @@ export const api = {
       headers: { 'x-secops-admin': token },
     });
   },
+  adminLogin(
+    username: string,
+    password: string
+  ): Promise<{ token: string; username: string }> {
+    return request<{ token: string; username: string }>('/api/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+  },
   adminSetGoal(token: string, goal: string): Promise<{ ok: boolean; goal: string; version: number }> {
     return request<{ ok: boolean; goal: string; version: number }>('/api/admin/goal', {
       method: 'POST',

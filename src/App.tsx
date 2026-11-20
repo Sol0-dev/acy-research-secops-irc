@@ -370,6 +370,29 @@ export default function App() {
     if (saved) void loadAdmin(saved);
   }, [loadAdmin]);
 
+  const unlockAdmin = async (credentials: {
+    username: string;
+    password: string;
+    token?: string;
+  }) => {
+    if (credentials.token) {
+      await loadAdmin(credentials.token);
+      return;
+    }
+    setAdminLoading(true);
+    setAdminError('');
+    try {
+      const issued = await api.adminLogin(credentials.username, credentials.password);
+      await loadAdmin(issued.token);
+    } catch (error) {
+      setAdminLoading(false);
+      setAdminSnapshot(null);
+      setAdminError(
+        error instanceof Error ? error.message : 'invalid admin credentials'
+      );
+    }
+  };
+
   const saveDocsGoal = async (goal: string) => {
     if (!adminToken) return { ok: false, error: 'admin token missing' };
     try {
@@ -2705,7 +2728,7 @@ export default function App() {
         snapshot={adminSnapshot}
         error={adminError}
         loading={adminLoading}
-        onUnlock={(token) => void loadAdmin(token)}
+        onUnlock={(credentials) => void unlockAdmin(credentials)}
         onSaveGoal={saveDocsGoal}
         onReviewReport={reviewVulnerabilityReport}
         onClose={() => setAdminOpen(false)}

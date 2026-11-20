@@ -22,6 +22,23 @@ const PROXY_TOKEN = process.env.API_PROXY_TOKEN ?? 'secops-irc-proxy';
 const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN ?? '').trim();
 const ADMIN_TOKEN_GENERATED = !ADMIN_TOKEN;
 const EFFECTIVE_ADMIN_TOKEN = ADMIN_TOKEN || crypto.randomBytes(18).toString('hex');
+const ADMIN_USERNAME = String(process.env.ADMIN_USERNAME ?? 'admin').trim() || 'admin';
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD ?? '').trim();
+const ADMIN_PASSWORD_GENERATED = !ADMIN_PASSWORD;
+const EFFECTIVE_ADMIN_PASSWORD =
+  ADMIN_PASSWORD || crypto.randomBytes(12).toString('base64url');
+
+function isAdminRequest(req) {
+  const provided = String(req.get('x-secops-admin') ?? '').trim();
+  if (!provided) return false;
+  if (provided === EFFECTIVE_ADMIN_TOKEN) return true;
+  try {
+    const payload = jwt.verify(provided, JWT_SECRET);
+    return payload && payload.admin === true;
+  } catch {
+    return false;
+  }
+}
 
 const app = express();
 app.disable('x-powered-by');
@@ -86,8 +103,18 @@ app.get('/api/health', async (_req, res) => {
 
 // Hidden, read-only admin oversight. Requires the server-side proxy header plus
 // a separate admin token that is never part of the workspace state.
+app.post('/api/admin/login', (req, res) => {
+  const username = String(req.body?.username ?? '').trim();
+  const password = String(req.body?.password ?? '');
+  if (username !== ADMIN_USERNAME || password !== EFFECTIVE_ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'invalid admin credentials' });
+  }
+  const token = jwt.sign({ admin: true, username }, JWT_SECRET, { expiresIn: '12h' });
+  return res.json({ token, username });
+});
+
 app.get('/api/admin', async (req, res) => {
-  if (req.get('x-secops-admin') !== EFFECTIVE_ADMIN_TOKEN) {
+  if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });
   }
   try {
@@ -188,7 +215,7 @@ app.get('/api/admin', async (req, res) => {
 });
 
 app.post('/api/admin/goal', async (req, res) => {
-  if (req.get('x-secops-admin') !== EFFECTIVE_ADMIN_TOKEN) {
+  if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });
   }
   const goal = String(req.body?.goal ?? '').trim();
@@ -206,7 +233,7 @@ app.post('/api/admin/goal', async (req, res) => {
 });
 
 app.post('/api/admin/report/review', async (req, res) => {
-  if (req.get('x-secops-admin') !== EFFECTIVE_ADMIN_TOKEN) {
+  if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });
   }
   const channelId = String(req.body?.channelId ?? '');
@@ -264,7 +291,7 @@ app.post('/api/admin/report/review', async (req, res) => {
 });
 
 app.get('/api/admin/report/:reportId/docx', (req, res) => {
-  if (req.get('x-secops-admin') !== EFFECTIVE_ADMIN_TOKEN) {
+  if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });
   }
   const reportId = String(req.params.reportId ?? '');
@@ -288,7 +315,7 @@ app.get('/api/admin/report/:reportId/docx', (req, res) => {
 });
 
 app.get('/api/admin/graph', (req, res) => {
-  if (req.get('x-secops-admin') !== EFFECTIVE_ADMIN_TOKEN) {
+  if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });
   }
   const channelId = String(req.query.channelId ?? '');
@@ -410,6 +437,9 @@ async function start() {
   console.log(`[db] workspace ${seeded ? 'seeded' : 'loaded'} from ${process.env.DB_NAME ?? 'secops_irc'}`);
   if (ADMIN_TOKEN_GENERATED) {
     console.log(`[admin] no ADMIN_TOKEN set — generated token for this process: ${EFFECTIVE_ADMIN_TOKEN}`);
+  }
+  if (ADMIN_PASSWORD_GENERATED) {
+    console.log(`[admin] no ADMIN_PASSWORD set — generated credentials: ${ADMIN_USERNAME} / ${EFFECTIVE_ADMIN_PASSWORD}`);
   }
   app.listen(PORT, HOST, () => {
     console.log(`[api] listening on http://${HOST}:${PORT} (proxy-only)`);

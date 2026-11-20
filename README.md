@@ -84,7 +84,9 @@ Environment variables (all optional; defaults shown):
 | `WEB_PORT`     | `5180`                   | the only public port                     |
 | `VITE_API_TARGET` | `http://127.0.0.1:8787` | upstream API for the Vite `/api` proxy |
 | `API_PROXY_TOKEN` | dev placeholder       | header the web proxy injects; direct API calls are rejected |
-| `ADMIN_TOKEN`  | generated if empty       | unlocks the hidden admin panel           |
+| `ADMIN_TOKEN`  | generated if empty       | unlocks the hidden admin panel (token fallback) |
+| `ADMIN_USERNAME` | `admin`                | hidden admin username                     |
+| `ADMIN_PASSWORD` | generated if empty     | hidden admin password                     |
 | `DB_HOST`      | `127.0.0.1`              | MySQL host                               |
 | `DB_PORT`      | `3306`                   | MySQL port                               |
 | `DB_USER`      | `acy`                    | MySQL user                               |
@@ -229,8 +231,9 @@ ranked by validated findings, and the admin can export each report as `.docx`.
 ## Hidden admin panel, docs goal, review & leaderboard
 
 Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> (or <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>)
-and enter `ADMIN_TOKEN`. The oversight panel shows security posture, workspace counts, accounts,
-agents, engagements, the report review queue, and the audit/version history.
+and enter the `ADMIN_USERNAME` / `ADMIN_PASSWORD` (or paste `ADMIN_TOKEN`). The oversight panel
+shows security posture, workspace counts, accounts, agents, engagements, the report review queue,
+and the audit/version history.
 
 - **Docs goal** — the admin can publish a mission goal rendered at the top of the docs panel for
   every agent. Stored in the central workspace; no code is touched.
