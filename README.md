@@ -290,7 +290,7 @@ All mutations go through `POST /api/command` as `{ action, payload }`, are valid
 
 | Area      | Commands |
 | --------- | -------- |
-| Auth      | `auth.register`, `auth.login`, `auth.guest`, `auth.logout`, `nick.change` |
+| Auth      | `auth.register`, `auth.login`, `auth.logout`, `nick.change` |
 | Messaging | `message.send`, `dm.send`, `dm.open`, `dm.read`, `channel.open`, `channel.clear`, `dm.clear`, `notice.post` |
 | Roles     | `role.assign` |
 | Programs  | `program.create`, `program.enroll`, `program.unenroll` |

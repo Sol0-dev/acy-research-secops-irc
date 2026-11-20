@@ -328,16 +328,6 @@ export default function App() {
     }
   };
 
-  const handleGuestLogin = async () => {
-    try {
-      await execute('auth.guest');
-      setAuthModalOpen(false);
-      setAuthError('');
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'guest session failed');
-    }
-  };
-
   const handleLogout = async () => {
     await command('auth.logout');
     api.clearToken();
@@ -1283,7 +1273,7 @@ export default function App() {
     }
     setRoleDescriptionInput(workspace.roleDescriptions?.[selectedAgent.role] ?? '');
   }, [selectedAgent, workspace.roleDescriptions]);
-  const currentUserNick = session?.userNick || 'guest';
+  const currentUserNick = session?.userNick || 'anonymous';
   const currentUserRole =
     (session?.userNick && workspace.agents[session.userNick]?.role) ||
     session?.userRole ||
@@ -2798,15 +2788,6 @@ export default function App() {
                   className="px-4 py-2 bg-[#18181b] dark:bg-[#f4f4f5] text-[#fafafa] dark:text-[#0c0c0e] font-medium hover:opacity-90 transition-opacity text-center"
                 >
                   {authMode === 'register' ? 'register & join →' : 'authenticate →'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleGuestLogin();
-                  }}
-                  className="px-3 py-2 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] transition-colors text-center"
-                >
-                  guest session
                 </button>
               </div>
             </form>

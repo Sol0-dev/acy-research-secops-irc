@@ -286,6 +286,30 @@ export default function GraphView({
     });
   };
 
+  const zoomBy = (factor: number) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const worldX = (cx - viewport.x) / viewport.k;
+    const worldY = (cy - viewport.y) / viewport.k;
+    const nextK = Math.min(2.6, Math.max(0.35, viewport.k * factor));
+    setViewport({
+      x: cx - worldX * nextK,
+      y: cy - worldY * nextK,
+      k: nextK,
+    });
+  };
+
+  const resetZoom = () => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    setViewport({
+      x: (rect?.width ?? size.width) / 2,
+      y: (rect?.height ?? size.height) / 2,
+      k: 1,
+    });
+  };
+
   const handleCanvasPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     if (event.button !== 0) return;
     panningRef.current = {
@@ -469,6 +493,36 @@ export default function GraphView({
           })}
         </g>
       </svg>
+
+      <div className="absolute bottom-3 right-3 flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => zoomBy(1.2)}
+          title="Zoom in"
+          aria-label="Zoom in"
+          className="w-7 h-7 flex items-center justify-center border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa]/90 dark:bg-[#09090b]/90 text-sm leading-none text-[#52525b] dark:text-[#d4d4d8] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={() => zoomBy(1 / 1.2)}
+          title="Zoom out"
+          aria-label="Zoom out"
+          className="w-7 h-7 flex items-center justify-center border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa]/90 dark:bg-[#09090b]/90 text-sm leading-none text-[#52525b] dark:text-[#d4d4d8] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+        >
+          -
+        </button>
+        <button
+          type="button"
+          onClick={resetZoom}
+          title="Reset zoom"
+          aria-label="Reset zoom"
+          className="w-7 h-7 flex items-center justify-center border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa]/90 dark:bg-[#09090b]/90 text-[10px] leading-none text-[#52525b] dark:text-[#d4d4d8] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+        >
+          1:1
+        </button>
+      </div>
 
       <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[9px] text-[#a1a1aa]">
         drag canvas to pan · scroll to zoom · drag node to move

@@ -35,8 +35,8 @@ interface AdminPanelProps {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="border border-[#2a2a30] bg-[#09090b] px-2.5 py-2">
-      <div className="text-[11px] uppercase tracking-wider text-[#71717a]">{label}</div>
-      <div className="text-sm text-[#f4f4f5] pt-0.5">{value}</div>
+      <div className="text-[15px] uppercase tracking-wider text-[#71717a]">{label}</div>
+      <div className="text-lg text-[#f4f4f5] pt-0.5">{value}</div>
     </div>
   );
 }
@@ -150,8 +150,8 @@ export default function AdminPanel({
     );
   };
 
-  const th = 'text-left py-1 pr-3 text-[11px] uppercase tracking-wider text-[#71717a] font-normal';
-  const td = 'py-1 pr-3 align-top text-xs text-[#d4d4d8]';
+  const th = 'text-left py-1 pr-3 text-[15px] uppercase tracking-wider text-[#71717a] font-normal';
+  const td = 'py-1 pr-3 align-top text-base text-[#d4d4d8]';
 
   const focusedGraph = graphFocusChannelId
     ? snapshot?.graphs.find((graph) => graph.channelId === graphFocusChannelId) ?? null
@@ -184,20 +184,20 @@ export default function AdminPanel({
       : null;
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#050506] text-[#f4f4f5] font-mono text-sm flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-[#050506] text-[#f4f4f5] font-mono text-lg flex flex-col">
       <header className="border-b border-[#2a2a30] px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
           <span className="font-medium tracking-tight truncate">hidden admin // oversight</span>
           {snapshot && (
-            <span className="text-xs text-[#71717a]">workspace v{snapshot.version}</span>
+            <span className="text-base text-[#71717a]">workspace v{snapshot.version}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onOpenAgentPortal}
-            className="text-xs text-[#4ade80] hover:text-[#f4f4f5] border border-[#4ade80]/40 px-2 py-1"
+            className="text-base text-[#4ade80] hover:text-[#f4f4f5] border border-[#4ade80]/40 px-2 py-1"
             title="Return to the live IRC portal used by agents"
           >
             agent portal →
@@ -205,7 +205,7 @@ export default function AdminPanel({
           <button
             type="button"
             onClick={onClose}
-            className="text-xs text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-2 py-1"
+            className="text-base text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-2 py-1"
           >
             close
           </button>
@@ -222,10 +222,10 @@ export default function AdminPanel({
             }}
             className="w-full max-w-sm border border-[#2a2a30] bg-[#09090b] p-4 space-y-3"
           >
-            <div className="text-xs uppercase tracking-wider text-[#71717a]">
+            <div className="text-base uppercase tracking-wider text-[#71717a]">
               admin login
             </div>
-            <p className="text-xs text-[#71717a] leading-relaxed">
+            <p className="text-base text-[#71717a] leading-relaxed">
               Enter the hidden admin username and password.
             </p>
             <input
@@ -235,7 +235,7 @@ export default function AdminPanel({
               onChange={(event) => setUsername(event.target.value)}
               autoComplete="off"
               placeholder="admin username"
-              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-sm text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
+              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-lg text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
             />
             <input
               type="password"
@@ -243,17 +243,17 @@ export default function AdminPanel({
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
               placeholder="admin password"
-              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-sm text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
+              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-lg text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
             />
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-3 py-1.5 border border-[#2a2a30] text-xs text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+              className="w-full px-3 py-1.5 border border-[#2a2a30] text-base text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
             >
               {loading ? 'unlocking…' : 'unlock oversight'}
             </button>
-            {error && <div className="text-xs text-[#f87171] leading-relaxed">{error}</div>}
-            <div className="text-[11px] text-[#52525b] leading-relaxed">
+            {error && <div className="text-base text-[#f87171] leading-relaxed">{error}</div>}
+            <div className="text-[15px] text-[#52525b] leading-relaxed">
               read-only: no code, file, or backend-mutation controls are exposed here.
             </div>
           </form>
@@ -268,15 +268,15 @@ export default function AdminPanel({
                   setGraphFocusChannelId(null);
                   setSelectedGraph(null);
                 }}
-                className="text-xs text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-1.5 py-0.5"
+                className="text-base text-[#71717a] hover:text-[#f4f4f5] border border-[#2a2a30] px-1.5 py-0.5"
               >
                 &larr; oversight
               </button>
               <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
-              <span className="text-sm text-[#f4f4f5] truncate">
+              <span className="text-lg text-[#f4f4f5] truncate">
                 knowledge graph // {focusedGraph.channelId}
               </span>
-              <span className="text-xs text-[#71717a]">
+              <span className="text-base text-[#71717a]">
                 {focusedGraph.nodes.length} nodes · {focusedGraph.edges.length} edges
               </span>
             </div>
@@ -289,7 +289,7 @@ export default function AdminPanel({
                   `graph-${focusedGraph.channelId.replace(/^#/, '')}.json`
                 )
               }
-              className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
+              className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
             >
               download json
             </button>
@@ -317,9 +317,9 @@ export default function AdminPanel({
               />
             </div>
 
-            <aside className="w-64 shrink-0 border-l border-[#2a2a30] p-3 overflow-y-auto space-y-3 text-xs">
+            <aside className="w-64 shrink-0 border-l border-[#2a2a30] p-3 overflow-y-auto space-y-3 text-base">
               <div className="space-y-1">
-                <div className="text-[11px] uppercase tracking-wider text-[#71717a]">
+                <div className="text-[15px] uppercase tracking-wider text-[#71717a]">
                   node intel
                 </div>
                 {!focusedSelectedNode ? (
@@ -345,7 +345,7 @@ export default function AdminPanel({
               </div>
 
               <div className="space-y-1 border-t border-[#2a2a30] pt-2">
-                <div className="text-[11px] uppercase tracking-wider text-[#71717a]">
+                <div className="text-[15px] uppercase tracking-wider text-[#71717a]">
                   contributors
                 </div>
                 {focusedContributors.length === 0 ? (
@@ -361,7 +361,7 @@ export default function AdminPanel({
               </div>
 
               <div className="space-y-1 border-t border-[#2a2a30] pt-2">
-                <div className="text-[11px] uppercase tracking-wider text-[#71717a]">legend</div>
+                <div className="text-[15px] uppercase tracking-wider text-[#71717a]">legend</div>
                 {focusedKinds.map((kind) => (
                   <div key={kind} className="text-[#a1a1aa]">
                     {kind}
@@ -388,7 +388,7 @@ export default function AdminPanel({
                 key={tab}
                 type="button"
                 onClick={() => setAdminTab(tab)}
-                className={`px-2.5 py-1 text-[11px] border transition-colors ${
+                className={`px-2.5 py-1 text-[15px] border transition-colors ${
                   adminTab === tab
                     ? 'border-[#4ade80] text-[#4ade80] bg-[#4ade80]/10'
                     : 'border-[#2a2a30] text-[#a1a1aa] hover:text-[#f4f4f5]'
@@ -398,9 +398,9 @@ export default function AdminPanel({
               </button>
             ))}
           </nav>
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-5">
           <section className={`space-y-2 ${adminTab === 'goal' ? '' : 'hidden'}`}>
-            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">workspace counts</h2>
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">workspace counts</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <Stat label="agents" value={snapshot.counts.agents} />
               <Stat label="engagements" value={snapshot.counts.engagements} />
@@ -409,7 +409,7 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-2 ${adminTab === 'goal' ? '' : 'hidden'}`}>
-            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               mission goal - shown at the top of docs
             </h2>
             <textarea
@@ -417,7 +417,7 @@ export default function AdminPanel({
               value={goalInput}
               onChange={(event) => setGoalInput(event.target.value)}
               placeholder="e.g. Find and report real, in-scope vulnerabilities without touching out-of-scope assets."
-              className="w-full min-h-[220px] bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-sm text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
+              className="w-full min-h-[220px] bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-lg text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
             />
             <div className="flex items-center gap-2">
               <button
@@ -433,32 +433,32 @@ export default function AdminPanel({
                     else setGoalNotice('goal saved and published to the docs header');
                   });
                 }}
-                className="px-3 py-1.5 border border-[#2a2a30] text-xs text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                className="px-3 py-1.5 border border-[#2a2a30] text-base text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
               >
                 {goalBusy ? 'saving…' : 'save goal'}
               </button>
               <button
                 type="button"
                 onClick={() => setGoalInput('')}
-                className="px-3 py-1.5 border border-[#2a2a30] text-xs text-[#71717a] hover:text-[#f87171]"
+                className="px-3 py-1.5 border border-[#2a2a30] text-base text-[#71717a] hover:text-[#f87171]"
               >
                 clear
               </button>
-              {goalNotice && <span className="text-xs text-[#4ade80]">{goalNotice}</span>}
-              {goalError && <span className="text-xs text-[#f87171]">{goalError}</span>}
+              {goalNotice && <span className="text-base text-[#4ade80]">{goalNotice}</span>}
+              {goalError && <span className="text-base text-[#f87171]">{goalError}</span>}
             </div>
-            <div className="text-[11px] text-[#52525b]">
+            <div className="text-[15px] text-[#52525b]">
               only admin credentials can set this. the goal is stored in the central workspace and
               rendered above the docs content for every agent.
             </div>
           </section>
 
           <section className={`space-y-2 ${adminTab === 'reports' ? '' : 'hidden'}`}>
-            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               report review queue ({snapshot.reports.length})
             </h2>
             {snapshot.reports.length === 0 ? (
-              <div className="text-xs text-[#52525b]">no reports filed.</div>
+              <div className="text-base text-[#52525b]">no reports filed.</div>
             ) : (
               <div className="overflow-x-auto border border-[#2a2a30]">
                 <table className="w-full border-collapse">
@@ -479,7 +479,7 @@ export default function AdminPanel({
                         <td className={`${td} max-w-[360px]`}>
                           <div className="truncate">{report.title}</div>
                           {report.reviewNote && (
-                            <div className="text-[11px] text-[#71717a] pt-0.5">
+                            <div className="text-[15px] text-[#71717a] pt-0.5">
                               note: {report.reviewNote}
                             </div>
                           )}
@@ -501,7 +501,7 @@ export default function AdminPanel({
                             {report.review}
                           </span>
                           {report.reviewedBy && (
-                            <div className="text-[11px] text-[#71717a]">
+                            <div className="text-[15px] text-[#71717a]">
                               by {report.reviewedBy} · {report.reviewedTime}
                             </div>
                           )}
@@ -516,7 +516,7 @@ export default function AdminPanel({
                                 onClick={() =>
                                   void reviewReport(report.channelId, report.id, decision)
                                 }
-                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#f4f4f5] disabled:opacity-40"
+                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#f4f4f5] disabled:opacity-40"
                               >
                                 {decision}
                               </button>
@@ -530,7 +530,7 @@ export default function AdminPanel({
                                   `${report.title.replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 60)}.docx`
                                 )
                               }
-                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
+                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
                             >
                               docx
                             </button>
@@ -542,28 +542,28 @@ export default function AdminPanel({
                 </table>
               </div>
             )}
-            {reviewNotice && <div className="text-xs text-[#4ade80]">{reviewNotice}</div>}
-            {reviewError && <div className="text-xs text-[#f87171]">{reviewError}</div>}
-            {downloadNotice && <div className="text-xs text-[#4ade80]">{downloadNotice}</div>}
-            {downloadError && <div className="text-xs text-[#f87171]">{downloadError}</div>}
+            {reviewNotice && <div className="text-base text-[#4ade80]">{reviewNotice}</div>}
+            {reviewError && <div className="text-base text-[#f87171]">{reviewError}</div>}
+            {downloadNotice && <div className="text-base text-[#4ade80]">{downloadNotice}</div>}
+            {downloadError && <div className="text-base text-[#f87171]">{downloadError}</div>}
           </section>
 
           <section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
-            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               direct messages ({snapshot.dmThreads.length})
             </h2>
             {snapshot.dmThreads.length === 0 ? (
-              <div className="text-xs text-[#52525b]">no direct messages.</div>
+              <div className="text-base text-[#52525b]">no direct messages.</div>
             ) : (
               <div className="space-y-2">
                 {snapshot.dmThreads.map((thread) => (
                   <details key={thread.id} className="border border-[#2a2a30] bg-[#09090b] p-2">
-                    <summary className="cursor-pointer text-xs text-[#d4d4d8]">
+                    <summary className="cursor-pointer text-base text-[#d4d4d8]">
                       {thread.participants.join(' ↔ ')} · {thread.messages.length} messages
                     </summary>
                     <div className="pt-2 max-h-64 overflow-y-auto space-y-1">
                       {thread.messages.map((message) => (
-                        <div key={message.id} className="text-xs leading-relaxed">
+                        <div key={message.id} className="text-base leading-relaxed">
                           <span className="text-[#71717a]">[{message.time}]</span>{' '}
                           {message.type === 'sys' ? (
                             <span className="text-[#71717a]">- {message.text}</span>
@@ -583,22 +583,22 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
-            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               progress logs ({snapshot.progress.length})
             </h2>
             {snapshot.progress.length === 0 ? (
-              <div className="text-xs text-[#52525b]">no progress logs.</div>
+              <div className="text-base text-[#52525b]">no progress logs.</div>
             ) : (
               <div className="space-y-2">
                 {snapshot.progress.map((log) => (
                   <details key={log.channelId} className="border border-[#2a2a30] bg-[#09090b] p-2">
-                    <summary className="cursor-pointer text-xs text-[#d4d4d8]">
+                    <summary className="cursor-pointer text-base text-[#d4d4d8]">
                       {log.channelId} · {log.entries.length} entries · head v
                       {log.headVersion ?? '-'}
                     </summary>
                     <div className="pt-2 max-h-64 overflow-y-auto space-y-1">
                       {log.entries.map((entry) => (
-                        <div key={entry.id} className="text-xs leading-relaxed">
+                        <div key={entry.id} className="text-base leading-relaxed">
                           <span className="text-[#71717a]">v{entry.version} · {entry.time}</span>{' '}
                           <span className="text-[#a1a1aa]">{entry.author}</span>{' '}
                           <span className="text-[#71717a]">[{entry.status}/{entry.kind}]</span>{' '}
@@ -613,15 +613,15 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-2 ${adminTab === 'graphs' ? '' : 'hidden'}`}>
-            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               knowledge graphs ({snapshot.graphs.length})
             </h2>
             {snapshot.graphs.length === 0 ? (
-              <div className="text-xs text-[#52525b]">no graphs yet.</div>
+              <div className="text-base text-[#52525b]">no graphs yet.</div>
             ) : adminGraph ? (
               <div className="space-y-2 border border-[#2a2a30] bg-[#09090b] p-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-xs text-[#a1a1aa]">
+                  <label className="flex items-center gap-1.5 text-base text-[#a1a1aa]">
                     <span>show</span>
                     <select
                       value={adminGraph.channelId}
@@ -629,7 +629,7 @@ export default function AdminPanel({
                         setAdminGraphChannelId(event.target.value);
                         setSelectedGraph(null);
                       }}
-                      className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-xs text-[#f4f4f5]"
+                      className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-base text-[#f4f4f5]"
                     >
                       {snapshot.graphs.map((graph) => (
                         <option key={graph.channelId} value={graph.channelId}>
@@ -638,7 +638,7 @@ export default function AdminPanel({
                       ))}
                     </select>
                   </label>
-                  <span className="text-xs text-[#71717a]">
+                  <span className="text-base text-[#71717a]">
                     {adminGraph.nodes.length} nodes · {adminGraph.edges.length} edges
                   </span>
                   <div className="flex items-center gap-1 ml-auto">
@@ -648,7 +648,7 @@ export default function AdminPanel({
                         setGraphFocusChannelId(adminGraph.channelId);
                         setSelectedGraph(null);
                       }}
-                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
+                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
                     >
                       open panel
                     </button>
@@ -661,7 +661,7 @@ export default function AdminPanel({
                           `graph-${adminGraph.channelId.replace(/^#/, '')}.json`
                         )
                       }
-                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
+                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
                     >
                       download json
                     </button>
@@ -670,14 +670,14 @@ export default function AdminPanel({
                         <button
                           type="button"
                           onClick={() => void confirmDelete('graph', adminGraph.channelId)}
-                          className="px-1.5 py-0.5 border border-[#f87171] text-[11px] text-[#f87171]"
+                          className="px-1.5 py-0.5 border border-[#f87171] text-[15px] text-[#f87171]"
                         >
                           confirm delete
                         </button>
                         <button
                           type="button"
                           onClick={() => setPendingDelete('')}
-                          className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa]"
+                          className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
                         >
                           cancel
                         </button>
@@ -686,7 +686,7 @@ export default function AdminPanel({
                       <button
                         type="button"
                         onClick={() => setPendingDelete(`graph:${adminGraph.channelId}`)}
-                        className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#f87171] hover:border-[#f87171]"
+                        className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
                       >
                         delete graph
                       </button>
@@ -695,7 +695,7 @@ export default function AdminPanel({
                 </div>
                 <div className="h-[420px] border border-[#2a2a30] overflow-hidden bg-[#050506]">
                   {adminGraph.nodes.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-xs text-[#52525b]">
+                    <div className="h-full flex items-center justify-center text-base text-[#52525b]">
                       graph is empty.
                     </div>
                   ) : (
@@ -716,7 +716,7 @@ export default function AdminPanel({
                   )}
                 </div>
                 {adminGraphNode && (
-                  <div className="border border-[#2a2a30] p-2 text-xs space-y-1">
+                  <div className="border border-[#2a2a30] p-2 text-base space-y-1">
                     <div className="text-[#f4f4f5]">
                       [{adminGraphNode.kind}] {adminGraphNode.label}
                     </div>
@@ -735,16 +735,16 @@ export default function AdminPanel({
                 )}
               </div>
             ) : null}
-            {deleteNotice && <div className="text-xs text-[#4ade80]">{deleteNotice}</div>}
-            {deleteError && <div className="text-xs text-[#f87171]">{deleteError}</div>}
+            {deleteNotice && <div className="text-base text-[#4ade80]">{deleteNotice}</div>}
+            {deleteError && <div className="text-base text-[#f87171]">{deleteError}</div>}
           </section>
 
           <section className={`space-y-2 ${adminTab === 'graphs' ? '' : 'hidden'}`}>
-            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               engagements ({snapshot.engagements.length})
             </h2>
             {snapshot.engagements.length === 0 ? (
-              <div className="text-xs text-[#52525b]">none - no seeded engagements.</div>
+              <div className="text-base text-[#52525b]">none - no seeded engagements.</div>
             ) : (
               <div className="overflow-x-auto border border-[#2a2a30]">
                 <table className="w-full border-collapse">
@@ -785,7 +785,7 @@ export default function AdminPanel({
                                   `graph-${engagement.id.replace(/^#/, '')}.json`
                                 )
                               }
-                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
+                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
                             >
                               graph json
                             </button>
@@ -796,14 +796,14 @@ export default function AdminPanel({
                                   onClick={() =>
                                     void confirmDelete('channel', engagement.id)
                                   }
-                                  className="px-1.5 py-0.5 border border-[#f87171] text-[11px] text-[#f87171]"
+                                  className="px-1.5 py-0.5 border border-[#f87171] text-[15px] text-[#f87171]"
                                 >
                                   confirm delete
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setPendingDelete('')}
-                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa]"
+                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
                                 >
                                   cancel
                                 </button>
@@ -814,7 +814,7 @@ export default function AdminPanel({
                                 onClick={() =>
                                   setPendingDelete(`channel:${engagement.id}`)
                                 }
-                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#f87171] hover:border-[#f87171]"
+                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
                               >
                                 delete group
                               </button>
@@ -831,11 +831,11 @@ export default function AdminPanel({
 
           <section className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${adminTab === 'accounts' ? '' : 'hidden'}`}>
             <div className="space-y-2">
-              <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+              <h2 className="text-base uppercase tracking-wider text-[#71717a]">
                 registered accounts ({snapshot.accounts.length})
               </h2>
               {snapshot.accounts.length === 0 ? (
-                <div className="text-xs text-[#52525b]">none - no seeded accounts.</div>
+                <div className="text-base text-[#52525b]">none - no seeded accounts.</div>
               ) : (
                 <div className="overflow-x-auto border border-[#2a2a30]">
                   <table className="w-full border-collapse">
@@ -863,11 +863,11 @@ export default function AdminPanel({
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+              <h2 className="text-base uppercase tracking-wider text-[#71717a]">
                 live agents ({snapshot.agents.length})
               </h2>
               {snapshot.agents.length === 0 ? (
-                <div className="text-xs text-[#52525b]">none online.</div>
+                <div className="text-base text-[#52525b]">none online.</div>
               ) : (
                 <div className="overflow-x-auto border border-[#2a2a30]">
                   <table className="w-full border-collapse">
@@ -904,7 +904,7 @@ export default function AdminPanel({
                                         setGraphFocusChannelId(program);
                                         setSelectedGraph(null);
                                       }}
-                                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[11px] text-[#a1a1aa] hover:text-[#4ade80]"
+                                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
                                     >
                                       {program} graph
                                     </button>
@@ -923,11 +923,11 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-2 ${adminTab === 'audit' ? '' : 'hidden'}`}>
-            <h2 className="text-xs uppercase tracking-wider text-[#71717a]">
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               audit / version history (latest {snapshot.audit.length})
             </h2>
             {snapshot.audit.length === 0 ? (
-              <div className="text-xs text-[#52525b]">no audit entries.</div>
+              <div className="text-base text-[#52525b]">no audit entries.</div>
             ) : (
               <div className="overflow-x-auto border border-[#2a2a30] max-h-96 overflow-y-auto">
                 <table className="w-full border-collapse">
@@ -958,7 +958,7 @@ export default function AdminPanel({
             )}
           </section>
 
-          <div className="text-[11px] text-[#52525b] border-t border-[#2a2a30] pt-2">
+          <div className="text-[15px] text-[#52525b] border-t border-[#2a2a30] pt-2">
             Hidden admin panel - credentials gated. Set the goal, review reports, inspect the IRC,
             open graphs, and export files. Press Esc to close.
           </div>

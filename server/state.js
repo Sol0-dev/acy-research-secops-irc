@@ -536,15 +536,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     }
 
     case 'auth.guest': {
-      let nick = `guest_${Math.floor(10 + Math.random() * 89)}`;
-      while (state.agents[nick]) nick = `guest_${Math.floor(10 + Math.random() * 89)}`;
-      addUserAgent(state, nick, 'unassigned');
-      appendChannelMessage(state, '#lobby', {
-        type: 'sys',
-        time: nowHHMM(),
-        text: `${nick} joined secops.irc (guest session - role: unassigned)`,
-      });
-      return { result: { nick }, tokenNick: nick };
+      throw new ApiError(403, 'guest sessions are disabled - register a handle instead');
     }
 
     case 'auth.logout': {

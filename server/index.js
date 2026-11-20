@@ -105,6 +105,7 @@ function tokenFromRequest(req) {
 
 function makeUser(state, nick) {
   const clean = normalizeHandle(nick);
+  if (clean.startsWith('guest_')) return null;
   const agent = state.agents[clean];
   if (!agent || !agent.isUser) return null;
   return {
