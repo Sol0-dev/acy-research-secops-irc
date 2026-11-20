@@ -198,6 +198,22 @@ app.get('/api/admin', async (req, res) => {
     }
     reports.sort((a, b) => String(b.time).localeCompare(String(a.time)));
 
+    const channels = state.channels.map((channel) => ({
+      id: channel.id,
+      group: channel.group,
+      platform: channel.platform,
+      isEngagement: channel.isEngagement,
+      topic: channel.topic,
+      messages: channel.messages,
+    }));
+    const dmThreads = Object.values(state.dmThreads);
+    const progress = Object.entries(state.progress ?? {}).map(([channelId, log]) => ({
+      channelId,
+      headVersion: log.headVersion ?? null,
+      entries: log.entries ?? [],
+    }));
+    const graphs = Object.values(state.graphs ?? {});
+
     res.json({
       version: getVersion(),
       goal: state.docsGoal ?? '',
@@ -206,6 +222,10 @@ app.get('/api/admin', async (req, res) => {
       agents,
       engagements,
       reports,
+      channels,
+      dmThreads,
+      progress,
+      graphs,
       audit,
       security: {
         apiHost: HOST,

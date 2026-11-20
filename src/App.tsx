@@ -1907,6 +1907,23 @@ export default function App() {
           ) : (
             <>
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3 font-mono text-xs sm:text-[13px] leading-relaxed">
+            {workspace.docsGoal && (
+              <div className="mb-3 border-l-2 border-[#16a34a] dark:border-[#4ade80] pl-3 py-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="text-[9px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
+                  admin goal
+                </span>
+                <span className="text-[11px] text-[#18181b] dark:text-[#f4f4f5]">
+                  {workspace.docsGoal}
+                </span>
+                <button
+                  type="button"
+                  onClick={openDocsPanel}
+                  className="text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                >
+                  docs →
+                </button>
+              </div>
+            )}
             {workspace.activeBuffer.kind === 'channel' && workspace.activeBuffer.id === '#lobby' && (
               <div className="mb-4 border border-[#16a34a]/40 dark:border-[#4ade80]/40 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 p-3.5 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">

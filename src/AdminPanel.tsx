@@ -365,6 +365,112 @@ export default function AdminPanel({
 
           <section className="space-y-2">
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              irc channels ({snapshot.channels.length})
+            </h2>
+            {snapshot.channels.length === 0 ? (
+              <div className="text-[10px] text-[#52525b]">no channels.</div>
+            ) : (
+              <div className="space-y-2">
+                {snapshot.channels.map((channel) => (
+                  <details
+                    key={channel.id}
+                    className="border border-[#2a2a30] bg-[#09090b] p-2"
+                    open={channel.id === '#lobby'}
+                  >
+                    <summary className="cursor-pointer text-[10px] text-[#d4d4d8]">
+                      {channel.id} · {channel.group} · {channel.messages.length} messages
+                    </summary>
+                    <div className="pt-2 max-h-72 overflow-y-auto space-y-1">
+                      {channel.messages.length === 0 ? (
+                        <div className="text-[9px] text-[#52525b]">no messages.</div>
+                      ) : (
+                        channel.messages.map((message) => (
+                          <div key={message.id} className="text-[10px] leading-relaxed">
+                            <span className="text-[#71717a]">[{message.time}]</span>{' '}
+                            {message.type === 'sys' ? (
+                              <span className="text-[#71717a]">— {message.text}</span>
+                            ) : (
+                              <>
+                                <span className="text-[#a1a1aa]">&lt;{message.nick}&gt;</span>{' '}
+                                <span className="text-[#d4d4d8]">{message.text}</span>
+                              </>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              direct messages ({snapshot.dmThreads.length})
+            </h2>
+            {snapshot.dmThreads.length === 0 ? (
+              <div className="text-[10px] text-[#52525b]">no direct messages.</div>
+            ) : (
+              <div className="space-y-2">
+                {snapshot.dmThreads.map((thread) => (
+                  <details key={thread.id} className="border border-[#2a2a30] bg-[#09090b] p-2">
+                    <summary className="cursor-pointer text-[10px] text-[#d4d4d8]">
+                      {thread.participants.join(' ↔ ')} · {thread.messages.length} messages
+                    </summary>
+                    <div className="pt-2 max-h-64 overflow-y-auto space-y-1">
+                      {thread.messages.map((message) => (
+                        <div key={message.id} className="text-[10px] leading-relaxed">
+                          <span className="text-[#71717a]">[{message.time}]</span>{' '}
+                          {message.type === 'sys' ? (
+                            <span className="text-[#71717a]">— {message.text}</span>
+                          ) : (
+                            <>
+                              <span className="text-[#a1a1aa]">&lt;{message.nick}&gt;</span>{' '}
+                              <span className="text-[#d4d4d8]">{message.text}</span>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              progress logs ({snapshot.progress.length})
+            </h2>
+            {snapshot.progress.length === 0 ? (
+              <div className="text-[10px] text-[#52525b]">no progress logs.</div>
+            ) : (
+              <div className="space-y-2">
+                {snapshot.progress.map((log) => (
+                  <details key={log.channelId} className="border border-[#2a2a30] bg-[#09090b] p-2">
+                    <summary className="cursor-pointer text-[10px] text-[#d4d4d8]">
+                      {log.channelId} · {log.entries.length} entries · head v
+                      {log.headVersion ?? '—'}
+                    </summary>
+                    <div className="pt-2 max-h-64 overflow-y-auto space-y-1">
+                      {log.entries.map((entry) => (
+                        <div key={entry.id} className="text-[10px] leading-relaxed">
+                          <span className="text-[#71717a]">v{entry.version} · {entry.time}</span>{' '}
+                          <span className="text-[#a1a1aa]">{entry.author}</span>{' '}
+                          <span className="text-[#71717a]">[{entry.status}/{entry.kind}]</span>{' '}
+                          <span className="text-[#d4d4d8]">{entry.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               engagements ({snapshot.engagements.length})
             </h2>
             {snapshot.engagements.length === 0 ? (

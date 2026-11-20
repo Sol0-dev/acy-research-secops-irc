@@ -277,6 +277,21 @@ export interface AdminSnapshot {
   agents: AdminAgent[];
   engagements: AdminEngagement[];
   reports: AdminReportSummary[];
+  channels: Array<{
+    id: string;
+    group: string;
+    platform: string;
+    isEngagement: boolean;
+    topic: string;
+    messages: IrcMessage[];
+  }>;
+  dmThreads: DirectMessageThread[];
+  progress: Array<{
+    channelId: string;
+    headVersion: number | null;
+    entries: ProgressEntry[];
+  }>;
+  graphs: EngagementGraph[];
   audit: AdminAuditEntry[];
   security: {
     apiHost: string;
