@@ -10,17 +10,14 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { GraphEdge, GraphNode, GraphNodeKind } from './types';
 
 // ============================================================================
-// Obsidian-style force-directed graph.
+// Hierarchical tree graph.
 //
-// Nodes are circles with a per-kind icon, edges are spring links, and a small
-// physics simulation runs continuously so the map settles and drifts like a
-// knowledge graph in Obsidian. Drag a node to rearrange it, drag the canvas to
-// pan, and scroll to zoom.
+// Nodes are circles with a per-kind icon, laid out as a top-down tree from the
+// root assets. The layout eases into place, edges connect parent to child, and
+// the canvas supports drag, pan, and zoom.
 // ============================================================================
 
 const RADIUS = 24;
-const LINK_DISTANCE = 142;
-const REPULSION = 118;
 
 const COLORS_DARK: Record<GraphNodeKind, string> = {
   target: '#38bdf8',
@@ -123,7 +120,6 @@ export default function GraphView({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const bodiesRef = useRef<Map<string, Body>>(new Map());
-  const frameRef = useRef<number | null>(null);
   const panningRef = useRef<{ pointerX: number; pointerY: number; startX: number; startY: number } | null>(null);
   const draggingRef = useRef<{ id: string; moved: boolean } | null>(null);
   const lastMoveRef = useRef(0);
@@ -137,6 +133,8 @@ export default function GraphView({
   // Keep a body per node, preserving positions when the node list changes.
   const currentIds = nodes.map((node) => node.id);
   const idKey = currentIds.join('|');
+  const edgeKey = edges.map((edge) => `${edge.from}>${edge.to}`).join('|');
+  const treeTargetsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   useEffect(() => {
     const next = new Map<string, Body>();
     nodes.forEach((node, index) => {
@@ -167,82 +165,95 @@ export default function GraphView({
     return () => observer.disconnect();
   }, []);
 
-  // Physics loop: repulsion, link springs, soft gravity, damping + ambient drift.
+  // Tree layout: BFS from root nodes, then place each depth on a horizontal
+  // level centered around the origin.
   useEffect(() => {
-    let time = 0;
-    const step = () => {
-      time += 16;
+    const incoming = new Map<string, number>();
+    const children = new Map<string, string[]>();
+    for (const node of nodes) {
+      incoming.set(node.id, 0);
+      children.set(node.id, []);
+    }
+    for (const edge of edges) {
+      if (!incoming.has(edge.from) || !incoming.has(edge.to)) continue;
+      incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1);
+      children.get(edge.from)?.push(edge.to);
+    }
+
+    const roots = nodes.filter((node) => (incoming.get(node.id) ?? 0) === 0).map((node) => node.id);
+    if (roots.length === 0 && nodes[0]) roots.push(nodes[0].id);
+
+    const depth = new Map<string, number>();
+    const queue: string[] = [];
+    for (const root of roots) {
+      if (!depth.has(root)) {
+        depth.set(root, 0);
+        queue.push(root);
+      }
+    }
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      const level = depth.get(id) ?? 0;
+      for (const child of children.get(id) ?? []) {
+        if (!depth.has(child)) {
+          depth.set(child, level + 1);
+          queue.push(child);
+        }
+      }
+    }
+
+    let maxDepth = 0;
+    for (const level of depth.values()) maxDepth = Math.max(maxDepth, level);
+    for (const node of nodes) {
+      if (!depth.has(node.id)) depth.set(node.id, maxDepth + 1);
+    }
+
+    const levels = new Map<number, string[]>();
+    for (const node of nodes) {
+      const level = depth.get(node.id) ?? 0;
+      const list = levels.get(level) ?? [];
+      list.push(node.id);
+      levels.set(level, list);
+    }
+
+    const horizontalGap = 180;
+    const verticalGap = 150;
+    const targets = new Map<string, { x: number; y: number }>();
+    for (const [level, ids] of levels) {
+      ids.forEach((id, index) => {
+        targets.set(id, {
+          x: (index - (ids.length - 1) / 2) * horizontalGap,
+          y: (level - maxDepth / 2) * verticalGap,
+        });
+      });
+    }
+    treeTargetsRef.current = targets;
+  }, [idKey, edgeKey, nodes]);
+
+  // Ease every node toward its tree position. Dragged nodes stay under the
+  // pointer until released, then ease back into the layout.
+  useEffect(() => {
+    let frame = 0;
+    const animate = () => {
       const bodies = bodiesRef.current;
-      const list = currentIds
-        .map((id) => bodies.get(id))
-        .filter((body): body is Body => Boolean(body));
-
-      for (let i = 0; i < list.length; i++) {
-        const a = list[i];
-        for (let j = i + 1; j < list.length; j++) {
-          const b = list[j];
-          let dx = b.x - a.x;
-          let dy = b.y - a.y;
-          let distance = Math.hypot(dx, dy);
-          if (distance < 0.001) {
-            dx = (Math.random() - 0.5) * 2;
-            dy = (Math.random() - 0.5) * 2;
-            distance = Math.hypot(dx, dy);
-          }
-          if (distance < REPULSION) {
-            const push = ((REPULSION - distance) / distance) * 0.045;
-            const fx = dx * push;
-            const fy = dy * push;
-            a.vx -= fx;
-            a.vy -= fy;
-            b.vx += fx;
-            b.vy += fy;
-          }
-        }
-        a.vx -= a.x * 0.0022;
-        a.vy -= a.y * 0.0022;
-        a.vx += Math.sin(time * 0.0007 + a.phase) * 0.012;
-        a.vy += Math.cos(time * 0.0006 + a.phase) * 0.012;
+      for (const node of nodes) {
+        const body = bodies.get(node.id);
+        const target = treeTargetsRef.current.get(node.id);
+        if (!body || !target) continue;
+        if (draggingRef.current?.id === node.id) continue;
+        body.x += (target.x - body.x) * 0.14;
+        body.y += (target.y - body.y) * 0.14;
+        body.vx = 0;
+        body.vy = 0;
       }
-
-      for (const edge of edges) {
-        const a = bodies.get(edge.from);
-        const b = bodies.get(edge.to);
-        if (!a || !b) continue;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const distance = Math.hypot(dx, dy) || 1;
-        const force = (distance - LINK_DISTANCE) * 0.006;
-        const fx = (dx / distance) * force;
-        const fy = (dy / distance) * force;
-        a.vx += fx;
-        a.vy += fy;
-        b.vx -= fx;
-        b.vy -= fy;
-      }
-
-      for (const body of list) {
-        if (draggingRef.current?.id && bodies.get(draggingRef.current.id) === body) {
-          body.vx = 0;
-          body.vy = 0;
-          continue;
-        }
-        body.vx *= 0.86;
-        body.vy *= 0.86;
-        body.x += body.vx;
-        body.y += body.vy;
-      }
-
       setTick((value) => value + 1);
-      frameRef.current = requestAnimationFrame(step);
+      frame = requestAnimationFrame(animate);
     };
-
-    frameRef.current = requestAnimationFrame(step);
+    frame = requestAnimationFrame(animate);
     return () => {
-      if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
-      frameRef.current = null;
+      if (frame) cancelAnimationFrame(frame);
     };
-  }, [edges, currentIds]);
+  }, [idKey, edgeKey, nodes]);
 
   const toWorld = (clientX: number, clientY: number) => {
     const rect = svgRef.current?.getBoundingClientRect();

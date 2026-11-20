@@ -401,6 +401,29 @@ export default function App() {
     }
   };
 
+  const enterAdminAgentPortal = async () => {
+    if (!adminToken) {
+      setAdminOpen(false);
+      return;
+    }
+    setAdminLoading(true);
+    try {
+      const result = await api.adminAgentSession(adminToken);
+      setWorkspace(result.state);
+      setWorkspaceVersion(result.version);
+      setSession(result.user);
+      setAuthModalOpen(false);
+      setAdminOpen(false);
+      setApiError('');
+    } catch (error) {
+      setApiError(
+        error instanceof Error ? error.message : 'could not open the admin agent portal'
+      );
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
   const saveDocsGoal = async (goal: string) => {
     if (!adminToken) return { ok: false, error: 'admin token missing' };
     try {
@@ -2793,7 +2816,7 @@ export default function App() {
         onUnlock={(credentials) => void unlockAdmin(credentials)}
         onSaveGoal={saveDocsGoal}
         onReviewReport={reviewVulnerabilityReport}
-        onOpenAgentPortal={() => setAdminOpen(false)}
+        onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onClose={() => setAdminOpen(false)}
       />
     </div>

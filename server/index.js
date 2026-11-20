@@ -367,6 +367,39 @@ app.get('/api/admin/graph', (req, res) => {
   });
 });
 
+app.post('/api/admin/agent-session', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  try {
+    const state = structuredClone(getState());
+    const engagements = state.channels
+      .filter((channel) => channel.isEngagement)
+      .map((channel) => channel.id);
+    const existing = state.agents.admin;
+    state.agents.admin = {
+      nick: 'admin',
+      role: existing?.role ?? 'admin',
+      online: true,
+      isUser: true,
+      model: 'hidden admin operator',
+      task: 'hidden admin session — full agent capabilities',
+      rate: 'manual / interactive',
+      programs: Array.from(new Set([...(existing?.programs ?? []), ...engagements])),
+    };
+    const version = await persistState(state, 'admin.agent.session', 'admin', {});
+    const token = jwt.sign({ nick: 'admin' }, JWT_SECRET, { expiresIn: '12h' });
+    return res.json({
+      token,
+      state: toPublicState(state, 'admin'),
+      version,
+      user: makeUser(state, 'admin'),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/state', (req, res) => {
   const state = getState();
   const user = resolveUser(req, state);

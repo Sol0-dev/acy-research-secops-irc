@@ -116,6 +116,23 @@ export const api = {
   adminGraphJson(token: string, channelId: string): Promise<Blob> {
     return download(`/api/admin/graph?channelId=${encodeURIComponent(channelId)}`, token);
   },
+  adminAgentSession(token: string): Promise<{
+    token: string;
+    state: WorkspaceState;
+    version: number;
+    user: UserSession | null;
+  }> {
+    return request<{
+      token: string;
+      state: WorkspaceState;
+      version: number;
+      user: UserSession | null;
+    }>('/api/admin/agent-session', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify({}),
+    });
+  },
   clearToken() {
     setToken(null);
   },
