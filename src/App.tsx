@@ -1401,7 +1401,7 @@ export default function App() {
 
   if (bootError && !ready) {
     return (
-      <div className="bg-[#0c0c0e] text-[#f4f4f5] font-mono h-screen w-screen flex flex-col items-center justify-center gap-3 p-6 text-xs">
+      <div className="bg-[#0c0c0e] text-[#f4f4f5] font-mono h-screen w-screen flex flex-col items-center justify-center gap-3 p-6 text-base">
         <span className="text-[#f87171]">central api / database unavailable</span>
         <span className="text-[#71717a] max-w-md text-center leading-relaxed">{bootError}</span>
         <button
@@ -1417,7 +1417,7 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="bg-[#0c0c0e] text-[#71717a] font-mono h-screen w-screen flex items-center justify-center text-xs">
+      <div className="bg-[#0c0c0e] text-[#71717a] font-mono h-screen w-screen flex items-center justify-center text-base">
         connecting to central mesh api…
       </div>
     );
@@ -1434,29 +1434,29 @@ export default function App() {
               setMobileRightOpen(false);
               setMobileLeftOpen((value) => !value);
             }}
-            className="md:hidden font-mono text-xs text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] p-1"
+            className="md:hidden font-mono text-base text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] p-1"
             aria-label="Toggle channels"
           >
             #
           </button>
 
-          <h1 className="font-mono text-xs sm:text-sm font-medium tracking-tight shrink-0">
+          <h1 className="font-mono text-base sm:text-lg font-medium tracking-tight shrink-0">
             {headerTitle}
           </h1>
 
-          <span className="text-[#d4d4d8] dark:text-[#27272a] font-mono text-xs shrink-0">/</span>
+          <span className="text-[#d4d4d8] dark:text-[#27272a] font-mono text-base shrink-0">/</span>
 
-          <p className="font-mono text-xs text-[#71717a] truncate">{headerSubtitle}</p>
+          <p className="font-mono text-base text-[#71717a] truncate">{headerSubtitle}</p>
         </div>
 
-        <div className="flex items-center gap-4 shrink-0 font-mono text-xs">
+        <div className="flex items-center gap-4 shrink-0 font-mono text-base">
           <button
             type="button"
             onClick={() => setAuthModalOpen(true)}
             className="text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] transition-colors flex items-center gap-1.5"
           >
             <span style={{ color: currentUserColor }}>{currentUserDisplay}</span>
-            <span className="text-[10px] text-[#71717a] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1">
+            <span className="text-[14px] text-[#71717a] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1">
               {currentUserRole}
             </span>
           </button>
@@ -1478,7 +1478,7 @@ export default function App() {
               {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement
                 ? 'graph'
                 : 'graphs'}{' '}
-              <span className="text-[10px] text-[#71717a]/70">
+              <span className="text-[14px] text-[#71717a]/70">
                 {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement
                   ? activeGraphNodeCount
                   : allGraphCount}
@@ -1495,7 +1495,7 @@ export default function App() {
               }}
               className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
             >
-              progress <span className="text-[10px] text-[#71717a]/70">{activeProgressCount}</span>
+              progress <span className="text-[14px] text-[#71717a]/70">{activeProgressCount}</span>
             </button>
           )}
 
@@ -1508,7 +1508,7 @@ export default function App() {
               }}
               className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
             >
-              reports <span className="text-[10px] text-[#71717a]/70">{activeReportCount}</span>
+              reports <span className="text-[14px] text-[#71717a]/70">{activeReportCount}</span>
             </button>
           )}
 
@@ -1528,7 +1528,7 @@ export default function App() {
             className="flex items-center gap-1 text-[#16a34a] dark:text-[#4ade80] border border-[#16a34a]/40 dark:border-[#4ade80]/40 px-2 py-0.5 hover:bg-[#16a34a]/10 dark:hover:bg-[#4ade80]/10 transition-colors"
             title="Start here: read the guide, create a chat group, and work together"
           >
-            docs <span className="text-[10px]">↗</span>
+            docs <span className="text-[14px]">↗</span>
           </button>
 
           <button
@@ -1555,7 +1555,7 @@ export default function App() {
       </header>
 
       {apiError && (
-        <div className="px-4 py-1.5 border-b border-[#e5e5e5] dark:border-[#1a1a1e] font-mono text-[11px] text-[#dc2626] dark:text-[#f87171] flex items-center justify-between gap-3 shrink-0">
+        <div className="px-4 py-1.5 border-b border-[#e5e5e5] dark:border-[#1a1a1e] font-mono text-[15px] text-[#dc2626] dark:text-[#f87171] flex items-center justify-between gap-3 shrink-0">
           <span className="truncate">api · {apiError}</span>
           <button type="button" onClick={() => setApiError('')} className="shrink-0 hover:underline">
             dismiss
@@ -1585,19 +1585,19 @@ export default function App() {
             <div className="px-4 py-3.5 border-b border-[#e5e5e5] dark:border-[#1a1a1e] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-                <span className="font-mono text-xs font-medium tracking-tight">secops.irc</span>
+                <span className="font-mono text-base font-medium tracking-tight">secops.irc</span>
               </div>
               <button
                 type="button"
                 onClick={() => openAddProgramModal()}
                 title="Add Bug Bounty Program or Pentest Engagement"
-                className="font-mono text-[11px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
+                className="font-mono text-[15px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
               >
                 [+ new]
               </button>
             </div>
 
-            <nav className="py-3 px-2 space-y-4 font-mono text-xs overflow-y-auto flex-1">
+            <nav className="py-3 px-2 space-y-4 font-mono text-base overflow-y-auto flex-1">
               {workspace.groups.map((groupName) => {
                 const groupChannels = workspace.channels.filter(
                   (channel) => channel.group === groupName
@@ -1617,10 +1617,10 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => toggleGroup(groupName)}
-                      className="w-full px-2 py-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] transition-colors"
+                      className="w-full px-2 py-1 flex items-center justify-between text-[14px] uppercase tracking-wider text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] transition-colors"
                     >
                       <span className="flex items-center gap-1.5 truncate">
-                        <span className="text-[9px] w-2 inline-block">
+                        <span className="text-[13px] w-2 inline-block">
                           {isCollapsed ? '+' : '-'}
                         </span>
                         <span className="truncate">{groupName}</span>
@@ -1629,7 +1629,7 @@ export default function App() {
                         {isCollapsed && hasUnread && (
                           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
                         )}
-                        <span className="text-[9px] text-[#71717a]/70">
+                        <span className="text-[13px] text-[#71717a]/70">
                           {groupChannels.length}
                         </span>
                       </span>
@@ -1638,7 +1638,7 @@ export default function App() {
                     {!isCollapsed && (
                       <div className="space-y-0.5 pl-1">
                         {groupChannels.length === 0 ? (
-                          <div className="px-2 py-1 text-[10px] text-[#71717a]/60 italic">
+                          <div className="px-2 py-1 text-[14px] text-[#71717a]/60 italic">
                             none active
                           </div>
                         ) : (
@@ -1664,7 +1664,7 @@ export default function App() {
                                   {graphNodeCount > 0 && (
                                     <span
                                       title={`${graphNodeCount} knowledge graph nodes`}
-                                      className="text-[9px] text-[#71717a]/70"
+                                      className="text-[13px] text-[#71717a]/70"
                                     >
                                       {graphNodeCount}n
                                     </span>
@@ -1685,13 +1685,13 @@ export default function App() {
 
               {/* Direct Messages */}
               <div className="pt-2 border-t border-[#e5e5e5] dark:border-[#1a1a1e] space-y-1">
-                <div className="px-2 py-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-[#71717a]">
+                <div className="px-2 py-1 flex items-center justify-between text-[14px] uppercase tracking-wider text-[#71717a]">
                   <span>DIRECT MESSAGES</span>
-                  <span className="text-[9px] text-[#71717a]/70">{sortedDmThreads.length}</span>
+                  <span className="text-[13px] text-[#71717a]/70">{sortedDmThreads.length}</span>
                 </div>
 
                 {sortedDmThreads.length === 0 ? (
-                  <div className="px-3 py-1 text-[10px] text-[#71717a]/60 leading-relaxed">
+                  <div className="px-3 py-1 text-[14px] text-[#71717a]/60 leading-relaxed">
                     click any agent or type /msg @agent
                   </div>
                 ) : (
@@ -1727,7 +1727,7 @@ export default function App() {
                           }`}
                         >
                           <span
-                            className="truncate text-[11px]"
+                            className="truncate text-[15px]"
                             style={{ color: isDirectWithUser ? peerColor : undefined }}
                           >
                             {displayLabel}
@@ -1744,7 +1744,7 @@ export default function App() {
             </nav>
           </div>
 
-          <div className="p-3.5 border-t border-[#e5e5e5] dark:border-[#1a1a1e] font-mono text-xs flex items-center justify-between text-[#71717a] shrink-0">
+          <div className="p-3.5 border-t border-[#e5e5e5] dark:border-[#1a1a1e] font-mono text-base flex items-center justify-between text-[#71717a] shrink-0">
             <button
               type="button"
               onClick={toggleLive}
@@ -1755,7 +1755,7 @@ export default function App() {
               <span className="w-1.5 h-1.5 rounded-full bg-current" />
               <span>{workspace.isLive ? 'live' : 'paused'}</span>
             </button>
-            <span className="text-[11px]">tls 1.3</span>
+            <span className="text-[15px]">tls 1.3</span>
           </div>
         </aside>
 
@@ -1945,19 +1945,19 @@ export default function App() {
             />
           ) : (
             <>
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3 font-mono text-xs sm:text-[13px] leading-relaxed">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3 font-mono text-base sm:text-[17px] leading-relaxed">
             {workspace.docsGoal && (
               <div className="mb-3 border-l-2 border-[#16a34a] dark:border-[#4ade80] pl-3 py-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="text-[9px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
+                <span className="text-[13px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
                   admin goal
                 </span>
-                <span className="text-[11px] text-[#18181b] dark:text-[#f4f4f5]">
+                <span className="text-[15px] text-[#18181b] dark:text-[#f4f4f5]">
                   {workspace.docsGoal}
                 </span>
                 <button
                   type="button"
                   onClick={openDocsPanel}
-                  className="text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                  className="text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
                 >
                   docs →
                 </button>
@@ -1967,11 +1967,11 @@ export default function App() {
               <div className="mb-4 border border-[#16a34a]/40 dark:border-[#4ade80]/40 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 p-3.5 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-                  <span className="font-medium text-[11px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
+                  <span className="font-medium text-[15px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
                     start here - docs + a chat group for every agent
                   </span>
                 </div>
-                <p className="text-[11px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
+                <p className="text-[15px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
                   Read the guide first. Every agent should create at least one chat group
                   (engagement) and enroll the others, so the whole team shares the knowledge graph,
                   progress log, vulnerability reports, and validated leaderboard.
@@ -1980,18 +1980,18 @@ export default function App() {
                   <button
                     type="button"
                     onClick={openDocsPanel}
-                    className="px-2.5 py-1 border border-[#16a34a]/50 dark:border-[#4ade80]/50 text-[10px] text-[#16a34a] dark:text-[#4ade80] hover:bg-[#16a34a]/10 dark:hover:bg-[#4ade80]/10"
+                    className="px-2.5 py-1 border border-[#16a34a]/50 dark:border-[#4ade80]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80] hover:bg-[#16a34a]/10 dark:hover:bg-[#4ade80]/10"
                   >
                     open docs →
                   </button>
                   <button
                     type="button"
                     onClick={() => openAddProgramModal(session?.userNick)}
-                    className="px-2.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                    className="px-2.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
                   >
                     + create chat group
                   </button>
-                  <span className="text-[10px] text-[#71717a]">
+                  <span className="text-[14px] text-[#71717a]">
                     {workspace.channels.some((channel) => channel.isEngagement)
                       ? 'or open an existing engagement from the left sidebar'
                       : 'you are not enrolled in a chat group yet - create one or ask an agent to enroll you'}
@@ -2038,7 +2038,7 @@ export default function App() {
                     </div>
                   </div>
                   {message.snippet && message.snippet.length > 0 && (
-                    <pre className="sm:ml-[10.25rem] pl-3 border-l border-[#d4d4d8] dark:border-[#27272a] text-[11px] sm:text-xs text-[#71717a] overflow-x-auto py-0.5 leading-relaxed">
+                    <pre className="sm:ml-[10.25rem] pl-3 border-l border-[#d4d4d8] dark:border-[#27272a] text-[15px] sm:text-base text-[#71717a] overflow-x-auto py-0.5 leading-relaxed">
                       {message.snippet.join('\n')}
                     </pre>
                   )}
@@ -2055,7 +2055,7 @@ export default function App() {
               setInputText('');
               void handleCommandOrMessage(value);
             }}
-            className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] px-4 py-3 flex items-center gap-2.5 font-mono text-xs shrink-0"
+            className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] px-4 py-3 flex items-center gap-2.5 font-mono text-base shrink-0"
           >
             <span className="text-[#71717a] select-none">&gt;</span>
             <input
@@ -2088,16 +2088,16 @@ export default function App() {
             mobileRightOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
           }`}
         >
-          <div className="p-3.5 space-y-4 font-mono text-xs overflow-y-auto">
+          <div className="p-3.5 space-y-4 font-mono text-base overflow-y-auto">
             <div className="flex items-center justify-between px-1">
-              <span className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
                 agents & roles
               </span>
               <button
                 type="button"
                 onClick={openRoleCreate}
                 title="Create a custom role - anyone can create any role for any agent"
-                className="text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+                className="text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
               >
                 + role
               </button>
@@ -2108,13 +2108,13 @@ export default function App() {
                 onSubmit={(event) => void submitCustomRole(event)}
                 className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-2 space-y-1.5"
               >
-                <div className="text-[9px] uppercase tracking-wider text-[#71717a]">
+                <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
                   new custom role
                 </div>
                 <select
                   value={roleCreateTarget}
                   onChange={(event) => setRoleCreateTarget(event.target.value)}
-                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
                 >
                   {Object.values(workspace.agents).length === 0 && (
                     <option value="">no agents online</option>
@@ -2131,36 +2131,36 @@ export default function App() {
                   value={roleCreateName}
                   onChange={(event) => setRoleCreateName(event.target.value)}
                   placeholder="type any role, e.g. cloud_hunter"
-                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
                 />
                 <textarea
                   rows={2}
                   value={roleCreateDescription}
                   onChange={(event) => setRoleCreateDescription(event.target.value)}
                   placeholder="describe what this custom role does (optional)"
-                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none resize-y"
+                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none resize-y"
                 />
                 <div className="flex items-center gap-1">
                   <button
                     type="submit"
-                    className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                    className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
                   >
                     create +
                   </button>
                   <button
                     type="button"
                     onClick={() => setRoleCreateOpen(false)}
-                    className="px-2 py-1 text-[10px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+                    className="px-2 py-1 text-[14px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
                   >
                     cancel
                   </button>
                 </div>
                 {roleCreateError && (
-                  <div className="text-[9px] text-[#dc2626] dark:text-[#f87171] leading-relaxed">
+                  <div className="text-[13px] text-[#dc2626] dark:text-[#f87171] leading-relaxed">
                     {roleCreateError}
                   </div>
                 )}
-                <div className="text-[9px] text-[#71717a] leading-relaxed">
+                <div className="text-[13px] text-[#71717a] leading-relaxed">
                   anyone can create any custom role for any agent.
                 </div>
               </form>
@@ -2169,12 +2169,12 @@ export default function App() {
             {roleGroups.map((group) => (
               <div key={group.role} className="space-y-1">
                 <div className="px-1 pb-0.5">
-                  <div className="text-[10px] uppercase tracking-wider text-[#71717a] flex items-center justify-between">
+                  <div className="text-[14px] uppercase tracking-wider text-[#71717a] flex items-center justify-between">
                     <span>{group.label}</span>
-                    <span className="text-[9px] text-[#71717a]/70">{group.members.length}</span>
+                    <span className="text-[13px] text-[#71717a]/70">{group.members.length}</span>
                   </div>
                   {group.description && (
-                    <div className="text-[9px] text-[#71717a]/80 leading-relaxed pt-0.5">
+                    <div className="text-[13px] text-[#71717a]/80 leading-relaxed pt-0.5">
                       {group.description}
                     </div>
                   )}
@@ -2215,7 +2215,7 @@ export default function App() {
                         </span>
                       </span>
                       {programCount > 0 && (
-                        <span className="text-[9px] text-[#71717a] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1 shrink-0 group-hover:border-[#71717a]">
+                        <span className="text-[13px] text-[#71717a] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1 shrink-0 group-hover:border-[#71717a]">
                           {programCount === 1 ? primaryTag.slice(0, 8) : `${programCount}p`}
                         </span>
                       )}
@@ -2227,7 +2227,7 @@ export default function App() {
           </div>
 
           {selectedAgent && (
-            <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] p-3.5 font-mono text-xs space-y-2.5 bg-[#f4f4f5]/50 dark:bg-[#111114] max-h-[65%] overflow-y-auto">
+            <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] p-3.5 font-mono text-base space-y-2.5 bg-[#f4f4f5]/50 dark:bg-[#111114] max-h-[65%] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <span
                   className="font-medium truncate"
@@ -2243,13 +2243,13 @@ export default function App() {
                   x
                 </button>
               </div>
-              <div className="text-[11px] text-[#71717a] truncate">{selectedAgent.model}</div>
-              <div className="text-[11px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
+              <div className="text-[15px] text-[#71717a] truncate">{selectedAgent.model}</div>
+              <div className="text-[15px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
                 {selectedAgent.task}
               </div>
 
               <div className="pt-1.5 border-t border-[#e5e5e5] dark:border-[#1a1a1e] space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-[#71717a]">
+                <div className="flex items-center justify-between text-[14px] uppercase tracking-wider text-[#71717a]">
                   <span>role</span>
                   <span className="text-[#16a34a] dark:text-[#4ade80]">{selectedAgent.role}</span>
                 </div>
@@ -2268,7 +2268,7 @@ export default function App() {
                             session?.userNick || selectedAgent.nick
                           )
                         }
-                        className={`px-1.5 py-0.5 text-[10px] border transition-colors ${
+                        className={`px-1.5 py-0.5 text-[14px] border transition-colors ${
                           active
                             ? 'border-[#16a34a] dark:border-[#4ade80] text-[#18181b] dark:text-[#f4f4f5] bg-[#fafafa] dark:bg-[#0c0c0e]'
                             : 'border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]'
@@ -2298,18 +2298,18 @@ export default function App() {
                     value={customRoleInput}
                     onChange={(event) => setCustomRoleInput(event.target.value)}
                     placeholder="create any role..."
-                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
                   />
                   <button
                     type="submit"
-                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] shrink-0"
+                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] shrink-0"
                   >
                     +role
                   </button>
                 </form>
 
                 <div className="pt-1 space-y-1">
-                  <div className="text-[9px] uppercase tracking-wider text-[#71717a]">
+                  <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
                     role description
                   </div>
                   <textarea
@@ -2322,7 +2322,7 @@ export default function App() {
                         : 'what does this role do? scope, tools, responsibilities…'
                     }
                     disabled={selectedAgent.role === 'unassigned'}
-                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none resize-y disabled:opacity-50"
+                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none resize-y disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -2330,7 +2330,7 @@ export default function App() {
                     onClick={() =>
                       void saveRoleDescription(selectedAgent.role, roleDescriptionInput)
                     }
-                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40"
+                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40"
                   >
                     save description
                   </button>
@@ -2342,7 +2342,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => void openOrCreateDmThread(selectedAgent.nick)}
-                    className="w-full py-1.5 px-2 border border-[#e5e5e5] dark:border-[#1a1a1e] hover:border-[#16a34a] dark:hover:border-[#4ade80] text-[11px] text-[#18181b] dark:text-[#f4f4f5] flex items-center justify-between transition-colors"
+                    className="w-full py-1.5 px-2 border border-[#e5e5e5] dark:border-[#1a1a1e] hover:border-[#16a34a] dark:hover:border-[#4ade80] text-[15px] text-[#18181b] dark:text-[#f4f4f5] flex items-center justify-between transition-colors"
                   >
                     <span>direct message</span>
                     <span className="text-[#16a34a] dark:text-[#4ade80]">&rarr;</span>
@@ -2356,7 +2356,7 @@ export default function App() {
                     const error = openGraphPanel(activeChannelObj.id, selectedAgent.nick);
                     if (error) setApiError(error);
                   }}
-                  className="w-full py-1.5 px-2 border border-[#e5e5e5] dark:border-[#1a1a1e] hover:border-[#16a34a] dark:hover:border-[#4ade80] text-[11px] text-[#18181b] dark:text-[#f4f4f5] flex items-center justify-between transition-colors"
+                  className="w-full py-1.5 px-2 border border-[#e5e5e5] dark:border-[#1a1a1e] hover:border-[#16a34a] dark:hover:border-[#4ade80] text-[15px] text-[#18181b] dark:text-[#f4f4f5] flex items-center justify-between transition-colors"
                 >
                   <span>contribute intel</span>
                   <span className="text-[#16a34a] dark:text-[#4ade80]">&rarr;</span>
@@ -2364,19 +2364,19 @@ export default function App() {
               )}
 
               <div className="pt-1.5 border-t border-[#e5e5e5] dark:border-[#1a1a1e] space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-[#71717a]">
+                <div className="flex items-center justify-between text-[14px] uppercase tracking-wider text-[#71717a]">
                   <span>enrolled programs</span>
                   <span>{selectedAgent.programs.length}</span>
                 </div>
 
                 <div className="flex flex-wrap gap-1">
                   {selectedAgent.programs.length === 0 ? (
-                    <span className="text-[10px] text-[#71717a]">none yet</span>
+                    <span className="text-[14px] text-[#71717a]">none yet</span>
                   ) : (
                     selectedAgent.programs.map((channelId) => (
                       <div
                         key={channelId}
-                        className="inline-flex items-center gap-1 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#fafafa] dark:bg-[#0c0c0e] px-1.5 py-0.5 text-[10px]"
+                        className="inline-flex items-center gap-1 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#fafafa] dark:bg-[#0c0c0e] px-1.5 py-0.5 text-[14px]"
                       >
                         <button
                           type="button"
@@ -2410,7 +2410,7 @@ export default function App() {
                       if (!event.target.value) return;
                       void enrollAgentInProgram(selectedAgent.nick, event.target.value);
                     }}
-                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
                   >
                     <option value="">+ enroll in program...</option>
                     {workspace.channels
@@ -2428,7 +2428,7 @@ export default function App() {
                     type="button"
                     onClick={() => openAddProgramModal(selectedAgent.nick)}
                     title="Create new engagement for this agent"
-                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] shrink-0"
+                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] shrink-0"
                   >
                     +new
                   </button>
@@ -2447,13 +2447,13 @@ export default function App() {
           }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
         >
-          <div className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] w-full max-w-xl p-5 sm:p-6 font-mono text-xs space-y-5 max-h-[85vh] overflow-y-auto">
+          <div className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] w-full max-w-xl p-5 sm:p-6 font-mono text-base space-y-5 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#e5e5e5] dark:border-[#1a1a1e] pb-3">
-              <span className="font-medium text-sm">scope // {activeScopeObj.program}</span>
+              <span className="font-medium text-lg">scope // {activeScopeObj.program}</span>
               <button
                 type="button"
                 onClick={() => setScopeModalOpen(false)}
-                className="text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] text-sm"
+                className="text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] text-lg"
               >
                 esc
               </button>
@@ -2464,7 +2464,7 @@ export default function App() {
                 {activeScopeObj.constraints}
               </div>
               <div className="space-y-1.5">
-                <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
+                <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
                   in-scope assets
                 </div>
                 <ul className="space-y-1 text-[#18181b] dark:text-[#e4e4e7]">
@@ -2474,7 +2474,7 @@ export default function App() {
                 </ul>
               </div>
               <div className="space-y-1.5">
-                <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
+                <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
                   out-of-scope / prohibited
                 </div>
                 <ul className="space-y-1 text-[#71717a]">
@@ -2496,25 +2496,25 @@ export default function App() {
           }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
         >
-          <div className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] w-full max-w-lg p-5 sm:p-6 font-mono text-xs space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] w-full max-w-lg p-5 sm:p-6 font-mono text-base space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#e5e5e5] dark:border-[#1a1a1e] pb-3">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-                <span className="font-medium text-sm tracking-tight">
+                <span className="font-medium text-lg tracking-tight">
                   register bug bounty / pentest engagement
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setAddProgramModalOpen(false)}
-                className="text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] text-sm"
+                className="text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] text-lg"
               >
                 esc
               </button>
             </div>
 
             {progError && (
-              <div className="text-[11px] border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
+              <div className="text-[15px] border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
                 {progError}
               </div>
             )}
@@ -2527,7 +2527,7 @@ export default function App() {
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="block text-[10px] uppercase tracking-wider text-[#71717a]">
+                  <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                     channel / program slug
                   </label>
                   <div className="flex items-center border border-[#e5e5e5] dark:border-[#1a1a1e] px-2.5 py-1.5 focus-within:border-[#71717a]">
@@ -2546,7 +2546,7 @@ export default function App() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-[10px] uppercase tracking-wider text-[#71717a]">
+                  <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                     platform / type
                   </label>
                   <select
@@ -2571,7 +2571,7 @@ export default function App() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-[10px] uppercase tracking-wider text-[#71717a]">
+                <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                   irc channel group
                 </label>
                 <select
@@ -2590,7 +2590,7 @@ export default function App() {
 
               {progGroup === '__NEW__' && (
                 <div className="space-y-1">
-                  <label className="block text-[10px] uppercase tracking-wider text-[#71717a]">
+                  <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                     new group title
                   </label>
                   <input
@@ -2605,7 +2605,7 @@ export default function App() {
               )}
 
               <div className="space-y-1">
-                <label className="block text-[10px] uppercase tracking-wider text-[#71717a]">
+                <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                   in-scope targets (comma or newline separated)
                 </label>
                 <textarea
@@ -2619,7 +2619,7 @@ export default function App() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-[10px] uppercase tracking-wider text-[#71717a]">
+                <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                   out-of-scope exclusions
                 </label>
                 <input
@@ -2632,7 +2632,7 @@ export default function App() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-[10px] uppercase tracking-wider text-[#71717a]">
+                <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                   bounty range / sla &amp; safe harbor notes
                 </label>
                 <input
@@ -2667,11 +2667,11 @@ export default function App() {
       {/* TERMINAL AUTH GATE MODAL (LOGIN / REGISTER / GUEST) */}
       {authModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-[1px]">
-          <div className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] w-full max-w-md p-6 font-mono text-xs space-y-5">
+          <div className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] w-full max-w-md p-6 font-mono text-base space-y-5">
             <div className="flex items-center justify-between border-b border-[#e5e5e5] dark:border-[#1a1a1e] pb-3">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-                <span className="font-medium text-sm tracking-tight">secops.irc // auth</span>
+                <span className="font-medium text-lg tracking-tight">secops.irc // auth</span>
               </div>
               {session?.isAuthenticated && (
                 <button
@@ -2716,7 +2716,7 @@ export default function App() {
             </div>
 
             {authError && (
-              <div className="text-[11px] border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
+              <div className="text-[15px] border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
                 {authError}
               </div>
             )}
@@ -2729,7 +2729,7 @@ export default function App() {
               className="space-y-3.5"
             >
               <div className="space-y-1">
-                <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-[#71717a]">
+                <div className="flex items-center justify-between text-[14px] uppercase tracking-wider text-[#71717a]">
                   <span>agent / operator handle</span>
                   <span style={{ color: authPreviewColor }}>{authPreviewNick}</span>
                 </div>
@@ -2751,7 +2751,7 @@ export default function App() {
 
               {authMode === 'register' && (
                 <div className="space-y-1">
-                  <label className="block text-[10px] uppercase tracking-wider text-[#71717a]">
+                  <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                     pgp fingerprint / email (optional · joins unassigned)
                   </label>
                   <input
@@ -2767,7 +2767,7 @@ export default function App() {
               )}
 
               <div className="space-y-1">
-                <label className="block text-[10px] uppercase tracking-wider text-[#71717a]">
+                <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                   passphrase / api token
                 </label>
                 <input
@@ -2792,7 +2792,7 @@ export default function App() {
               </div>
             </form>
 
-            <div className="pt-2 border-t border-[#e5e5e5] dark:border-[#1a1a1e] flex items-center justify-between text-[11px] text-[#71717a]">
+            <div className="pt-2 border-t border-[#e5e5e5] dark:border-[#1a1a1e] flex items-center justify-between text-[15px] text-[#71717a]">
               <span>
                 {Object.keys(workspace.accounts).length === 0
                   ? 'no seeded accounts - register the first handle'

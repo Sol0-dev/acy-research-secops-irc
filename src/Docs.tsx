@@ -49,7 +49,7 @@ function Code({ children }: { children: React.ReactNode }) {
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="px-1.5 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#52525b] dark:text-[#a1a1aa]">
+    <kbd className="px-1.5 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#52525b] dark:text-[#a1a1aa]">
       {children}
     </kbd>
   );
@@ -169,7 +169,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
                 key={command}
                 type="button"
                 onClick={() => copyCommand(command)}
-                className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[11px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[15px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
               >
                 {command}
               </button>
@@ -356,7 +356,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
                   key={command}
                   type="button"
                   onClick={() => copyCommand(command)}
-                  className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[11px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                  className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[15px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
                 >
                   {command}
                 </button>
@@ -431,7 +431,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
       label: 'command list',
       body: (
         <div className="space-y-3">
-          <table className="w-full text-[11px] border-collapse">
+          <table className="w-full text-[15px] border-collapse">
             <thead>
               <tr className="text-left text-[#71717a] border-b border-[#e5e5e5] dark:border-[#1a1a1e]">
                 <th className="py-1 pr-2 font-medium">command</th>
@@ -474,31 +474,31 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
   const activeSection = sections.find((section) => section.id === active) ?? sections[0];
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#fafafa] dark:bg-[#0c0c0e] font-mono text-xs overflow-hidden">
+    <div className="flex-1 flex flex-col min-w-0 bg-[#fafafa] dark:bg-[#0c0c0e] font-mono text-base overflow-hidden">
       <div className="flex items-center justify-between border-b border-[#e5e5e5] dark:border-[#1a1a1e] px-4 sm:px-5 py-3 shrink-0 gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={onClose}
-            className="text-[11px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+            className="text-[15px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
           >
             &larr; chat
           </button>
           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-          <span className="font-medium text-sm tracking-tight truncate">secops.irc // guide</span>
+          <span className="font-medium text-lg tracking-tight truncate">secops.irc // guide</span>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="text-[10px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+          className="text-[14px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
         >
           esc
         </button>
       </div>
 
       {goal && (
-        <div className="border-b border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/60 dark:bg-[#111114] px-4 sm:px-5 py-2 text-[11px] leading-relaxed">
-          <span className="text-[9px] uppercase tracking-wider text-[#71717a] mr-2">goal</span>
+        <div className="border-b border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/60 dark:bg-[#111114] px-4 sm:px-5 py-2 text-[15px] leading-relaxed">
+          <span className="text-[13px] uppercase tracking-wider text-[#71717a] mr-2">goal</span>
           <span className="text-[#18181b] dark:text-[#f4f4f5]">{goal}</span>
         </div>
       )}
@@ -522,7 +522,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
         </nav>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-3 leading-relaxed">
-          <h2 className="text-sm font-medium tracking-tight">{activeSection.label}</h2>
+          <h2 className="text-lg font-medium tracking-tight">{activeSection.label}</h2>
           {activeSection.body}
         </div>
       </div>

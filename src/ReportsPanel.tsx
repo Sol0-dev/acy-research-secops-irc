@@ -170,13 +170,13 @@ export default function ReportsPanel({
   };
 
   const inputClass =
-    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[11px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a]';
+    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a]';
   const areaClass = `${inputClass} resize-y`;
   const buttonClass =
-    'px-3 py-1.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40';
+    'px-3 py-1.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40';
 
   const label = (text: string) => (
-    <span className="text-[9px] uppercase tracking-wider text-[#71717a]">{text}</span>
+    <span className="text-[13px] uppercase tracking-wider text-[#71717a]">{text}</span>
   );
 
   return (
@@ -186,24 +186,24 @@ export default function ReportsPanel({
           <button
             type="button"
             onClick={onClose}
-            className="font-mono text-[11px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+            className="font-mono text-[15px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
           >
             &larr; chat
           </button>
           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-          <span className="font-mono text-xs font-medium truncate">
+          <span className="font-mono text-base font-medium truncate">
             vulnerability reports // {channelId}
           </span>
-          <span className="font-mono text-[10px] text-[#71717a]">{reports.length} filed</span>
+          <span className="font-mono text-[14px] text-[#71717a]">{reports.length} filed</span>
         </div>
 
-        <div className="flex items-center gap-2 font-mono text-[10px] text-[#71717a]">
+        <div className="flex items-center gap-2 font-mono text-[14px] text-[#71717a]">
           <label className="flex items-center gap-1.5">
             <span>as</span>
             <select
               value={author}
               onChange={(event) => setAuthor(event.target.value)}
-              className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+              className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
             >
               {Object.values(agents).map((agent) => (
                 <option key={agent.nick} value={agent.nick}>
@@ -226,13 +226,13 @@ export default function ReportsPanel({
       </div>
 
       {error && (
-        <div className="mx-4 sm:mx-5 mt-3 text-[11px] font-mono border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
+        <div className="mx-4 sm:mx-5 mt-3 text-[15px] font-mono border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
           {error}
         </div>
       )}
 
       {mode === 'list' && (
-        <div className="px-4 sm:px-5 py-2 border-b border-[#e5e5e5] dark:border-[#1a1a1e] flex items-center gap-3 overflow-x-auto shrink-0 font-mono text-[10px]">
+        <div className="px-4 sm:px-5 py-2 border-b border-[#e5e5e5] dark:border-[#1a1a1e] flex items-center gap-3 overflow-x-auto shrink-0 font-mono text-[14px]">
           <span className="uppercase tracking-wider text-[#71717a] shrink-0">
             validated leaderboard
           </span>
@@ -257,8 +257,8 @@ export default function ReportsPanel({
       )}
 
       {mode === 'new' ? (
-        <form onSubmit={(event) => void submit(event)} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 font-mono text-[11px]">
-          <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
+        <form onSubmit={(event) => void submit(event)} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 font-mono text-[15px]">
+          <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
             file a structured vulnerability report
           </div>
 
@@ -435,7 +435,7 @@ export default function ReportsPanel({
 
           <div className="flex items-center gap-2">
             <select
-              className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[10px] text-[#18181b] dark:text-[#f4f4f5]"
+              className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[14px] text-[#18181b] dark:text-[#f4f4f5]"
               value={draft.status}
               onChange={(event) => setField('status', event.target.value as ReportStatus)}
             >
@@ -452,9 +452,9 @@ export default function ReportsPanel({
         </form>
       ) : (
         <div className="flex-1 flex min-h-0 flex-col lg:flex-row">
-          <nav className="lg:w-64 shrink-0 border-b lg:border-b-0 lg:border-r border-[#e5e5e5] dark:border-[#1a1a1e] p-2 overflow-y-auto font-mono text-[11px] max-h-48 lg:max-h-none">
+          <nav className="lg:w-64 shrink-0 border-b lg:border-b-0 lg:border-r border-[#e5e5e5] dark:border-[#1a1a1e] p-2 overflow-y-auto font-mono text-[15px] max-h-48 lg:max-h-none">
             {reports.length === 0 ? (
-              <div className="p-3 text-[10px] text-[#71717a] leading-relaxed">
+              <div className="p-3 text-[14px] text-[#71717a] leading-relaxed">
                 no reports yet - when an agent confirms a vulnerability, file it here with the full
                 summary, classification, reproduction, impact and remediation.
               </div>
@@ -474,64 +474,64 @@ export default function ReportsPanel({
                     }`}
                   >
                     <div className="flex items-center gap-1.5">
-                      <span className={`text-[9px] px-1 border ${SEVERITY_CLASS[report.severity]}`}>
+                      <span className={`text-[13px] px-1 border ${SEVERITY_CLASS[report.severity]}`}>
                         {report.severity}
                       </span>
                       <span
-                        className={`text-[9px] px-1 border ${REVIEW_CLASS[report.review] ?? REVIEW_CLASS.pending}`}
+                        className={`text-[13px] px-1 border ${REVIEW_CLASS[report.review] ?? REVIEW_CLASS.pending}`}
                       >
                         {report.review}
                       </span>
-                      <span className="text-[9px] text-[#71717a]">v{report.version}</span>
+                      <span className="text-[13px] text-[#71717a]">v{report.version}</span>
                     </div>
-                    <div className="truncate text-[10px] pt-1">{report.title}</div>
+                    <div className="truncate text-[14px] pt-1">{report.title}</div>
                   </button>
                 ))
             )}
           </nav>
 
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 font-mono text-[11px] leading-relaxed">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 font-mono text-[15px] leading-relaxed">
             {!selected ? (
-              <div className="h-full flex items-center justify-center text-center text-[#71717a] text-[11px]">
+              <div className="h-full flex items-center justify-center text-center text-[#71717a] text-[15px]">
                 select a report or file a new one.
               </div>
             ) : (
               <article className="max-w-3xl space-y-4">
                 <header className="space-y-2 border-b border-[#e5e5e5] dark:border-[#1a1a1e] pb-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`text-[9px] px-1 py-0.5 border ${SEVERITY_CLASS[selected.severity]}`}>
+                    <span className={`text-[13px] px-1 py-0.5 border ${SEVERITY_CLASS[selected.severity]}`}>
                       {selected.severity}
                     </span>
-                    <span className={`text-[9px] px-1 py-0.5 border ${REVIEW_CLASS[selected.review] ?? REVIEW_CLASS.pending}`}>
+                    <span className={`text-[13px] px-1 py-0.5 border ${REVIEW_CLASS[selected.review] ?? REVIEW_CLASS.pending}`}>
                       {selected.review}
                     </span>
-                    <span className="text-[9px] px-1 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a]">
+                    <span className="text-[13px] px-1 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a]">
                       {selected.status}
                     </span>
-                    <span className="text-[9px] text-[#71717a]">v{selected.version}</span>
-                    <span className="text-[9px] text-[#71717a]">
+                    <span className="text-[13px] text-[#71717a]">v{selected.version}</span>
+                    <span className="text-[13px] text-[#71717a]">
                       {selected.time} · {formatNick(selected.createdBy, agents[selected.createdBy]?.role)}
                     </span>
                   </div>
-                  <h1 className="text-sm sm:text-base font-medium text-[#18181b] dark:text-[#f4f4f5] not-italic">
+                  <h1 className="text-lg sm:text-xl font-medium text-[#18181b] dark:text-[#f4f4f5] not-italic">
                     {selected.title}
                   </h1>
                 </header>
 
                 <section className="space-y-1">
-                  <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">Summary</h2>
+                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">Summary</h2>
                   <p>{selected.summary}</p>
                 </section>
 
                 <section className="space-y-1">
-                  <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">
                     Affected asset
                   </h2>
                   <p className="break-all">{selected.affectedAsset}</p>
                 </section>
 
                 <section className="space-y-1">
-                  <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">
                     Classification
                   </h2>
                   <ul className="list-disc list-inside space-y-0.5">
@@ -543,7 +543,7 @@ export default function ReportsPanel({
                 </section>
 
                 <section className="space-y-1">
-                  <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">
                     Steps to reproduce
                   </h2>
                   <ol className="list-decimal list-inside space-y-0.5">
@@ -554,14 +554,14 @@ export default function ReportsPanel({
                 </section>
 
                 <section className="space-y-1">
-                  <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">Request</h2>
+                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">Request</h2>
                   <pre className="p-2.5 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap">
                     {selected.request}
                   </pre>
                 </section>
 
                 <section className="space-y-1">
-                  <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">Response</h2>
+                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">Response</h2>
                   <pre className="p-2.5 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap">
                     {selected.response}
                   </pre>
@@ -569,20 +569,20 @@ export default function ReportsPanel({
 
                 {selected.proof && (
                   <section className="space-y-1">
-                    <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">Proof</h2>
+                    <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">Proof</h2>
                     <p className="break-all">{selected.proof}</p>
                   </section>
                 )}
 
                 {selected.pocScript && (
                   <section className="space-y-1">
-                    <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">PoC script</h2>
+                    <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">PoC script</h2>
                     <p className="break-all">{selected.pocScript}</p>
                   </section>
                 )}
 
                 <section className="space-y-1">
-                  <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">
                     What this gives an attacker
                   </h2>
                   <p>{selected.attackerValue}</p>
@@ -590,7 +590,7 @@ export default function ReportsPanel({
 
                 {selected.testedRuledOut.length > 0 && (
                   <section className="space-y-1">
-                    <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+                    <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">
                       What was tested and ruled out
                     </h2>
                     <ul className="list-disc list-inside space-y-0.5">
@@ -602,12 +602,12 @@ export default function ReportsPanel({
                 )}
 
                 <section className="space-y-1">
-                  <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">Impact</h2>
+                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">Impact</h2>
                   <p>{selected.impact}</p>
                 </section>
 
                 <section className="space-y-1">
-                  <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">Remediation</h2>
+                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">Remediation</h2>
                   <ol className="list-decimal list-inside space-y-0.5">
                     {selected.remediation.map((item, index) => (
                       <li key={`${index}-${item}`}>{item}</li>
@@ -615,7 +615,7 @@ export default function ReportsPanel({
                   </ol>
                 </section>
 
-                <div className="text-[9px] text-[#71717a] border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2 space-y-0.5">
+                <div className="text-[13px] text-[#71717a] border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2 space-y-0.5">
                   <div>
                     linked graph node: {selected.graphNodeId ?? 'none'} · attributed to{' '}
                     <span style={{ color: nickColor(selected.createdBy) }}>

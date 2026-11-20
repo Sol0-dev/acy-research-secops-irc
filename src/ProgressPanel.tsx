@@ -107,11 +107,11 @@ export default function ProgressPanel({
   const failedCount = entries.filter((entry) => entry.status === 'failed').length;
 
   const inputClass =
-    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[11px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a]';
+    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a]';
   const areaClass =
-    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[11px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y';
+    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y';
   const buttonClass =
-    'px-3 py-1.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40';
+    'px-3 py-1.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40';
 
   const run = async (action: () => Promise<ProgressActionResult>, success: string) => {
     setBusy(true);
@@ -135,28 +135,28 @@ export default function ProgressPanel({
           <button
             type="button"
             onClick={onClose}
-            className="font-mono text-[11px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+            className="font-mono text-[15px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
           >
             &larr; chat
           </button>
           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-          <span className="font-mono text-xs font-medium truncate">
+          <span className="font-mono text-base font-medium truncate">
             progress log // {channelId}
           </span>
-          <span className="font-mono text-[10px] text-[#71717a]">
+          <span className="font-mono text-[14px] text-[#71717a]">
             {entries.length} entries · {commitCount} commits · {failedCount} failed
           </span>
-          <span className="font-mono text-[10px] text-[#71717a]">
+          <span className="font-mono text-[14px] text-[#71717a]">
             head v{log?.headVersion ?? version}
           </span>
         </div>
 
-        <label className="flex items-center gap-1.5 font-mono text-[10px] text-[#71717a]">
+        <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
           <span>acting as</span>
           <select
             value={contributor}
             onChange={(event) => setContributor(event.target.value)}
-            className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+            className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
           >
             {Object.values(agents).map((agent) => (
               <option key={agent.nick} value={agent.nick}>
@@ -168,24 +168,24 @@ export default function ProgressPanel({
       </div>
 
       {error && (
-        <div className="mx-4 sm:mx-5 mt-3 text-[11px] font-mono border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
+        <div className="mx-4 sm:mx-5 mt-3 text-[15px] font-mono border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
           {error}
         </div>
       )}
       {notice && (
-        <div className="mx-4 sm:mx-5 mt-3 text-[11px] font-mono border-l border-[#4ade80] pl-2.5 py-0.5 text-[#16a34a] dark:text-[#4ade80]">
+        <div className="mx-4 sm:mx-5 mt-3 text-[15px] font-mono border-l border-[#4ade80] pl-2.5 py-0.5 text-[#16a34a] dark:text-[#4ade80]">
           {notice}
         </div>
       )}
 
-      <div className="p-4 sm:p-5 space-y-4 font-mono text-[11px]">
+      <div className="p-4 sm:p-5 space-y-4 font-mono text-[15px]">
         <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
                 session protocol
               </div>
-              <div className="text-[10px] text-[#71717a]/80 leading-relaxed">
+              <div className="text-[14px] text-[#71717a]/80 leading-relaxed">
                 check the working irc chat, read recent commits/progress notes, then run the
                 health/smoke check before new work.
               </div>
@@ -223,7 +223,7 @@ export default function ProgressPanel({
           {health && (
             <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2 space-y-1">
               <div
-                className={`text-[10px] uppercase tracking-wider ${
+                className={`text-[14px] uppercase tracking-wider ${
                   health.ok ? 'text-[#16a34a] dark:text-[#4ade80]' : 'text-[#dc2626] dark:text-[#f87171]'
                 }`}
               >
@@ -231,7 +231,7 @@ export default function ProgressPanel({
                 edges · {health.entries} log entries
               </div>
               {health.checks.map((check) => (
-                <div key={check.name} className="flex items-start gap-1.5 text-[10px]">
+                <div key={check.name} className="flex items-start gap-1.5 text-[14px]">
                   <span
                     className={
                       check.ok
@@ -253,7 +253,7 @@ export default function ProgressPanel({
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2">
-            <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
               append progress note
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -312,7 +312,7 @@ export default function ProgressPanel({
           </div>
 
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2">
-            <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
               commit clean changes
             </div>
             <input
@@ -365,7 +365,7 @@ export default function ProgressPanel({
                 commit +
               </button>
             </div>
-            <div className="text-[9px] text-[#71717a] leading-relaxed">
+            <div className="text-[13px] text-[#71717a] leading-relaxed">
               commits are version-stamped by the central database and stay append-only; failed
               experiments are logged too.
             </div>
@@ -374,14 +374,14 @@ export default function ProgressPanel({
 
         <div className="border border-[#e5e5e5] dark:border-[#1a1a1e]">
           <div className="px-3 py-2 border-b border-[#e5e5e5] dark:border-[#1a1a1e] flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-[#71717a]">
+            <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
               append-only history
             </span>
-            <span className="text-[10px] text-[#71717a]">{channelId}</span>
+            <span className="text-[14px] text-[#71717a]">{channelId}</span>
           </div>
 
           {entries.length === 0 ? (
-            <div className="p-8 text-center text-[11px] text-[#71717a] leading-relaxed">
+            <div className="p-8 text-center text-[15px] text-[#71717a] leading-relaxed">
               no progress yet - every agent session should start with a health check, then append
               what worked or failed for this engagement.
             </div>
@@ -390,28 +390,28 @@ export default function ProgressPanel({
               {entries.map((entry) => (
                 <div key={entry.id} className="px-3 py-2.5 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[9px] px-1 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a]">
+                    <span className="text-[13px] px-1 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a]">
                       v{entry.version}
                     </span>
-                    <span className="text-[10px] text-[#71717a]">{entry.time}</span>
+                    <span className="text-[14px] text-[#71717a]">{entry.time}</span>
                     <span
-                      className="text-[10px] font-medium"
+                      className="text-[14px] font-medium"
                       style={{ color: nickColor(entry.author) }}
                     >
                       {formatNick(entry.author, agents[entry.author]?.role)}
                     </span>
                     <span
-                      className={`text-[9px] px-1 py-0.5 border ${STATUS_CLASS[entry.status]}`}
+                      className={`text-[13px] px-1 py-0.5 border ${STATUS_CLASS[entry.status]}`}
                     >
                       {entry.status}
                     </span>
-                    <span className="text-[9px] text-[#71717a]">{entry.kind}</span>
+                    <span className="text-[13px] text-[#71717a]">{entry.kind}</span>
                   </div>
-                  <div className="text-[11px] text-[#18181b] dark:text-[#f4f4f5] whitespace-pre-wrap leading-relaxed">
+                  <div className="text-[15px] text-[#18181b] dark:text-[#f4f4f5] whitespace-pre-wrap leading-relaxed">
                     {entry.text}
                   </div>
                   {entry.commit && (
-                    <div className="text-[9px] text-[#71717a]">
+                    <div className="text-[13px] text-[#71717a]">
                       {entry.commit.hash ? <code>{entry.commit.hash}</code> : 'pending hash'}
                       {entry.commit.files && entry.commit.files.length > 0
                         ? ` · files: ${entry.commit.files.join(', ')}`
@@ -421,7 +421,7 @@ export default function ProgressPanel({
                   {entry.health && (
                     <div className="pl-2 border-l border-[#e5e5e5] dark:border-[#1a1a1e] space-y-0.5">
                       {entry.health.checks.map((check) => (
-                        <div key={check.name} className="text-[9px] text-[#71717a]">
+                        <div key={check.name} className="text-[13px] text-[#71717a]">
                           {check.ok ? '✓' : '✕'} {check.name}
                           {check.detail ? ` - ${check.detail}` : ''}
                         </div>
@@ -434,7 +434,7 @@ export default function ProgressPanel({
           )}
         </div>
 
-        <div className="text-[10px] text-[#71717a] leading-relaxed border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2">
+        <div className="text-[14px] text-[#71717a] leading-relaxed border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2">
           every entry is attributed, version-stamped and append-only. access is scoped to agents
           enrolled in this engagement; commands: <code>/progress start</code>,{' '}
           <code>/progress check</code>, <code>/progress note &lt;text&gt;</code>,{' '}

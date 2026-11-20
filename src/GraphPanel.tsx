@@ -193,7 +193,7 @@ export default function GraphPanel({
   };
 
   const inputClass =
-    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[11px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a]';
+    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a]';
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#fafafa] dark:bg-[#0c0c0e] overflow-y-auto">
@@ -202,23 +202,23 @@ export default function GraphPanel({
           <button
             type="button"
             onClick={onClose}
-            className="font-mono text-[11px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+            className="font-mono text-[15px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
           >
             &larr; chat
           </button>
           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-          <span className="font-mono text-xs font-medium truncate">
+          <span className="font-mono text-base font-medium truncate">
             knowledge graph // {channelId}
           </span>
-          <span className="font-mono text-[10px] text-[#71717a]">
+          <span className="font-mono text-[14px] text-[#71717a]">
             {graph.nodes.length} nodes · {graph.edges.length} edges
           </span>
-          <label className="flex items-center gap-1.5 font-mono text-[10px] text-[#71717a]">
+          <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
             <span>target</span>
             <select
               value={channelId}
               onChange={(event) => onSelectChannel(event.target.value)}
-              className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+              className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
             >
               {Object.keys(graphs)
                 .sort()
@@ -231,12 +231,12 @@ export default function GraphPanel({
           </label>
         </div>
 
-        <label className="flex items-center gap-1.5 font-mono text-[10px] text-[#71717a]">
+        <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
           <span>contributing as</span>
           <select
             value={contributor}
             onChange={(event) => setContributor(event.target.value)}
-            className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+            className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
           >
             {Object.values(agents).map((agent) => (
               <option key={agent.nick} value={agent.nick}>
@@ -248,7 +248,7 @@ export default function GraphPanel({
       </div>
 
       {error && (
-        <div className="mx-4 sm:mx-5 mt-3 text-[11px] font-mono border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
+        <div className="mx-4 sm:mx-5 mt-3 text-[15px] font-mono border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
           {error}
         </div>
       )}
@@ -257,7 +257,7 @@ export default function GraphPanel({
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_250px] gap-3">
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] bg-white/40 dark:bg-[#09090b] h-[420px] sm:h-[500px] overflow-hidden">
             {graph.nodes.length === 0 ? (
-              <div className="h-full flex items-center justify-center p-8 text-center font-mono text-[11px] text-[#71717a] leading-relaxed">
+              <div className="h-full flex items-center justify-center p-8 text-center font-mono text-[15px] text-[#71717a] leading-relaxed">
                 the graph is empty - each agent creates intel here.
                 <br />
                 add a node on the right, or run <code className="mx-1">/node target &lt;asset&gt;</code> in
@@ -274,29 +274,29 @@ export default function GraphPanel({
             )}
           </div>
 
-          <div className="space-y-3 font-mono text-[11px]">
+          <div className="space-y-3 font-mono text-[15px]">
             <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
                 contributors
               </div>
               {contributorEntries.length === 0 ? (
-                <span className="text-[10px] text-[#71717a]">none yet</span>
+                <span className="text-[14px] text-[#71717a]">none yet</span>
               ) : (
                 contributorEntries.map(([nick, count]) => (
                   <div key={nick} className="flex items-center justify-between gap-2">
-                    <span className="truncate text-[10px]" style={{ color: nickColor(nick) }}>
+                    <span className="truncate text-[14px]" style={{ color: nickColor(nick) }}>
                       {formatNick(nick, agents[nick]?.role)}
                     </span>
-                    <span className="text-[9px] text-[#71717a]/70">{count}</span>
+                    <span className="text-[13px] text-[#71717a]/70">{count}</span>
                   </div>
                 ))
               )}
             </div>
 
             <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-[#71717a]">legend</div>
+              <div className="text-[14px] uppercase tracking-wider text-[#71717a]">legend</div>
               {kindLegend.length === 0 ? (
-                <span className="text-[10px] text-[#71717a]">-</span>
+                <span className="text-[14px] text-[#71717a]">-</span>
               ) : (
                 kindLegend.map((kind) => (
                   <div key={kind} className="flex items-center gap-1.5">
@@ -304,32 +304,32 @@ export default function GraphPanel({
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ background: kindColor(kind, isDark) }}
                     />
-                    <span className="text-[10px] text-[#71717a]">{kind}</span>
+                    <span className="text-[14px] text-[#71717a]">{kind}</span>
                   </div>
                 ))
               )}
             </div>
 
             <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2">
-              <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
                 {selected ? 'node intel' : 'select a node'}
               </div>
               {!selected ? (
-                <div className="text-[10px] text-[#71717a] leading-relaxed">
+                <div className="text-[14px] text-[#71717a] leading-relaxed">
                   click a circle to inspect its submitted intel.
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="text-[10px] text-[#18181b] dark:text-[#f4f4f5]">
+                  <div className="text-[14px] text-[#18181b] dark:text-[#f4f4f5]">
                     [{selected.kind}] {selected.label}
                   </div>
-                  <div className="text-[10px] text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap leading-relaxed">
+                  <div className="text-[14px] text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap leading-relaxed">
                     {selected.notes || 'no custom information'}
                   </div>
-                  <div className="text-[9px] text-[#71717a]">
+                  <div className="text-[13px] text-[#71717a]">
                     submitted by {selected.createdBy} · {selected.time}
                   </div>
-                  <div className="text-[9px] text-[#71717a] border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5">
+                  <div className="text-[13px] text-[#71717a] border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5">
                     append-only: submitted nodes cannot be edited or removed.
                   </div>
                 </div>
@@ -338,9 +338,9 @@ export default function GraphPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 font-mono text-[11px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 font-mono text-[15px]">
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2">
-            <div className="text-[10px] uppercase tracking-wider text-[#71717a]">add node</div>
+            <div className="text-[14px] uppercase tracking-wider text-[#71717a]">add node</div>
             <input
               type="text"
               value={nodeLabel}
@@ -379,7 +379,7 @@ export default function GraphPanel({
           </div>
 
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2">
-            <div className="text-[10px] uppercase tracking-wider text-[#71717a]">add edge</div>
+            <div className="text-[14px] uppercase tracking-wider text-[#71717a]">add edge</div>
             <div className="grid grid-cols-[1fr_1fr] gap-2">
               <select
                 value={edgeFrom}
@@ -424,7 +424,7 @@ export default function GraphPanel({
           </div>
         </div>
 
-        <div className="font-mono text-[10px] text-[#71717a] leading-relaxed border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2">
+        <div className="font-mono text-[14px] text-[#71717a] leading-relaxed border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2">
           every agent can contribute: <code>/node &lt;kind&gt; &lt;label&gt;</code> and{' '}
           <code>/edge &lt;a&gt; -&gt; &lt;b&gt; [label]</code> work from chat, or use the forms
           above. custom information, attribution and links are persisted centrally per engagement.

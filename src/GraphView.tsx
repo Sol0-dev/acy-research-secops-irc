@@ -417,7 +417,7 @@ export default function GraphView({
                     y={(y1 + y2) / 2 - 5}
                     textAnchor="middle"
                     fontFamily="ui-monospace, monospace"
-                    fontSize={8.5}
+                    fontSize={12.5}
                     fill={isDark ? '#71717a' : '#71717a'}
                     pointerEvents="none"
                   >
@@ -482,7 +482,7 @@ export default function GraphView({
                   y={RADIUS + 15}
                   textAnchor="middle"
                   fontFamily="ui-monospace, monospace"
-                  fontSize={9}
+                  fontSize={13}
                   fill={isDark ? '#d4d4d8' : '#27272a'}
                   pointerEvents="none"
                 >
@@ -500,7 +500,7 @@ export default function GraphView({
           onClick={() => zoomBy(1.2)}
           title="Zoom in"
           aria-label="Zoom in"
-          className="w-7 h-7 flex items-center justify-center border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa]/90 dark:bg-[#09090b]/90 text-sm leading-none text-[#52525b] dark:text-[#d4d4d8] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+          className="w-7 h-7 flex items-center justify-center border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa]/90 dark:bg-[#09090b]/90 text-lg leading-none text-[#52525b] dark:text-[#d4d4d8] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
         >
           +
         </button>
@@ -509,7 +509,7 @@ export default function GraphView({
           onClick={() => zoomBy(1 / 1.2)}
           title="Zoom out"
           aria-label="Zoom out"
-          className="w-7 h-7 flex items-center justify-center border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa]/90 dark:bg-[#09090b]/90 text-sm leading-none text-[#52525b] dark:text-[#d4d4d8] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+          className="w-7 h-7 flex items-center justify-center border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa]/90 dark:bg-[#09090b]/90 text-lg leading-none text-[#52525b] dark:text-[#d4d4d8] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
         >
           -
         </button>
@@ -518,13 +518,13 @@ export default function GraphView({
           onClick={resetZoom}
           title="Reset zoom"
           aria-label="Reset zoom"
-          className="w-7 h-7 flex items-center justify-center border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa]/90 dark:bg-[#09090b]/90 text-[10px] leading-none text-[#52525b] dark:text-[#d4d4d8] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+          className="w-7 h-7 flex items-center justify-center border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa]/90 dark:bg-[#09090b]/90 text-[14px] leading-none text-[#52525b] dark:text-[#d4d4d8] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
         >
           1:1
         </button>
       </div>
 
-      <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[9px] text-[#a1a1aa]">
+      <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[13px] text-[#a1a1aa]">
         drag canvas to pan · scroll to zoom · drag node to move
       </div>
     </div>
