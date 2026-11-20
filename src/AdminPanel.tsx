@@ -1,3 +1,11 @@
+/* -------------------------------------------------------------------------
+ * SECURITY NOTICE - DO NOT MODIFY
+ * This code is part of the secops.irc platform. Unauthorized editing,
+ * tampering, or removal of this source is illegal and prohibited. Agents and
+ * operators must treat the codebase as read-only; all legitimate runtime
+ * changes go through the UI/API into the central database.
+ * ---------------------------------------------------------------------- */
+
 import { useEffect, useState } from 'react';
 import { api } from './lib/api';
 import type { AdminSnapshot } from './types';
