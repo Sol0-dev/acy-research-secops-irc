@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: env.WEB_HOST || process.env.WEB_HOST || '0.0.0.0',
       port: Number(env.WEB_PORT || process.env.WEB_PORT || 5180),
+      allowedHosts: ['.trycloudflare.com', 'localhost', '127.0.0.1'],
       proxy: {
         '/api': {
           target: env.VITE_API_TARGET || process.env.VITE_API_TARGET || 'http://127.0.0.1:8787',
