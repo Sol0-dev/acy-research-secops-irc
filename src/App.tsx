@@ -646,11 +646,12 @@ export default function App() {
   };
 
   const openGraphPanel = (channelId?: string, contributor?: string): string | null => {
-    const targetId =
+    const activeId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
-    const channel = workspace.channels.find((item) => item.id === targetId);
-    if (!channel || !channel.isEngagement) {
-      return 'knowledge graphs are attached to engagement channels — open a bug bounty or pentest first';
+    const fallback = Object.keys(workspace.graphs).sort()[0] ?? '';
+    const targetId = workspace.graphs[activeId] ? activeId : fallback;
+    if (!targetId) {
+      return 'no engagement graphs exist yet — create a chat group first';
     }
     setGraphChannelId(targetId);
     setGraphContributor(normalizeHandle(contributor || session?.userNick || ''));
@@ -1301,6 +1302,8 @@ export default function App() {
       ? workspace.reports?.[workspace.activeBuffer.id]?.length ?? 0
       : 0;
 
+  const allGraphCount = Object.keys(workspace.graphs ?? {}).length;
+
   const renderFormattedTokens = (rawText: string) => {
     const tokens = rawText.split(/(@[a-zA-Z0-9_-]+|#[a-z0-9][a-z0-9-]*|`[^`]+`)/gi);
     return tokens.map((token, index) => {
@@ -1427,16 +1430,28 @@ export default function App() {
             </span>
           </button>
 
-          {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement && (
+          {((workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement) ||
+            allGraphCount > 0) && (
             <button
               type="button"
               onClick={() => {
-                const error = openGraphPanel(activeChannelObj.id);
+                const target =
+                  workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement
+                    ? activeChannelObj.id
+                    : undefined;
+                const error = openGraphPanel(target);
                 if (error) setApiError(error);
               }}
               className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
             >
-              graph <span className="text-[10px] text-[#71717a]/70">{activeGraphNodeCount}</span>
+              {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement
+                ? 'graph'
+                : 'graphs'}{' '}
+              <span className="text-[10px] text-[#71717a]/70">
+                {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement
+                  ? activeGraphNodeCount
+                  : allGraphCount}
+              </span>
             </button>
           )}
 
@@ -1719,11 +1734,16 @@ export default function App() {
             <GraphPanel
               channelId={graphChannelId}
               graph={graphObj}
+              graphs={workspace.graphs}
               agents={workspace.agents}
               isDark={isDark}
               defaultContributor={graphContributor}
               formatNick={formatNickWithRole}
               nickColor={(nick) => getNickColor(nick, isDark)}
+              onSelectChannel={(nextChannel) => {
+                setGraphChannelId(nextChannel);
+                setGraphContributor((current) => current || normalizeHandle(session?.userNick || ''));
+              }}
               onClose={() => setGraphPanelOpen(false)}
               onAddNode={async (input) => {
                 try {

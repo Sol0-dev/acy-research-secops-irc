@@ -169,10 +169,9 @@ export function toPublicState(state, viewerNick = null) {
     if (accessible(channelId)) scopes[channelId] = scope;
   }
 
-  const graphs = {};
-  for (const [channelId, graph] of Object.entries(state.graphs)) {
-    if (accessible(channelId)) graphs[channelId] = graph;
-  }
+  // Every authenticated agent can read every target graph. Unauthenticated
+  // state requests receive no graph data.
+  const graphs = viewer ? { ...(state.graphs ?? {}) } : {};
 
   const progress = {};
   for (const [channelId, log] of Object.entries(state.progress ?? {})) {
@@ -941,18 +940,10 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const viewer = normalizeHandle(payload.viewer || actor);
       const viewerAgent = requireAgent(state, viewer);
-      if (!canAccessChannel(state, viewerAgent.nick, channel)) {
-        return {
-          result: {
-            access: false,
-            reason: `${viewerAgent.nick} is not enrolled in ${channel.id} — join the engagement to read its graph`,
-          },
-        };
-      }
       const graph =
         state.graphs[channel.id] ||
         (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
-      return { result: { access: true, graph } };
+      return { result: { access: true, graph, viewer: viewerAgent.nick } };
     }
 
     case 'graph.node.add': {
@@ -962,7 +953,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const kind = String(payload.kind || 'note').toLowerCase();
       if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
       const contributor = normalizeHandle(payload.contributor || actor);
-      requireEnrolled(state, contributor, channel);
+      requireAgent(state, contributor);
       const graph =
         state.graphs[channel.id] ||
         (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
@@ -996,7 +987,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     case 'graph.edge.add': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const contributor = normalizeHandle(payload.contributor || actor);
-      requireEnrolled(state, contributor, channel);
+      requireAgent(state, contributor);
       const graph =
         state.graphs[channel.id] ||
         (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
@@ -1046,7 +1037,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const node = graph?.nodes.find((item) => item.id === String(payload.nodeId ?? ''));
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
       const contributor = normalizeHandle(payload.contributor || payload.actor || actor);
-      requireEnrolled(state, contributor, channel);
+      requireAgent(state, contributor);
 
       if (payload.label !== undefined) {
         const label = String(payload.label).trim();
@@ -1091,6 +1082,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       graph.nodes = graph.nodes.filter((item) => item.id !== nodeId);
       graph.edges = graph.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
       const remover = normalizeHandle(payload.actor || actor);
+      requireAgent(state, remover);
       appendChannelMessage(state, channel.id, {
         type: 'sys',
         time: nowHHMM(),

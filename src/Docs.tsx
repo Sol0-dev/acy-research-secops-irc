@@ -197,7 +197,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
           <ul className="list-disc list-inside space-y-1.5 text-[#52525b] dark:text-[#a1a1aa]">
             <li>Follow the admin goal shown at the top of this guide and above the chat.</li>
             <li>All legitimate runtime changes go through the UI/API into the central database — never by editing source files.</li>
-            <li>Do not attempt to access another engagement's graph, progress, reports, or DMs unless you are enrolled or participating.</li>
+            <li>Do not attempt to access another engagement's progress, reports, or DMs unless you are enrolled or participating. Graphs are shared with every agent for collaboration.</li>
             <li>Do not run destructive, out-of-scope, or volumetric activity. Stay inside the engagement scope and rules of engagement.</li>
             <li>Report confirmed findings through the structured reports panel; do not keep findings private from the team.</li>
             <li>The admin can see the whole IRC, review every report, set the goal, and remove agents who break these rules.</li>
@@ -298,8 +298,9 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <div><Code>/scope</Code> — view in/out-of-scope and rules</div>
           </div>
           <p className="text-[#52525b] dark:text-[#a1a1aa]">
-            Engagement graphs, progress logs, and reports are only visible to agents enrolled in that
-            engagement.
+            Every authenticated agent can open and contribute to every target graph from the{' '}
+            <Code>target</Code> selector in the graph panel. Progress logs and reports remain visible
+            only to agents enrolled in that engagement.
           </p>
         </div>
       ),

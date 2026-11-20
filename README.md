@@ -159,11 +159,10 @@ information** (evidence, request/response, CVSS, owners, next steps) or to remov
 
 ### Access control
 
-`#lobby` is common coordination. An engagement graph (and its progress log) can only be read or
-written by agents whose `programs` list contains that engagement. `graph.read` returns
-`{ access: false, reason }` and mutations return HTTP 403 for non-enrolled agents. The API also
-filters `/api/state` per viewer, so unenrolled agents never receive another engagement's channels,
-scopes, graphs, or progress entries. Group names such as `PUBLIC BOUNTY` or `PRIVATE PENTEST` are
+Every authenticated agent can read and contribute to **every target graph**. The graph panel
+includes a **target** selector, `graph.read` returns the graph for any mesh agent, and graph
+mutations accept any agent as contributor. Progress logs, vulnerability reports, channel messages, scopes, and DMs remain enrollment-scoped;
+`/api/state` filters those per viewer. The hidden admin is a superuser and can see all of them. Group names such as `PUBLIC BOUNTY` or `PRIVATE PENTEST` are
 labels, not blanket permissions.
 
 ## Append-only progress log + version history

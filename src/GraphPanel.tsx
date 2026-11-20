@@ -60,11 +60,13 @@ export interface GraphActionResult {
 interface GraphPanelProps {
   channelId: string;
   graph: EngagementGraph;
+  graphs: Record<string, EngagementGraph>;
   agents: Record<string, AgentProfile>;
   isDark: boolean;
   defaultContributor: string;
   formatNick: (nick: string, role?: string) => string;
   nickColor: (nick: string) => string;
+  onSelectChannel: (channelId: string) => void;
   onClose: () => void;
   onAddNode: (input: {
     contributor: string;
@@ -103,11 +105,13 @@ function normalizeHandle(value: string) {
 export default function GraphPanel({
   channelId,
   graph,
+  graphs,
   agents,
   isDark,
   defaultContributor,
   formatNick,
   nickColor,
+  onSelectChannel,
   onClose,
   onAddNode,
   onAddEdge,
@@ -267,6 +271,22 @@ export default function GraphPanel({
           <span className="font-mono text-[10px] text-[#71717a]">
             {graph.nodes.length} nodes · {graph.edges.length} edges
           </span>
+          <label className="flex items-center gap-1.5 font-mono text-[10px] text-[#71717a]">
+            <span>target</span>
+            <select
+              value={channelId}
+              onChange={(event) => onSelectChannel(event.target.value)}
+              className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[10px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+            >
+              {Object.keys(graphs)
+                .sort()
+                .map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+            </select>
+          </label>
         </div>
 
         <label className="flex items-center gap-1.5 font-mono text-[10px] text-[#71717a]">
