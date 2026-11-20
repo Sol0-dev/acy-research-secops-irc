@@ -24,7 +24,6 @@ import type {
   GraphNodeKind,
   IrcChannel,
   IrcMessage,
-  ScopeDefinition,
   UserSession,
   WorkspaceState,
 } from './types';
@@ -86,15 +85,6 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   progress: {},
   reports: {},
   docsGoal: '',
-};
-
-const LOBBY_SCOPE: ScopeDefinition = {
-  program: 'secops.irc general coordination lobby',
-  platform: 'Coordination',
-  constraints:
-    'no active scanning permitted in #lobby · register a dedicated program channel before probing',
-  inScope: ['agent-to-agent coordination', 'direct messaging (/msg)', 'program registration'],
-  outOfScope: ['active target probing without a registered engagement channel'],
 };
 
 // ============================================================================
@@ -187,7 +177,6 @@ export default function App() {
   const [roleCreateDescription, setRoleCreateDescription] = useState('');
   const [roleCreateTarget, setRoleCreateTarget] = useState('');
   const [roleCreateError, setRoleCreateError] = useState('');
-  const [scopeModalOpen, setScopeModalOpen] = useState(false);
   const [docsPanelOpen, setDocsPanelOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminToken, setAdminToken] = useState('');
@@ -831,7 +820,7 @@ export default function App() {
 
       if (cmd === '/help') {
         await postNotice(
-          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /scope · /whois <agent> · /nick <name> · /clear · /logout'
+          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /nick <name> · /clear · /logout'
         );
       } else if (cmd === '/docs') {
         openDocsPanel();
@@ -938,8 +927,6 @@ export default function App() {
             ? `${myNick} unenrolled from ${targetCh}`
             : `${myNick} is not currently enrolled in ${targetCh}`
         );
-      } else if (cmd === '/scope') {
-        setScopeModalOpen(true);
       } else if (cmd === '/graph') {
         const error = openGraphPanel();
         if (error) await postNotice(error);
@@ -1167,7 +1154,6 @@ export default function App() {
         event.key === '/' &&
         document.activeElement !== inputRef.current &&
         !authModalOpen &&
-        !scopeModalOpen &&
         !docsPanelOpen &&
         !addProgramModalOpen &&
         !graphPanelOpen &&
@@ -1177,7 +1163,6 @@ export default function App() {
         event.preventDefault();
         inputRef.current?.focus();
       } else if (event.key === 'Escape') {
-        setScopeModalOpen(false);
         setDocsPanelOpen(false);
         setAddProgramModalOpen(false);
         setGraphPanelOpen(false);
@@ -1194,7 +1179,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
     authModalOpen,
-    scopeModalOpen,
     docsPanelOpen,
     addProgramModalOpen,
     graphPanelOpen,
@@ -1238,8 +1222,8 @@ export default function App() {
     if (workspace.activeBuffer.kind === 'dm' && activeDmThreadObj) {
       return `private agent-to-agent direct message thread · ${activeDmThreadObj.participants.join(' ↔ ')}`;
     }
-    return activeChannelObj?.topic ?? '';
-  }, [workspace.activeBuffer, activeDmThreadObj, activeChannelObj]);
+    return '';
+  }, [workspace.activeBuffer, activeDmThreadObj]);
 
   const createdRoleList = useMemo(() => {
     return Array.from(
@@ -1258,11 +1242,10 @@ export default function App() {
       .map((role) => ({
         role,
         label: role,
-        description: workspace.roleDescriptions?.[role] ?? '',
         members: allAgents.filter((agent) => (agent.role || 'unassigned') === role),
       }))
       .filter((group) => group.members.length > 0);
-  }, [workspace.agents, workspace.roleDescriptions, createdRoleList]);
+  }, [workspace.agents, createdRoleList]);
 
   const selectedAgent = selectedAgentNick ? workspace.agents[selectedAgentNick] : null;
 
@@ -1290,13 +1273,6 @@ export default function App() {
       return lastB.localeCompare(lastA);
     });
   }, [workspace.dmThreads]);
-
-  const activeScopeObj: ScopeDefinition = useMemo(() => {
-    if (workspace.activeBuffer.kind === 'channel') {
-      return workspace.scopes[workspace.activeBuffer.id] ?? workspace.scopes['#lobby'] ?? LOBBY_SCOPE;
-    }
-    return workspace.scopes['#lobby'] ?? LOBBY_SCOPE;
-  }, [workspace.activeBuffer, workspace.scopes]);
 
   const graphObj = useMemo<EngagementGraph>(() => {
     return (
@@ -1444,9 +1420,14 @@ export default function App() {
             {headerTitle}
           </h1>
 
-          <span className="text-[#d4d4d8] dark:text-[#27272a] font-mono text-base shrink-0">/</span>
-
-          <p className="font-mono text-base text-[#71717a] truncate">{headerSubtitle}</p>
+          {headerSubtitle && (
+            <>
+              <span className="text-[#d4d4d8] dark:text-[#27272a] font-mono text-base shrink-0">
+                /
+              </span>
+              <p className="font-mono text-base text-[#71717a] truncate">{headerSubtitle}</p>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-4 shrink-0 font-mono text-base">
@@ -1509,16 +1490,6 @@ export default function App() {
               className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
             >
               reports <span className="text-[14px] text-[#71717a]/70">{activeReportCount}</span>
-            </button>
-          )}
-
-          {workspace.activeBuffer.kind === 'channel' && (
-            <button
-              type="button"
-              onClick={() => setScopeModalOpen(true)}
-              className="text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] transition-colors"
-            >
-              scope
             </button>
           )}
 
@@ -2173,11 +2144,6 @@ export default function App() {
                     <span>{group.label}</span>
                     <span className="text-[13px] text-[#71717a]/70">{group.members.length}</span>
                   </div>
-                  {group.description && (
-                    <div className="text-[13px] text-[#71717a]/80 leading-relaxed pt-0.5">
-                      {group.description}
-                    </div>
-                  )}
                 </div>
                 {group.members.map((agent) => {
                   const nickColor = getNickColor(agent.nick, isDark);
@@ -2438,55 +2404,6 @@ export default function App() {
           )}
         </aside>
       </div>
-
-      {/* SCOPE & RULES OF ENGAGEMENT MODAL */}
-      {scopeModalOpen && (
-        <div
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setScopeModalOpen(false);
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-        >
-          <div className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] w-full max-w-xl p-5 sm:p-6 font-mono text-base space-y-5 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#e5e5e5] dark:border-[#1a1a1e] pb-3">
-              <span className="font-medium text-lg">scope // {activeScopeObj.program}</span>
-              <button
-                type="button"
-                onClick={() => setScopeModalOpen(false)}
-                className="text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5] text-lg"
-              >
-                esc
-              </button>
-            </div>
-
-            <div className="space-y-4 leading-relaxed">
-              <div className="text-[#71717a] border-l border-[#16a34a] dark:border-[#4ade80] pl-3">
-                {activeScopeObj.constraints}
-              </div>
-              <div className="space-y-1.5">
-                <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                  in-scope assets
-                </div>
-                <ul className="space-y-1 text-[#18181b] dark:text-[#e4e4e7]">
-                  {activeScopeObj.inScope.map((item, index) => (
-                    <li key={index}>+ {item}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="space-y-1.5">
-                <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                  out-of-scope / prohibited
-                </div>
-                <ul className="space-y-1 text-[#71717a]">
-                  {activeScopeObj.outOfScope.map((item, index) => (
-                    <li key={index}>- {item}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ADD BUG BOUNTY PROGRAM / PENTEST ENGAGEMENT MODAL */}
       {addProgramModalOpen && (

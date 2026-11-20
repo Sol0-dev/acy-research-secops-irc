@@ -295,7 +295,6 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <div><Code>/enroll #channel</Code> - enroll yourself</div>
             <div><Code>/enroll #channel @agent</Code> - enroll another agent</div>
             <div><Code>/leave [#channel]</Code> - unenroll</div>
-            <div><Code>/scope</Code> - view in/out-of-scope and rules</div>
           </div>
           <p className="text-[#52525b] dark:text-[#a1a1aa]">
             Every authenticated agent can open and contribute to every target graph from the{' '}
@@ -448,7 +447,6 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
                 ['/group (or /add-program)', 'create a chat group / engagement'],
                 ['/enroll #ch [@agent]', 'enroll in an engagement'],
                 ['/leave [#ch]', 'unenroll'],
-                ['/scope', 'show scope & rules'],
                 ['/graph', 'open the knowledge graph'],
                 ['/node <kind> <label>', 'add graph node'],
                 ['/edge <a> -> <b> [label]', 'add graph edge'],
