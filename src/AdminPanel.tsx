@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from './lib/api';
+import GraphView from './GraphView';
 import type { AdminSnapshot } from './types';
 
 interface AdminPanelProps {
@@ -58,6 +59,10 @@ export default function AdminPanel({
   const [reviewError, setReviewError] = useState('');
   const [downloadNotice, setDownloadNotice] = useState('');
   const [downloadError, setDownloadError] = useState('');
+  const [selectedGraph, setSelectedGraph] = useState<{
+    channelId: string;
+    nodeId: string;
+  } | null>(null);
 
   const downloadFile = async (kind: 'docx' | 'graph', id: string, filename: string) => {
     setDownloadNotice('');
@@ -465,6 +470,94 @@ export default function AdminPanel({
                     </div>
                   </details>
                 ))}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
+              knowledge graphs ({snapshot.graphs.length})
+            </h2>
+            {snapshot.graphs.length === 0 ? (
+              <div className="text-[10px] text-[#52525b]">no graphs yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {snapshot.graphs.map((graph) => {
+                  const isSelectedGraph = selectedGraph?.channelId === graph.channelId;
+                  const selectedNode = isSelectedGraph
+                    ? graph.nodes.find((node) => node.id === selectedGraph.nodeId) ?? null
+                    : null;
+                  return (
+                    <details
+                      key={graph.channelId}
+                      className="border border-[#2a2a30] bg-[#09090b] p-2"
+                      open
+                    >
+                      <summary className="cursor-pointer text-[10px] text-[#d4d4d8] flex items-center justify-between gap-2">
+                        <span>
+                          {graph.channelId} · {graph.nodes.length} nodes · {graph.edges.length} edges
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void downloadFile(
+                              'graph',
+                              graph.channelId,
+                              `graph-${graph.channelId.replace(/^#/, '')}.json`
+                            );
+                          }}
+                          className="px-1.5 py-0.5 border border-[#2a2a30] text-[9px] text-[#a1a1aa] hover:text-[#4ade80]"
+                        >
+                          download json
+                        </button>
+                      </summary>
+                      <div className="pt-2 space-y-2">
+                        <div className="h-[360px] border border-[#2a2a30] overflow-hidden bg-[#050506]">
+                          {graph.nodes.length === 0 ? (
+                            <div className="h-full flex items-center justify-center text-[10px] text-[#52525b]">
+                              graph is empty.
+                            </div>
+                          ) : (
+                            <GraphView
+                              nodes={graph.nodes}
+                              edges={graph.edges}
+                              isDark
+                              selectedNodeId={isSelectedGraph ? selectedGraph.nodeId : null}
+                              onSelectNode={(nodeId) =>
+                                setSelectedGraph((current) =>
+                                  current?.channelId === graph.channelId &&
+                                  current.nodeId === nodeId
+                                    ? null
+                                    : { channelId: graph.channelId, nodeId }
+                                )
+                              }
+                            />
+                          )}
+                        </div>
+                        {selectedNode && (
+                          <div className="border border-[#2a2a30] p-2 text-[10px] space-y-1">
+                            <div className="text-[#f4f4f5]">
+                              [{selectedNode.kind}] {selectedNode.label}
+                            </div>
+                            {selectedNode.notes && (
+                              <div className="text-[#a1a1aa] whitespace-pre-wrap">
+                                {selectedNode.notes}
+                              </div>
+                            )}
+                            <div className="text-[#71717a]">
+                              contributed by {selectedNode.createdBy} · {selectedNode.time}
+                              {selectedNode.updatedBy
+                                ? ` · updated by ${selectedNode.updatedBy} at ${selectedNode.updatedTime}`
+                                : ''}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  );
+                })}
               </div>
             )}
           </section>
