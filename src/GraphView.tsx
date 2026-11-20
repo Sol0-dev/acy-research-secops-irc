@@ -10,11 +10,12 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { GraphEdge, GraphNode, GraphNodeKind } from './types';
 
 // ============================================================================
-// Hierarchical tree graph.
+// Hierarchical tree graph with Obsidian-style motion.
 //
 // Nodes are circles with a per-kind icon, laid out as a top-down tree from the
-// root assets. The layout eases into place, edges connect parent to child, and
-// the canvas supports drag, pan, and zoom.
+// root assets. Nodes ease into the tree and then drift gently, so the map feels
+// alive like an Obsidian graph while keeping the hierarchy readable. Drag a
+// node, pan the canvas, and scroll to zoom.
 // ============================================================================
 
 const RADIUS = 24;
@@ -230,19 +231,24 @@ export default function GraphView({
     treeTargetsRef.current = targets;
   }, [idKey, edgeKey, nodes]);
 
-  // Ease every node toward its tree position. Dragged nodes stay under the
-  // pointer until released, then ease back into the layout.
+  // Ease every node toward its tree position with a gentle Obsidian-style
+  // drift. Dragged nodes stay under the pointer until released, then ease
+  // back into the layout.
   useEffect(() => {
     let frame = 0;
+    let time = 0;
     const animate = () => {
+      time += 16;
       const bodies = bodiesRef.current;
       for (const node of nodes) {
         const body = bodies.get(node.id);
         const target = treeTargetsRef.current.get(node.id);
         if (!body || !target) continue;
         if (draggingRef.current?.id === node.id) continue;
-        body.x += (target.x - body.x) * 0.14;
-        body.y += (target.y - body.y) * 0.14;
+        const driftX = Math.sin(time * 0.0007 + body.phase) * 5;
+        const driftY = Math.cos(time * 0.0009 + body.phase) * 5;
+        body.x += (target.x + driftX - body.x) * 0.12;
+        body.y += (target.y + driftY - body.y) * 0.12;
         body.vx = 0;
         body.vy = 0;
       }
