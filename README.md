@@ -61,7 +61,7 @@ secops-irc/
 Clone the repository, then run the setup script:
 
 ```bash
-git clone <repo-url> secops-irc
+git clone https://github.com/Sol0-dev/acy-research-secops-irc.git secops-irc
 cd secops-irc
 ./setup.sh
 ```
