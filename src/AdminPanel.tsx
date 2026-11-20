@@ -11,13 +11,15 @@ import { api } from './lib/api';
 import GraphView from './GraphView';
 import type { AdminSnapshot } from './types';
 
+type AdminTab = 'overview' | 'irc' | 'reports' | 'graphs' | 'people' | 'audit';
+
 interface AdminPanelProps {
   open: boolean;
   token: string;
   snapshot: AdminSnapshot | null;
   error: string;
   loading: boolean;
-  onUnlock: (credentials: { username: string; password: string; token?: string }) => void;
+  onUnlock: (credentials: { username: string; password: string }) => void;
   onSaveGoal: (goal: string) => Promise<{ ok: boolean; error?: string }>;
   onReviewReport: (input: {
     channelId: string;
@@ -51,7 +53,6 @@ export default function AdminPanel({
 }: AdminPanelProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [token, setToken] = useState('');
   const [goalInput, setGoalInput] = useState('');
   const [goalNotice, setGoalNotice] = useState('');
   const [goalError, setGoalError] = useState('');
@@ -66,12 +67,13 @@ export default function AdminPanel({
     nodeId: string;
   } | null>(null);
   const [graphFocusChannelId, setGraphFocusChannelId] = useState<string | null>(null);
+  const [adminTab, setAdminTab] = useState<AdminTab>('overview');
 
   const downloadFile = async (kind: 'docx' | 'graph', id: string, filename: string) => {
     setDownloadNotice('');
     setDownloadError('');
     if (!adminToken) {
-      setDownloadError('admin token missing');
+      setDownloadError('admin session missing');
       return;
     }
     try {
@@ -171,23 +173,16 @@ export default function AdminPanel({
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (!token.trim() && (!username.trim() || !password)) return;
-              onUnlock({
-                username: username.trim(),
-                password,
-                token: token.trim() || undefined,
-              });
+              if (!username.trim() || !password) return;
+              onUnlock({ username: username.trim(), password });
             }}
             className="w-full max-w-sm border border-[#2a2a30] bg-[#09090b] p-4 space-y-3"
           >
             <div className="text-[10px] uppercase tracking-wider text-[#71717a]">
-              admin credentials required
+              admin login
             </div>
             <p className="text-[10px] text-[#71717a] leading-relaxed">
-              This panel is not part of the normal UI. Enter the server-side{' '}
-              <code className="text-[#f4f4f5]">ADMIN_USERNAME</code> /{' '}
-              <code className="text-[#f4f4f5]">ADMIN_PASSWORD</code>, or paste the{' '}
-              <code className="text-[#f4f4f5]">ADMIN_TOKEN</code>.
+              Enter the hidden admin username and password.
             </p>
             <input
               type="text"
@@ -204,17 +199,6 @@ export default function AdminPanel({
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
               placeholder="admin password"
-              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
-            />
-            <div className="text-[9px] uppercase tracking-wider text-[#52525b]">
-              or token
-            </div>
-            <input
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              autoComplete="new-password"
-              placeholder="admin token (optional)"
               className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[11px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
             />
             <button
@@ -344,30 +328,47 @@ export default function AdminPanel({
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-          <section className="space-y-2">
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">security posture</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <>
+          <nav className="border-b border-[#2a2a30] px-4 sm:px-6 py-2 flex flex-wrap gap-1 shrink-0">
+            {(['overview', 'irc', 'reports', 'graphs', 'people', 'audit'] as AdminTab[]).map(
+              (tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setAdminTab(tab)}
+                  className={`px-2.5 py-1 text-[10px] border transition-colors ${
+                    adminTab === tab
+                      ? 'border-[#4ade80] text-[#4ade80] bg-[#4ade80]/10'
+                      : 'border-[#2a2a30] text-[#a1a1aa] hover:text-[#f4f4f5]'
+                  }`}
+                >
+                  {tab}
+                </button>
+              )
+            )}
+          </nav>
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+<section className={`space-y-2 ${adminTab === 'overview' ? '' : 'hidden'}`}>
+            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">security</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <Stat label="api bind" value={snapshot.security.apiHost} />
               <Stat label="proxy required" value={snapshot.security.proxyRequired ? 'yes' : 'no'} />
               <Stat
-                label="admin token"
+                label="admin login"
                 value={
-                  snapshot.security.adminTokenConfigured
+                  snapshot.security.adminPasswordConfigured
                     ? 'configured'
-                    : snapshot.security.adminTokenGenerated
+                    : snapshot.security.adminPasswordGenerated
                       ? 'generated'
                       : 'none'
                 }
               />
-              <Stat label="cors origin" value={snapshot.security.corsOrigin} />
               <Stat label="code endpoints" value={snapshot.security.codeEndpoints ? 'yes' : 'none'} />
-              <Stat label="write surface" value={snapshot.security.writeSurface} />
             </div>
           </section>
 
-          <section className="space-y-2">
-            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">workspace counts</h2>
+<section className={`space-y-2 ${adminTab === 'overview' ? '' : 'hidden'}`}>
+            <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">counts</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
               {Object.entries(snapshot.counts).map(([key, value]) => (
                 <Stat key={key} label={key} value={value} />
@@ -375,9 +376,9 @@ export default function AdminPanel({
             </div>
           </section>
 
-          <section className="space-y-2">
+<section className={`space-y-2 ${adminTab === 'overview' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
-              mission goal — shown at the top of docs
+              mission goal (shown to every agent)
             </h2>
             <textarea
               rows={3}
@@ -420,7 +421,7 @@ export default function AdminPanel({
             </div>
           </section>
 
-          <section className="space-y-2">
+<section className={`space-y-2 ${adminTab === 'reports' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               report review queue ({snapshot.reports.length})
             </h2>
@@ -515,7 +516,7 @@ export default function AdminPanel({
             {downloadError && <div className="text-[10px] text-[#f87171]">{downloadError}</div>}
           </section>
 
-          <section className="space-y-2">
+<section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               irc channels ({snapshot.channels.length})
             </h2>
@@ -557,7 +558,7 @@ export default function AdminPanel({
             )}
           </section>
 
-          <section className="space-y-2">
+<section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               direct messages ({snapshot.dmThreads.length})
             </h2>
@@ -591,7 +592,7 @@ export default function AdminPanel({
             )}
           </section>
 
-          <section className="space-y-2">
+<section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               progress logs ({snapshot.progress.length})
             </h2>
@@ -621,7 +622,7 @@ export default function AdminPanel({
             )}
           </section>
 
-          <section className="space-y-2">
+<section className={`space-y-2 ${adminTab === 'graphs' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               knowledge graphs ({snapshot.graphs.length})
             </h2>
@@ -723,7 +724,7 @@ export default function AdminPanel({
             )}
           </section>
 
-          <section className="space-y-2">
+<section className={`space-y-2 ${adminTab === 'graphs' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               engagements ({snapshot.engagements.length})
             </h2>
@@ -781,7 +782,7 @@ export default function AdminPanel({
             )}
           </section>
 
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+<section className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${adminTab === 'people' ? '' : 'hidden'}`}>
             <div className="space-y-2">
               <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
                 registered accounts ({snapshot.accounts.length})
@@ -874,7 +875,7 @@ export default function AdminPanel({
             </div>
           </section>
 
-          <section className="space-y-2">
+<section className={`space-y-2 ${adminTab === 'audit' ? '' : 'hidden'}`}>
             <h2 className="text-[10px] uppercase tracking-wider text-[#71717a]">
               audit / version history (latest {snapshot.audit.length})
             </h2>
@@ -911,11 +912,11 @@ export default function AdminPanel({
           </section>
 
           <div className="text-[9px] text-[#52525b] border-t border-[#2a2a30] pt-2">
-            hidden admin panel — credentials/token gated. The admin can set the docs goal, review
-            reports, and export files; there are no code, file, or backend-mutation controls. Press Esc
-            to close.
+            Hidden admin panel — credentials gated. Set the goal, review reports, inspect the IRC,
+            open graphs, and export files. Press Esc to close.
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

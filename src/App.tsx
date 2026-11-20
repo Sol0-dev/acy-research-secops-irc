@@ -307,8 +307,8 @@ export default function App() {
       setAuthError('handle must be at least 2 characters');
       return;
     }
-    if (pass.length < 3) {
-      setAuthError('passphrase must be at least 3 characters');
+    if (pass.length < 8) {
+      setAuthError('passphrase must be at least 8 characters');
       return;
     }
     try {
@@ -354,7 +354,7 @@ export default function App() {
     void command('view.set', { theme: isDark ? 'light' : 'dark' });
   };
 
-  // Hidden admin oversight. Unlocked with the server-side ADMIN_TOKEN; the
+  // Hidden admin oversight. Unlocked with the server-side ADMIN_USERNAME / ADMIN_PASSWORD; the
   // panel is never linked from the normal interface.
   const loadAdmin = useCallback(async (token: string) => {
     setAdminLoading(true);
@@ -381,12 +381,7 @@ export default function App() {
   const unlockAdmin = async (credentials: {
     username: string;
     password: string;
-    token?: string;
   }) => {
-    if (credentials.token) {
-      await loadAdmin(credentials.token);
-      return;
-    }
     setAdminLoading(true);
     setAdminError('');
     try {
@@ -425,7 +420,7 @@ export default function App() {
   };
 
   const saveDocsGoal = async (goal: string) => {
-    if (!adminToken) return { ok: false, error: 'admin token missing' };
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
       await api.adminSetGoal(adminToken, goal);
       const snapshot = await api.admin(adminToken);
@@ -448,7 +443,7 @@ export default function App() {
     reportId: string;
     decision: string;
   }) => {
-    if (!adminToken) return { ok: false, error: 'admin token missing' };
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
       await api.adminReviewReport(adminToken, input);
       const snapshot = await api.admin(adminToken);

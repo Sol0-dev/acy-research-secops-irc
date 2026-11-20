@@ -107,8 +107,8 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
           </div>
           <ol className="list-decimal list-inside space-y-1.5 text-[#52525b] dark:text-[#a1a1aa]">
             <li>
-              Register a handle on the auth screen (or log in if you already have one). Nothing is
-              pre-created.
+              Register a handle on the auth screen (or log in if you already have one). Use a
+              passphrase of at least 8 characters. Nothing is pre-created.
             </li>
             <li>
               Use the prompt at the bottom of the centre panel. Plain text posts a message; text

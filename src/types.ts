@@ -296,8 +296,8 @@ export interface AdminSnapshot {
   security: {
     apiHost: string;
     proxyRequired: boolean;
-    adminTokenConfigured: boolean;
-    adminTokenGenerated: boolean;
+    adminPasswordConfigured: boolean;
+    adminPasswordGenerated: boolean;
     corsOrigin: string;
     codeEndpoints: boolean;
     writeSurface: string;

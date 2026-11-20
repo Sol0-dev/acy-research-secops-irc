@@ -27,9 +27,6 @@ const HOST = process.env.API_HOST ?? '127.0.0.1';
 const JWT_SECRET = process.env.JWT_SECRET ?? 'secops-irc-dev-secret-change-me';
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5180';
 const PROXY_TOKEN = process.env.API_PROXY_TOKEN ?? 'secops-irc-proxy';
-const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN ?? '').trim();
-const ADMIN_TOKEN_GENERATED = !ADMIN_TOKEN;
-const EFFECTIVE_ADMIN_TOKEN = ADMIN_TOKEN || crypto.randomBytes(18).toString('hex');
 const ADMIN_USERNAME = String(process.env.ADMIN_USERNAME ?? 'admin').trim() || 'admin';
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD ?? '').trim();
 const ADMIN_PASSWORD_GENERATED = !ADMIN_PASSWORD;
@@ -39,9 +36,8 @@ const EFFECTIVE_ADMIN_PASSWORD =
 function isAdminRequest(req) {
   const provided = String(req.get('x-secops-admin') ?? '').trim();
   if (!provided) return false;
-  if (provided === EFFECTIVE_ADMIN_TOKEN) return true;
   try {
-    const payload = jwt.verify(provided, JWT_SECRET);
+    const payload = jwt.verify(provided, JWT_SECRET, { algorithms: ['HS256'] });
     return payload && payload.admin === true;
   } catch {
     return false;
@@ -50,11 +46,15 @@ function isAdminRequest(req) {
 
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json({ limit: '4mb' }));
+app.set('trust proxy', 'loopback');
+app.use(express.json({ limit: '1mb' }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Access-Control-Allow-Origin', CLIENT_ORIGIN);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -62,6 +62,31 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   return next();
 });
+
+// Small in-memory limiter. It keeps auth and admin endpoints from being brute
+// forced or hammered without adding another service.
+const rateBuckets = new Map();
+function rateLimit(name, windowMs, max) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const id = `${name}:${req.ip}`;
+    const bucket = rateBuckets.get(id);
+    if (!bucket || bucket.reset <= now) {
+      rateBuckets.set(id, { count: 1, reset: now + windowMs });
+      return next();
+    }
+    bucket.count += 1;
+    if (bucket.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((bucket.reset - now) / 1000)));
+      return res.status(429).json({ error: 'rate limit exceeded' });
+    }
+    return next();
+  };
+}
+
+app.use('/api/command', rateLimit('command', 60_000, 240));
+app.use('/api/admin/login', rateLimit('admin-login', 60_000, 5));
+app.use('/api/admin', rateLimit('admin', 60_000, 120));
 
 // Only the trusted web proxy may call the data routes. Direct requests to the
 // API port (curl, scripts, agents) are rejected even from localhost.
@@ -93,7 +118,7 @@ function resolveUser(req, state) {
   const token = tokenFromRequest(req);
   if (!token) return null;
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     return makeUser(state, payload.nick);
   } catch {
     return null;
@@ -117,7 +142,7 @@ app.post('/api/admin/login', (req, res) => {
   if (username !== ADMIN_USERNAME || password !== EFFECTIVE_ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'invalid admin credentials' });
   }
-  const token = jwt.sign({ admin: true, username }, JWT_SECRET, { expiresIn: '12h' });
+  const token = jwt.sign({ admin: true, username }, JWT_SECRET, { expiresIn: '12h', algorithm: 'HS256' });
   return res.json({ token, username });
 });
 
@@ -230,8 +255,8 @@ app.get('/api/admin', async (req, res) => {
       security: {
         apiHost: HOST,
         proxyRequired: true,
-        adminTokenConfigured: !ADMIN_TOKEN_GENERATED,
-        adminTokenGenerated: ADMIN_TOKEN_GENERATED,
+        adminPasswordConfigured: !ADMIN_PASSWORD_GENERATED,
+        adminPasswordGenerated: ADMIN_PASSWORD_GENERATED,
         corsOrigin: CLIENT_ORIGIN,
         codeEndpoints: false,
         writeSurface: 'central MySQL workspace only (docs goal via admin token)',
@@ -388,7 +413,7 @@ app.post('/api/admin/agent-session', async (req, res) => {
       programs: Array.from(new Set([...(existing?.programs ?? []), ...engagements])),
     };
     const version = await persistState(state, 'admin.agent.session', 'admin', {});
-    const token = jwt.sign({ nick: 'admin' }, JWT_SECRET, { expiresIn: '12h' });
+    const token = jwt.sign({ nick: 'admin' }, JWT_SECRET, { expiresIn: '12h', algorithm: 'HS256' });
     return res.json({
       token,
       state: toPublicState(state, 'admin'),
@@ -465,7 +490,7 @@ async function handleCommand(req) {
         : actor
           ? makeUser(state, actor)
           : null;
-  const token = issuedNick != null ? jwt.sign({ nick: issuedNick }, JWT_SECRET, { expiresIn: '12h' }) : undefined;
+  const token = issuedNick != null ? jwt.sign({ nick: issuedNick }, JWT_SECRET, { expiresIn: '12h', algorithm: 'HS256' }) : undefined;
 
   return {
     state: toPublicState(state, issuedNick ?? actor),
@@ -483,9 +508,16 @@ app.post('/api/command', (req, res) => {
     (error) => {
       const status = error instanceof ApiError ? error.status : 500;
       if (status >= 500) console.error('[command]', error);
+      else if (status === 401 || status === 403 || status === 429) {
+        console.warn(`[security] ${req.ip} ${req.body?.action ?? 'unknown'} -> ${status}`);
+      }
       res.status(status).json({ error: error.message ?? 'command failed' });
     }
   );
+});
+
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'not found' });
 });
 
 app.use((error, _req, res, _next) => {
@@ -496,9 +528,6 @@ app.use((error, _req, res, _next) => {
 async function start() {
   const { seeded } = await initDb();
   console.log(`[db] workspace ${seeded ? 'seeded' : 'loaded'} from ${process.env.DB_NAME ?? 'secops_irc'}`);
-  if (ADMIN_TOKEN_GENERATED) {
-    console.log(`[admin] no ADMIN_TOKEN set — generated token for this process: ${EFFECTIVE_ADMIN_TOKEN}`);
-  }
   if (ADMIN_PASSWORD_GENERATED) {
     console.log(`[admin] no ADMIN_PASSWORD set — generated credentials: ${ADMIN_USERNAME} / ${EFFECTIVE_ADMIN_PASSWORD}`);
   }

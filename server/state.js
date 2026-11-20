@@ -106,6 +106,14 @@ function parseLines(value) {
     .filter(Boolean);
 }
 
+function limitText(value, max, field) {
+  const text = String(value ?? '');
+  if (text.length > max) {
+    throw new ApiError(400, `${field} must be ${max} characters or fewer`);
+  }
+  return text;
+}
+
 // ============================================================================
 // Seed (used only when the central database has no workspace row yet)
 // ============================================================================
@@ -254,6 +262,17 @@ function requireAgent(state, nick) {
   const target = state.agents[clean];
   if (!target) throw new ApiError(400, `agent ${clean || '(empty)'} not found in mesh`);
   return target;
+}
+
+// Prevent an authenticated agent from posting or acting as a different agent.
+// The hidden admin agent may act on behalf of others.
+function requireSelf(actor, claimed, field = 'agent') {
+  if (!actor) return;
+  const actorNick = normalizeHandle(actor);
+  const claimedNick = normalizeHandle(claimed);
+  if (actorNick !== 'admin' && claimedNick !== actorNick) {
+    throw new ApiError(403, `cannot act as ${claimedNick || field}`);
+  }
 }
 
 function requireEngagement(state, channelId) {
@@ -428,7 +447,7 @@ function removeUserAgent(state, nick) {
 
 function validatePassphrase(passphrase) {
   const value = String(passphrase ?? '').trim();
-  if (value.length < 3) throw new ApiError(400, 'passphrase must be at least 3 characters');
+  if (value.length < 8) throw new ApiError(400, 'passphrase must be at least 8 characters');
   return value;
 }
 
@@ -476,10 +495,10 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const pass = String(payload.passphrase ?? '').trim();
       const account = state.accounts[nick];
       if (!account) {
-        throw new ApiError(401, `account ${nick} not found — register or use a guest session`);
+        throw new ApiError(401, 'invalid handle or passphrase');
       }
       if (!bcrypt.compareSync(pass, account.passHash)) {
-        throw new ApiError(401, 'invalid passphrase for handle');
+        throw new ApiError(401, 'invalid handle or passphrase');
       }
       syncAccountPrograms(state, actor);
       addUserAgent(state, nick, account.role || 'unassigned', account.programs ?? []);
@@ -547,7 +566,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     case 'message.send': {
       const nick = normalizeHandle(payload.nick || actor);
       requireAgent(state, nick);
-      const text = String(payload.text ?? '').trim();
+      requireSelf(actor, nick, 'message author');
+      const text = limitText(payload.text, 4000, 'message text').trim();
       if (!text) throw new ApiError(400, 'message text required');
       const channelId = String(payload.channelId ?? '');
       const channel = state.channels.find((item) => item.id === channelId);
@@ -570,7 +590,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     }
 
     case 'notice.post': {
-      const text = String(payload.text ?? '').trim();
+      const text = limitText(payload.text, 2000, 'notice text').trim();
       if (!text) throw new ApiError(400, 'notice text required');
       if (payload.kind === 'dm') {
         const threadId = String(payload.id ?? '');
@@ -582,6 +602,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = state.channels.find((item) => item.id === channelId);
       if (!channel) throw new ApiError(404, 'channel not found');
       const poster = normalizeHandle(payload.actor || actor || '');
+      requireSelf(actor, poster, 'notice author');
       if (
         channel.isEngagement &&
         channel.id !== '#lobby' &&
@@ -601,10 +622,13 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     case 'dm.send': {
       const from = normalizeHandle(payload.from);
       const to = normalizeHandle(payload.to);
-      const text = String(payload.text ?? '').trim();
-      if (!from || !to || from === to) throw new ApiError(400, 'invalid direct message participants');
+      const text = limitText(payload.text, 4000, 'direct message text').trim();
+      if (!from || !to || from === to) {
+        throw new ApiError(400, 'invalid direct message participants');
+      }
       requireAgent(state, from);
       requireAgent(state, to);
+      requireSelf(actor, from, 'direct message sender');
       if (!text) throw new ApiError(400, 'message text required');
       const threadId = getDmThreadId(from, to);
       if (!state.dmThreads[threadId]) {
@@ -948,7 +972,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'graph.node.add': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const label = String(payload.label ?? '').trim();
+      const label = limitText(payload.label, 200, 'node label').trim();
       if (!label) throw new ApiError(400, 'node label required');
       const kind = String(payload.kind || 'note').toLowerCase();
       if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
@@ -965,7 +989,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         id: makeId('gn'),
         label,
         kind,
-        notes: String(payload.notes ?? '').trim() || undefined,
+        notes: limitText(payload.notes, 4000, 'node notes').trim() || undefined,
         createdBy: contributor,
         time: nowHHMM(),
       };
@@ -1054,7 +1078,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         node.kind = kind;
       }
       if (payload.notes !== undefined) {
-        node.notes = String(payload.notes).trim() || undefined;
+        node.notes = limitText(payload.notes, 4000, 'node notes').trim() || undefined;
       }
       node.updatedBy = contributor;
       node.updatedTime = nowHHMM();
@@ -1126,7 +1150,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const author = normalizeHandle(payload.author || payload.actor || actor);
       requireEnrolled(state, author, channel);
-      const text = String(payload.text ?? '').trim();
+      const text = limitText(payload.text, 4000, 'progress text').trim();
       if (!text) throw new ApiError(400, 'progress text required');
       const status = String(payload.status || 'note').toLowerCase();
       if (!PROGRESS_STATUSES.includes(status)) {
@@ -1236,20 +1260,20 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const author = normalizeHandle(payload.author || payload.actor || actor);
       requireEnrolled(state, author, channel);
 
-      const title = String(payload.title ?? '').trim();
-      const summary = String(payload.summary ?? '').trim();
-      const affectedAsset = String(payload.affectedAsset ?? '').trim();
+      const title = limitText(payload.title, 300, 'report title').trim();
+      const summary = limitText(payload.summary, 8000, 'report summary').trim();
+      const affectedAsset = limitText(payload.affectedAsset, 1000, 'affected asset').trim();
       const cwe = parseLines(payload.cwe);
-      const cvss = String(payload.cvss ?? '').trim();
+      const cvss = limitText(payload.cvss, 300, 'CVSS vector').trim();
       const severity = String(payload.severity ?? 'medium').trim().toLowerCase();
       const steps = parseLines(payload.steps);
-      const request = String(payload.request ?? '').trim();
-      const response = String(payload.response ?? '').trim();
-      const proof = String(payload.proof ?? '').trim();
-      const pocScript = String(payload.pocScript ?? '').trim();
-      const attackerValue = String(payload.attackerValue ?? '').trim();
+      const request = limitText(payload.request, 16000, 'request').trim();
+      const response = limitText(payload.response, 16000, 'response').trim();
+      const proof = limitText(payload.proof, 500, 'proof path').trim();
+      const pocScript = limitText(payload.pocScript, 500, 'PoC script path').trim();
+      const attackerValue = limitText(payload.attackerValue, 8000, 'attacker value').trim();
       const testedRuledOut = parseLines(payload.testedRuledOut);
-      const impact = String(payload.impact ?? '').trim();
+      const impact = limitText(payload.impact, 8000, 'impact').trim();
       const remediation = parseLines(payload.remediation);
       const status = String(payload.status ?? 'final').toLowerCase() === 'draft' ? 'draft' : 'final';
 
