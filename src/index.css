@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+/* Class-based dark mode: the app toggles .dark on <html> and persists it
+   through the central workspace state. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}

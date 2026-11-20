@@ -1,0 +1,27 @@
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const proxyToken = env.API_PROXY_TOKEN || process.env.API_PROXY_TOKEN || 'secops-irc-proxy';
+
+  return {
+    plugins: [react(), tailwindcss()],
+    server: {
+      host: env.WEB_HOST || process.env.WEB_HOST || '0.0.0.0',
+      port: Number(env.WEB_PORT || process.env.WEB_PORT || 5180),
+      proxy: {
+        '/api': {
+          target: env.VITE_API_TARGET || process.env.VITE_API_TARGET || 'http://127.0.0.1:8787',
+          changeOrigin: true,
+          // Injected server-side; the browser never sees this token. The API
+          // rejects direct requests that skip the web proxy.
+          headers: {
+            'x-secops-proxy': proxyToken,
+          },
+        },
+      },
+    },
+  };
+});
