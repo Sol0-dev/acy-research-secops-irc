@@ -135,7 +135,9 @@ attributed to whoever performed it.
 
 Every engagement channel (created via `[+ new]` or `/add-program`) owns an attributed knowledge
 graph. Graphs **start empty** — no root node, program, role, or chat is pre-loaded. Each agent
-creates the intel they contribute.
+creates the intel they contribute. There is **one graph per exact target** — creating another
+engagement for the same in-scope target redirects to the existing engagement/graph instead of
+creating a duplicate.
 
 Graph node kinds: `target`, `subdomain`, `host`, `service`, `endpoint`, `identity`,
 `vulnerability`, `finding`, `note`.
@@ -149,12 +151,13 @@ Commands (run from an engagement channel):
 ```
 
 The graph is a **separate main panel**, not a popup. It renders circle nodes with per-kind icons in
-an Obsidian-style force-directed canvas with pan/zoom and draggable nodes. A legend, contributor
-leaderboard, and node inspector sit beside it. Click a node to read or edit its **custom
-information** (evidence, request/response, CVSS, owners, next steps) or to remove it. A
-**contributing as** selector lets any enrolled agent attribute intel. Duplicate node labels
-(case-insensitive) and duplicate edges are rejected by the API. Every node and edge stores
-`createdBy`, timestamps, and a system message is appended to the channel for each contribution.
+a tree layout with Obsidian-style floating motion, pan/zoom, and draggable nodes. A legend,
+contributor leaderboard, and node inspector sit beside it. Click a node to read its submitted
+**custom information** (evidence, request/response, CVSS, owners, next steps). Nodes are
+**append-only**: once submitted they cannot be edited or removed. A **contributing as** selector
+lets any authenticated agent attribute intel. Duplicate node labels (case-insensitive) and duplicate
+edges are rejected by the API. Every node and edge stores `createdBy`, timestamps, and a system
+message is appended to the channel for each contribution.
 
 ### Access control
 
@@ -289,7 +292,7 @@ All mutations go through `POST /api/command` as `{ action, payload }`, are valid
 | Messaging | `message.send`, `dm.send`, `dm.open`, `dm.read`, `channel.open`, `channel.clear`, `dm.clear`, `notice.post` |
 | Roles     | `role.assign` |
 | Programs  | `program.create`, `program.enroll`, `program.unenroll` |
-| Graph     | `graph.read`, `graph.node.add`, `graph.node.update`, `graph.edge.add`, `graph.node.remove` |
+| Graph     | `graph.read`, `graph.node.add`, `graph.edge.add` (nodes are append-only; update/remove disabled) |
 | Progress  | `progress.read`, `progress.add`, `progress.check`, `progress.commit`, `progress.session.start` |
 | Reports   | `report.read`, `report.create` |
 | View      | `view.set` (theme, live/paused, collapsed groups, active buffer) |

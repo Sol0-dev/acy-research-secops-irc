@@ -114,6 +114,31 @@ function limitText(value, max, field) {
   return text;
 }
 
+// Reduce an in-scope asset to its exact target so one target cannot grow
+// multiple competing graphs. Different subdomains/repos remain different
+// targets; descriptions in parentheses are ignored.
+function targetKey(raw) {
+  let value = String(raw ?? '').trim().toLowerCase();
+  if (!value) return '';
+  if (/^https?:\/\//.test(value)) {
+    try {
+      value = new URL(value).hostname;
+    } catch {
+      value = value.replace(/^[a-z]+:\/\//, '');
+    }
+  } else {
+    value = value.replace(/^[a-z]+:\/\//, '');
+  }
+  value = value
+    .split(/\s+/)[0]
+    .replace(/^www\./, '')
+    .replace(/^\*\./, '')
+    .replace(/[),.;]+$/, '');
+  value = value.split('?')[0].split('#')[0];
+  value = value.replace(/:\d+$/, '');
+  return value.replace(/\/+$/, '').replace(/\.$/, '');
+}
+
 // ============================================================================
 // Seed (used only when the central database has no workspace row yet)
 // ============================================================================
@@ -831,6 +856,25 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         String(payload.constraints ?? '').trim() ||
         'max 40 req/s · safe harbor active · follow program RoE';
 
+      const newKeys = new Set(finalIn.map(targetKey).filter(Boolean));
+      for (const existing of state.channels.filter((item) => item.isEngagement)) {
+        const existingScope = state.scopes[existing.id];
+        if (!existingScope) continue;
+        const existingKeys = new Set(existingScope.inScope.map(targetKey).filter(Boolean));
+        const overlap = Array.from(newKeys).find((key) => existingKeys.has(key));
+        if (overlap) {
+          return {
+            result: {
+              channelId: existing.id,
+              created: false,
+              duplicateTarget: true,
+              target: overlap,
+              message: `target ${overlap} already has a graph in ${existing.id} — one target has one graph; contribute there instead`,
+            },
+          };
+        }
+      }
+
       if (!state.groups.includes(groupName)) state.groups.push(groupName);
       state.collapsedGroups[groupName] = false;
 
@@ -1056,69 +1100,17 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     }
 
     case 'graph.node.update': {
-      const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const graph = state.graphs[channel.id];
-      const node = graph?.nodes.find((item) => item.id === String(payload.nodeId ?? ''));
-      if (!graph || !node) throw new ApiError(404, 'graph node not found');
-      const contributor = normalizeHandle(payload.contributor || payload.actor || actor);
-      requireAgent(state, contributor);
-
-      if (payload.label !== undefined) {
-        const label = String(payload.label).trim();
-        if (!label) throw new ApiError(400, 'node label required');
-        const duplicate = graph.nodes.find(
-          (item) => item.id !== node.id && item.label.toLowerCase() === label.toLowerCase()
-        );
-        if (duplicate) throw new ApiError(409, `node ${label} already exists in this graph`);
-        node.label = label;
-      }
-      if (payload.kind !== undefined) {
-        const kind = String(payload.kind).toLowerCase();
-        if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
-        node.kind = kind;
-      }
-      if (payload.notes !== undefined) {
-        node.notes = limitText(payload.notes, 4000, 'node notes').trim() || undefined;
-      }
-      node.updatedBy = contributor;
-      node.updatedTime = nowHHMM();
-
-      appendChannelMessage(state, channel.id, {
-        type: 'sys',
-        time: nowHHMM(),
-        text: `${formatNick(contributor, state.agents[contributor]?.role)} updated intel on \`${node.label}\` in the engagement graph`,
-      });
-      appendProgressEntry(state, channel.id, {
-        author: contributor,
-        status: 'ok',
-        kind: 'progress',
-        text: `updated graph node \`${node.label}\` [${node.kind}]${node.notes ? ` — ${node.notes}` : ''}`,
-      });
-      return { result: { node } };
+      throw new ApiError(
+        403,
+        'graph nodes are append-only; submitted node information cannot be edited'
+      );
     }
 
     case 'graph.node.remove': {
-      const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const graph = state.graphs[channel.id];
-      const nodeId = String(payload.nodeId ?? '');
-      const node = graph?.nodes.find((item) => item.id === nodeId);
-      if (!graph || !node) throw new ApiError(404, 'graph node not found');
-      graph.nodes = graph.nodes.filter((item) => item.id !== nodeId);
-      graph.edges = graph.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
-      const remover = normalizeHandle(payload.actor || actor);
-      requireAgent(state, remover);
-      appendChannelMessage(state, channel.id, {
-        type: 'sys',
-        time: nowHHMM(),
-        text: `${formatNick(remover, state.agents[remover]?.role)} removed graph node \`${node.label}\` and its links`,
-      });
-      appendProgressEntry(state, channel.id, {
-        author: remover,
-        status: 'note',
-        kind: 'change',
-        text: `removed graph node \`${node.label}\` and its links`,
-      });
-      return { result: { nodeId } };
+      throw new ApiError(
+        403,
+        'graph nodes are append-only; submitted nodes cannot be removed or edited out'
+      );
     }
 
     // -------------------------------------------------- progress log (per engagement)

@@ -603,7 +603,15 @@ export default function App() {
     announcement?: string;
   }) => {
     const response = await command('program.create', { ...params });
-    return resultOf<{ channelId: string }>(response)?.channelId ?? null;
+    const result = resultOf<{
+      channelId: string;
+      duplicateTarget?: boolean;
+      message?: string;
+    }>(response);
+    if (result?.duplicateTarget && result.message) {
+      setApiError(result.message);
+    }
+    return result?.channelId ?? null;
   };
 
   const addGraphNode = async (
@@ -1781,41 +1789,6 @@ export default function App() {
                   return {
                     ok: false,
                     error: error instanceof Error ? error.message : 'could not add edge',
-                  };
-                }
-              }}
-              onUpdateNode={async (input) => {
-                try {
-                  const response = await execute('graph.node.update', {
-                    channelId: graphChannelId,
-                    nodeId: input.nodeId,
-                    contributor: input.contributor,
-                    label: input.label,
-                    kind: input.kind,
-                    notes: input.notes,
-                  });
-                  return resultOf<{ node: GraphNode }>(response)
-                    ? { ok: true }
-                    : { ok: false, error: 'central api returned no result' };
-                } catch (error) {
-                  return {
-                    ok: false,
-                    error: error instanceof Error ? error.message : 'could not update node information',
-                  };
-                }
-              }}
-              onRemoveNode={async (input) => {
-                try {
-                  const response = await execute('graph.node.remove', {
-                    channelId: graphChannelId,
-                    nodeId: input.nodeId,
-                    actor: input.actor,
-                  });
-                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
-                } catch (error) {
-                  return {
-                    ok: false,
-                    error: error instanceof Error ? error.message : 'could not remove node',
                   };
                 }
               }}

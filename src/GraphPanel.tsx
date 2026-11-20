@@ -6,7 +6,7 @@
  * changes go through the UI/API into the central database.
  * ---------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import GraphView from './GraphView';
 import type {
   AgentProfile,
@@ -80,14 +80,6 @@ interface GraphPanelProps {
     to: string;
     label?: string;
   }) => Promise<GraphActionResult>;
-  onUpdateNode: (input: {
-    contributor: string;
-    nodeId: string;
-    label: string;
-    kind: GraphNodeKind;
-    notes?: string;
-  }) => Promise<GraphActionResult>;
-  onRemoveNode: (input: { actor: string; nodeId: string }) => Promise<GraphActionResult>;
 }
 
 function kindColor(kind: GraphNodeKind, isDark: boolean) {
@@ -115,8 +107,6 @@ export default function GraphPanel({
   onClose,
   onAddNode,
   onAddEdge,
-  onUpdateNode,
-  onRemoveNode,
 }: GraphPanelProps) {
   const [contributor, setContributor] = useState(normalizeHandle(defaultContributor));
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -129,10 +119,6 @@ export default function GraphPanel({
   const [edgeTo, setEdgeTo] = useState('');
   const [edgeLabel, setEdgeLabel] = useState('');
 
-  const [editLabel, setEditLabel] = useState('');
-  const [editKind, setEditKind] = useState<GraphNodeKind>('note');
-  const [editNotes, setEditNotes] = useState('');
-
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -140,13 +126,6 @@ export default function GraphPanel({
     () => graph.nodes.find((node) => node.id === selectedId) ?? null,
     [graph.nodes, selectedId]
   );
-
-  useEffect(() => {
-    if (!selected) return;
-    setEditLabel(selected.label);
-    setEditKind(selected.kind);
-    setEditNotes(selected.notes ?? '');
-  }, [selected]);
 
   const contributorEntries = useMemo(() => {
     const counts = new Map<string, number>();
@@ -213,45 +192,8 @@ export default function GraphPanel({
     setEdgeLabel('');
   };
 
-  const updateInfo = async () => {
-    if (!selected) return;
-    if (!editLabel.trim()) {
-      setError('node label is required');
-      return;
-    }
-    setBusy(true);
-    const result = await onUpdateNode({
-      contributor,
-      nodeId: selected.id,
-      label: editLabel.trim(),
-      kind: editKind,
-      notes: editNotes.trim() || undefined,
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error || 'could not update node information');
-      return;
-    }
-    setError('');
-  };
-
-  const removeNode = async () => {
-    if (!selected) return;
-    setBusy(true);
-    const result = await onRemoveNode({ actor: contributor, nodeId: selected.id });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error || 'could not remove node');
-      return;
-    }
-    setError('');
-    setSelectedId(null);
-  };
-
   const inputClass =
     'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[11px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a]';
-  const areaClass =
-    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[11px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y';
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#fafafa] dark:bg-[#0c0c0e] overflow-y-auto">
@@ -374,78 +316,23 @@ export default function GraphPanel({
               </div>
               {!selected ? (
                 <div className="text-[10px] text-[#71717a] leading-relaxed">
-                  click a circle to inspect it, edit its custom information, or remove it.
+                  click a circle to inspect its submitted intel.
                 </div>
               ) : (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] text-[#52525b] dark:text-[#a1a1aa]">
-                      [{selected.kind}] by {selected.createdBy} · {selected.time}
-                    </span>
-                    <button
-                      type="button"
-                      title="Remove node and its links"
-                      onClick={() => void removeNode()}
-                      disabled={busy}
-                      className="text-[#71717a] hover:text-[#dc2626] dark:hover:text-[#f87171] disabled:opacity-40"
-                    >
-                      &times;
-                    </button>
+                <div className="space-y-2">
+                  <div className="text-[10px] text-[#18181b] dark:text-[#f4f4f5]">
+                    [{selected.kind}] {selected.label}
                   </div>
-
-                  <label className="block space-y-1">
-                    <span className="text-[9px] uppercase tracking-wider text-[#71717a]">label</span>
-                    <input
-                      type="text"
-                      value={editLabel}
-                      onChange={(event) => setEditLabel(event.target.value)}
-                      className={inputClass}
-                    />
-                  </label>
-
-                  <label className="block space-y-1">
-                    <span className="text-[9px] uppercase tracking-wider text-[#71717a]">kind</span>
-                    <select
-                      value={editKind}
-                      onChange={(event) => setEditKind(event.target.value as GraphNodeKind)}
-                      className={inputClass}
-                    >
-                      {KIND_ORDER.map((kind) => (
-                        <option key={kind} value={kind}>
-                          {kind}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block space-y-1">
-                    <span className="text-[9px] uppercase tracking-wider text-[#71717a]">
-                      custom information
-                    </span>
-                    <textarea
-                      rows={4}
-                      value={editNotes}
-                      onChange={(event) => setEditNotes(event.target.value)}
-                      placeholder="notes, evidence, request/response, cvss, owners, next steps…"
-                      className={areaClass}
-                    />
-                  </label>
-
-                  {selected.updatedBy && (
-                    <div className="text-[9px] text-[#71717a]">
-                      updated by {selected.updatedBy} · {selected.updatedTime}
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => void updateInfo()}
-                    disabled={busy}
-                    className="w-full px-2 py-1.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40"
-                  >
-                    save node information
-                  </button>
-                </>
+                  <div className="text-[10px] text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap leading-relaxed">
+                    {selected.notes || 'no custom information'}
+                  </div>
+                  <div className="text-[9px] text-[#71717a]">
+                    submitted by {selected.createdBy} · {selected.time}
+                  </div>
+                  <div className="text-[9px] text-[#71717a] border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5">
+                    append-only: submitted nodes cannot be edited or removed.
+                  </div>
+                </div>
               )}
             </div>
           </div>

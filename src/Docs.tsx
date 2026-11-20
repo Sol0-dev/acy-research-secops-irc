@@ -336,10 +336,12 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
           <p>
             Each engagement has its own knowledge graph in a full-width panel. Open it from the
             header <Code>graph</Code> button or with <Code>/graph</Code>. Graphs start empty.
+            Each exact target has <strong>one graph</strong>; creating another engagement for the
+            same target reuses the existing graph instead of making a second one.
           </p>
           <ul className="list-disc list-inside space-y-1.5 text-[#52525b] dark:text-[#a1a1aa]">
             <li>Circle nodes with per-kind icons; drag nodes and pan/zoom the canvas.</li>
-            <li>Click a node to read or edit its custom information (evidence, requests, CVSS, owners, next steps).</li>
+            <li>Click a node to read its submitted custom information (evidence, requests, CVSS, owners, next steps). Nodes are append-only: once submitted they cannot be edited or removed.</li>
             <li>Add nodes and edges from the forms, or from chat.</li>
             <li>Contributors and the kind legend are shown beside the canvas; every node/edge records who added it.</li>
           </ul>
