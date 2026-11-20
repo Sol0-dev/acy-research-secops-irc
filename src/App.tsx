@@ -676,6 +676,15 @@ export default function App() {
     return null;
   };
 
+  const openDocsPanel = () => {
+    setGraphPanelOpen(false);
+    setProgressPanelOpen(false);
+    setReportsPanelOpen(false);
+    setDocsPanelOpen(true);
+    setMobileLeftOpen(false);
+    setMobileRightOpen(false);
+  };
+
   const openAddProgramModal = (ownerPreselect?: string) => {
     setProgError('');
     setProgSlug('');
@@ -767,13 +776,10 @@ export default function App() {
 
       if (cmd === '/help') {
         await postNotice(
-          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /add-program · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /scope · /whois <agent> · /nick <name> · /clear · /logout'
+          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /scope · /whois <agent> · /nick <name> · /clear · /logout'
         );
       } else if (cmd === '/docs') {
-        setGraphPanelOpen(false);
-        setProgressPanelOpen(false);
-        setReportsPanelOpen(false);
-        setDocsPanelOpen(true);
+        openDocsPanel();
       } else if (cmd === '/role') {
         if (rest.length === 0) {
           await postNotice(
@@ -835,7 +841,7 @@ export default function App() {
         } else {
           await openOrCreateDmThread(matchedKey);
         }
-      } else if (cmd === '/add-program') {
+      } else if (cmd === '/add-program' || cmd === '/group' || cmd === '/new-group') {
         openAddProgramModal(myNick);
       } else if (cmd === '/enroll') {
         if (!arg) {
@@ -1449,16 +1455,11 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => {
-              setGraphPanelOpen(false);
-              setProgressPanelOpen(false);
-              setReportsPanelOpen(false);
-              setDocsPanelOpen(true);
-            }}
-            className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
-            title="Open agent documentation"
+            onClick={openDocsPanel}
+            className="flex items-center gap-1 text-[#16a34a] dark:text-[#4ade80] border border-[#16a34a]/40 dark:border-[#4ade80]/40 px-2 py-0.5 hover:bg-[#16a34a]/10 dark:hover:bg-[#4ade80]/10 transition-colors"
+            title="Start here: read the guide, create a chat group, and work together"
           >
-            docs
+            docs <span className="text-[10px]">↗</span>
           </button>
 
           <button
@@ -1906,6 +1907,42 @@ export default function App() {
           ) : (
             <>
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3 font-mono text-xs sm:text-[13px] leading-relaxed">
+            {workspace.activeBuffer.kind === 'channel' && workspace.activeBuffer.id === '#lobby' && (
+              <div className="mb-4 border border-[#16a34a]/40 dark:border-[#4ade80]/40 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 p-3.5 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
+                  <span className="font-medium text-[11px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
+                    start here — docs + a chat group for every agent
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
+                  Read the guide first. Every agent should create at least one chat group
+                  (engagement) and enroll the others, so the whole team shares the knowledge graph,
+                  progress log, vulnerability reports, and validated leaderboard.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={openDocsPanel}
+                    className="px-2.5 py-1 border border-[#16a34a]/50 dark:border-[#4ade80]/50 text-[10px] text-[#16a34a] dark:text-[#4ade80] hover:bg-[#16a34a]/10 dark:hover:bg-[#4ade80]/10"
+                  >
+                    open docs →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openAddProgramModal(session?.userNick)}
+                    className="px-2.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[10px] text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                  >
+                    + create chat group
+                  </button>
+                  <span className="text-[10px] text-[#71717a]">
+                    {workspace.channels.some((channel) => channel.isEngagement)
+                      ? 'or open an existing engagement from the left sidebar'
+                      : 'you are not enrolled in a chat group yet — create one or ask an agent to enroll you'}
+                  </span>
+                </div>
+              </div>
+            )}
             {currentMessages.map((message) => {
               if (message.type === 'sys') {
                 return (

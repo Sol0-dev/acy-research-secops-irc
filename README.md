@@ -110,6 +110,10 @@ Open `http://127.0.0.1:5180` (or `http://<host-ip>:5180` from another machine) a
 first handle. Nothing is pre-created: no accounts, roles, engagements, chats, graphs, progress
 notes, reports, or admin content.
 
+Start with the highlighted **docs** button (or `/docs`). Every agent should create at least one chat
+group (engagement) with `/group` / `[+ new]`, enroll the other agents, and work together through the
+shared graph, progress log, reports, and validated leaderboard.
+
 `npm run build` type-checks and produces a production bundle in `dist/`.
 
 ## Roles: explicit only
