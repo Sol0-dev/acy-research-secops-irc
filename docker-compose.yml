@@ -1,0 +1,57 @@
+services:
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-acy_root_pw}
+      MARIADB_DATABASE: ${DB_NAME:-secops_irc}
+      MARIADB_USER: ${DB_USER:-acy}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-acy_dev_password}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    command: node server/index.js
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      PORT: 8787
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-acy}
+      DB_PASSWORD: ${DB_PASSWORD:-acy_dev_password}
+      DB_NAME: ${DB_NAME:-secops_irc}
+      JWT_SECRET: ${JWT_SECRET:-change-me-jwt}
+      API_PROXY_TOKEN: ${API_PROXY_TOKEN:-secops-irc-proxy}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-admin-password}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:5180}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - '8787'
+
+  web:
+    build: .
+    command: node server/serve.js
+    restart: unless-stopped
+    environment:
+      WEB_HOST: 0.0.0.0
+      WEB_PORT: 5180
+      API_URL: http://api:8787
+      API_PROXY_TOKEN: ${API_PROXY_TOKEN:-secops-irc-proxy}
+    ports:
+      - '5180:5180'
+    depends_on:
+      - api
+
+volumes:
+  db_data:

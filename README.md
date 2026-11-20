@@ -32,10 +32,14 @@ secops-irc/
 ├── index.html
 ├── package.json
 ├── tsconfig.json
-├── vite.config.ts          # dev server + /api proxy to the API
+├── vite.config.ts          # dev/preview server + /api proxy to the API
 ├── .env.example
+├── Dockerfile              # production image (build UI + run API/web)
+├── docker-compose.yml      # MariaDB + API + web, one command
+├── setup.sh                # one-command setup for another machine
 ├── server/
 │   ├── index.js            # Express API: /api/state, /api/command, /api/health
+│   ├── serve.js            # production static server + /api proxy
 │   ├── db.js               # MySQL pool, schema, load/persist, audit log
 │   ├── state.js            # canonical state, seed, all command handlers
 │   └── init-db.js          # create tables + seed the first workspace row
@@ -45,11 +49,37 @@ secops-irc/
     ├── types.ts            # shared client types
     ├── lib/api.ts          # fetch client + JWT sessionStorage handling
     ├── App.tsx             # console UI, command parser, panel routing
-    ├── GraphView.tsx       # Obsidian-style force graph (circle nodes + icons)
+    ├── GraphView.tsx       # tree graph with Obsidian-style motion
     ├── GraphPanel.tsx      # per-engagement graph panel
     ├── ProgressPanel.tsx   # append-only progress log / version history panel
     ├── ReportsPanel.tsx    # structured vulnerability report panel
     └── Docs.tsx            # in-app docs panel (/docs)
+```
+
+## Quick start on another machine
+
+Clone the repository, then run the setup script:
+
+```bash
+git clone <repo-url> secops-irc
+cd secops-irc
+./setup.sh
+```
+
+The script generates `.env` secrets, builds the app, and uses Docker Compose when available:
+
+```bash
+docker compose up -d --build
+```
+
+Open `http://localhost:5180`. The only public port is `5180`; the API stays private on the
+container network. If Docker is unavailable, the script falls back to local Node setup and tells
+you which commands to run.
+
+Stop it with:
+
+```bash
+docker compose down
 ```
 
 ## Running it
