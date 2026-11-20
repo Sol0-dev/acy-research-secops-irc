@@ -237,8 +237,10 @@ export default function GraphView({
   useEffect(() => {
     let frame = 0;
     let time = 0;
+    let frameCount = 0;
     const animate = () => {
       time += 16;
+      frameCount += 1;
       const bodies = bodiesRef.current;
       for (const node of nodes) {
         const body = bodies.get(node.id);
@@ -252,7 +254,8 @@ export default function GraphView({
         body.vx = 0;
         body.vy = 0;
       }
-      setTick((value) => value + 1);
+      // Render at ~30fps; the drift still moves every frame.
+      if (frameCount % 2 === 0) setTick((value) => value + 1);
       frame = requestAnimationFrame(animate);
     };
     frame = requestAnimationFrame(animate);
