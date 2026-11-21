@@ -35,7 +35,6 @@ const REVIEW_CLASS: Record<string, string> = {
 };
 
 export interface ReportDraft {
-  author: string;
   title: string;
   summary: string;
   affectedAsset: string;
@@ -78,7 +77,7 @@ function normalizeHandle(value: string) {
     .toLowerCase();
 }
 
-const EMPTY_DRAFT: Omit<ReportDraft, 'author'> = {
+const EMPTY_DRAFT: ReportDraft = {
   title: '',
   summary: '',
   affectedAsset: '',
@@ -109,8 +108,8 @@ export default function ReportsPanel({
 }: ReportsPanelProps) {
   const [mode, setMode] = useState<'list' | 'new'>('list');
   const [selectedId, setSelectedId] = useState<string | null>(reports[0]?.id ?? null);
-  const [author, setAuthor] = useState(normalizeHandle(defaultContributor));
-  const [draft, setDraft] = useState<Omit<ReportDraft, 'author'>>(EMPTY_DRAFT);
+  const author = normalizeHandle(defaultContributor);
+  const [draft, setDraft] = useState<ReportDraft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -160,7 +159,7 @@ export default function ReportsPanel({
     event.preventDefault();
     setBusy(true);
     setError('');
-    const result = await onCreate({ ...draft, author });
+    const result = await onCreate({ ...draft });
     setBusy(false);
     if (!result.ok) {
       setError(result.error || 'could not file report');
@@ -198,20 +197,12 @@ export default function ReportsPanel({
         </div>
 
         <div className="flex items-center gap-2 font-mono text-[14px] text-[#71717a]">
-          <label className="flex items-center gap-1.5">
-            <span>as</span>
-            <select
-              value={author}
-              onChange={(event) => setAuthor(event.target.value)}
-              className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
-            >
-              {Object.values(agents).map((agent) => (
-                <option key={agent.nick} value={agent.nick}>
-                  {formatNick(agent.nick, agent.role)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <span>
+            as{' '}
+            <span className="text-[#18181b] dark:text-[#f4f4f5]">
+              {formatNick(author, agents[author]?.role)}
+            </span>
+          </span>
           <button
             type="button"
             onClick={() => {

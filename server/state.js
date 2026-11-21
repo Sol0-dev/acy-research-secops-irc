@@ -214,7 +214,8 @@ export function toPublicState(state, viewerNick = null) {
 
   const accounts = {};
   for (const [key, account] of Object.entries(state.accounts)) {
-    accounts[key] = { nick: account.nick, role: account.role, email: account.email };
+    // Never expose registered email addresses in the shared workspace state.
+    accounts[key] = { nick: account.nick, role: account.role };
   }
 
   const accessible = (channelId) => {
@@ -544,7 +545,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         nick,
         role: 'unassigned',
         email: String(payload.email ?? '').trim() || undefined,
-        passHash: bcrypt.hashSync(pass, 10),
+        passHash: bcrypt.hashSync(pass, 12),
       };
       addUserAgent(state, nick, 'unassigned');
       appendChannelMessage(state, '#lobby', {
@@ -595,8 +596,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!actor) throw new ApiError(401, 'authentication required');
       const next = normalizeHandle(payload.nick);
       validateHandle(next);
-      if (state.agents[next] && !state.agents[next].isUser) {
-        throw new ApiError(409, `handle ${next} is reserved by a system agent`);
+      if (next === actor) return { result: { nick: next }, tokenNick: next };
+      if (state.accounts[next] || state.agents[next]) {
+        throw new ApiError(409, `handle ${next} is already taken`);
       }
       const previous = state.agents[actor];
       if (!previous) throw new ApiError(400, `agent ${actor} not found`);
@@ -621,7 +623,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     // -------------------------------------------------------------- messages
     case 'message.send': {
-      const nick = normalizeHandle(payload.nick || actor);
+      const nick = normalizeHandle(actor);
       requireAgent(state, nick);
       requireSelf(actor, nick, 'message author');
       const text = limitText(payload.text, 4000, 'message text').trim();
@@ -651,14 +653,19 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!text) throw new ApiError(400, 'notice text required');
       if (payload.kind === 'dm') {
         const threadId = String(payload.id ?? '');
-        if (!state.dmThreads[threadId]) throw new ApiError(404, 'dm thread not found');
+        const thread = state.dmThreads[threadId];
+        if (!thread) throw new ApiError(404, 'dm thread not found');
+        const poster = normalizeHandle(actor);
+        if (!thread.participants.some((participant) => normalizeHandle(participant) === poster)) {
+          throw new ApiError(403, 'not a participant in this direct message thread');
+        }
         const message = appendDmSystem(state, threadId, text);
         return { result: { message } };
       }
       const channelId = String(payload.id ?? '');
       const channel = state.channels.find((item) => item.id === channelId);
       if (!channel) throw new ApiError(404, 'channel not found');
-      const poster = normalizeHandle(payload.actor || actor || '');
+      const poster = normalizeHandle(actor);
       requireSelf(actor, poster, 'notice author');
       if (
         channel.isEngagement &&
@@ -677,7 +684,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     }
 
     case 'dm.send': {
-      const from = normalizeHandle(payload.from);
+      const from = normalizeHandle(actor);
       const to = normalizeHandle(payload.to);
       const text = limitText(payload.text, 4000, 'direct message text').trim();
       if (!from || !to || from === to) {
@@ -707,7 +714,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     }
 
     case 'dm.open': {
-      const me = normalizeHandle(payload.actor || actor);
+      const me = normalizeHandle(actor);
       const peer = normalizeHandle(payload.peer);
       if (!me || !peer || me === peer) throw new ApiError(400, 'invalid direct message participants');
       requireAgent(state, me);
@@ -730,6 +737,10 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     case 'dm.read': {
       const thread = state.dmThreads[String(payload.threadId ?? '')];
       if (!thread) throw new ApiError(404, 'dm thread not found');
+      const viewer = normalizeHandle(actor);
+      if (!thread.participants.some((participant) => normalizeHandle(participant) === viewer)) {
+        throw new ApiError(403, 'not a participant in this direct message thread');
+      }
       thread.unread = false;
       state.activeBuffer = { kind: 'dm', threadId: thread.id };
       return { result: { threadId: thread.id } };
@@ -739,7 +750,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channelId = String(payload.channelId ?? '');
       const channel = state.channels.find((item) => item.id === channelId);
       if (!channel) throw new ApiError(404, 'channel not found');
-      const viewer = normalizeHandle(payload.actor || actor || '');
+      const viewer = normalizeHandle(actor);
       if (
         channel.isEngagement &&
         channel.id !== '#lobby' &&
@@ -755,7 +766,10 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     case 'channel.clear': {
       const channel = state.channels.find((item) => item.id === String(payload.channelId ?? ''));
       if (!channel) throw new ApiError(404, 'channel not found');
-      const clearer = normalizeHandle(payload.actor || actor || 'operator');
+      const clearer = normalizeHandle(actor);
+      if (clearer !== 'admin') {
+        throw new ApiError(403, 'only the admin can clear a shared channel');
+      }
       if (
         channel.isEngagement &&
         channel.id !== '#lobby' &&
@@ -777,12 +791,16 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     case 'dm.clear': {
       const thread = state.dmThreads[String(payload.threadId ?? '')];
       if (!thread) throw new ApiError(404, 'dm thread not found');
+      const clearer = normalizeHandle(actor);
+      if (!thread.participants.some((participant) => normalizeHandle(participant) === clearer)) {
+        throw new ApiError(403, 'not a participant in this direct message thread');
+      }
       thread.messages = [
         {
           id: makeId('dm-sys'),
           type: 'sys',
           time: nowHHMM(),
-          text: `dm history cleared by ${normalizeHandle(payload.actor || actor || 'operator')}`,
+          text: `dm history cleared by ${clearer}`,
         },
       ];
       return { result: { threadId: thread.id } };
@@ -791,6 +809,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     // ----------------------------------------------------------------- roles
     case 'role.assign': {
       const targetNick = normalizeHandle(payload.target);
+      requireSelf(actor, targetNick, 'role target');
       const target = requireAgent(state, targetNick);
       const nextRole = normalizeRole(payload.role);
 
@@ -865,7 +884,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     // -------------------------------------------------------------- programs
     case 'program.create': {
-      const owner = normalizeHandle(payload.ownerNick || payload.owner || actor);
+      const owner = normalizeHandle(actor);
       const ownerAgent = requireAgent(state, owner);
       const slug = String(payload.slug ?? '')
         .trim()
@@ -999,16 +1018,17 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         text: `${formatNick(nick, agent.role)} enrolled in ${channel.id} (${channel.platform})`,
       });
       appendProgressEntry(state, channel.id, {
-        author: nick,
+        author: normalizeHandle(actor),
         status: 'ok',
         kind: 'session',
-        text: `enrolled in ${channel.id} (${channel.platform}) as role ${agent.role}`,
+        text: `enrolled ${nick} in ${channel.id} (${channel.platform}) as role ${agent.role}`,
       });
       return { result: { changed: true, channelId: channel.id } };
     }
 
     case 'program.unenroll': {
       const nick = normalizeHandle(payload.nick);
+      requireSelf(actor, nick, 'unenroll target');
       const agent = requireAgent(state, nick);
       const channelId = String(payload.channelId ?? '');
       if (!agent.programs.includes(channelId)) {
@@ -1027,10 +1047,10 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         text: `${formatNick(nick, agent.role)} unenrolled from ${channelId}`,
       });
       appendProgressEntry(state, channelId, {
-        author: nick,
+        author: normalizeHandle(actor),
         status: 'note',
         kind: 'change',
-        text: `unenrolled from ${channelId}; graph access revoked for this agent`,
+        text: `unenrolled ${nick} from ${channelId}; graph access revoked for this agent`,
       });
       return { result: { changed: true, channelId } };
     }
@@ -1038,7 +1058,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     // --------------------------------------------------------- knowledge graph
     case 'graph.read': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(payload.viewer || actor);
+      const viewer = normalizeHandle(actor);
       const viewerAgent = requireAgent(state, viewer);
       const graph =
         state.graphs[channel.id] ||
@@ -1048,7 +1068,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'graph.query': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(payload.viewer || actor);
+      const viewer = normalizeHandle(actor);
       requireAgent(state, viewer);
       const graph =
         state.graphs[channel.id] ||
@@ -1095,7 +1115,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!label) throw new ApiError(400, 'node label required');
       const kind = String(payload.kind || 'note').toLowerCase();
       if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
-      const contributor = normalizeHandle(payload.contributor || actor);
+      const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
       const intel = parseIntel(payload.intel);
       const graph =
@@ -1131,7 +1151,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'graph.edge.add': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const contributor = normalizeHandle(payload.contributor || actor);
+      const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
       const graph =
         state.graphs[channel.id] ||
@@ -1181,7 +1201,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const graph = state.graphs[channel.id];
       const node = graph?.nodes.find((item) => item.id === String(payload.nodeId ?? ''));
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
-      const contributor = normalizeHandle(payload.contributor || payload.actor || actor);
+      const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
 
       if (payload.label !== undefined) {
@@ -1230,7 +1250,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
       graph.nodes = graph.nodes.filter((item) => item.id !== nodeId);
       graph.edges = graph.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
-      const remover = normalizeHandle(payload.actor || actor);
+      const remover = normalizeHandle(actor);
       requireAgent(state, remover);
       appendChannelMessage(state, channel.id, {
         type: 'sys',
@@ -1249,7 +1269,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     // ------------------------------------------------------- agent tool library
     case 'tool.read': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(payload.viewer || actor);
+      const viewer = normalizeHandle(actor);
       requireAgent(state, viewer);
       return {
         result: { access: true, channelId: channel.id, tools: state.tools[channel.id] ?? [] },
@@ -1258,7 +1278,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'tool.query': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(payload.viewer || actor);
+      const viewer = normalizeHandle(actor);
       requireAgent(state, viewer);
       const query = String(payload.query ?? '').trim().toLowerCase();
       const category = String(payload.category ?? '').trim().toLowerCase();
@@ -1288,8 +1308,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'tool.create': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const author = normalizeHandle(payload.author || payload.actor || actor);
-      requireAgent(state, author);
+      const author = normalizeHandle(actor);
+      requireEnrolled(state, author, channel);
       const name = limitText(payload.name, 200, 'tool name').trim();
       if (!name) throw new ApiError(400, 'tool name required');
       const code = limitText(payload.code, 500000, 'tool code');
@@ -1334,8 +1354,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'tool.update': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const author = normalizeHandle(payload.author || payload.actor || actor);
-      requireAgent(state, author);
+      const author = normalizeHandle(actor);
+      requireEnrolled(state, author, channel);
       const list = state.tools[channel.id] ?? [];
       const tool = list.find((item) => item.id === String(payload.toolId ?? ''));
       if (!tool) throw new ApiError(404, 'tool not found');
@@ -1404,8 +1424,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'tool.remove': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const actorNick = normalizeHandle(payload.actor || actor);
-      requireAgent(state, actorNick);
+      const actorNick = normalizeHandle(actor);
+      requireEnrolled(state, actorNick, channel);
       const list = state.tools[channel.id] ?? [];
       const tool = list.find((item) => item.id === String(payload.toolId ?? ''));
       if (!tool) throw new ApiError(404, 'tool not found');
@@ -1422,7 +1442,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     // -------------------------------------------------- progress log (per engagement)
     case 'progress.read': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(payload.viewer || payload.actor || actor);
+      const viewer = normalizeHandle(actor);
       const viewerAgent = requireAgent(state, viewer);
       if (!canAccessChannel(state, viewerAgent.nick, channel)) {
         return {
@@ -1446,7 +1466,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'progress.add': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const author = normalizeHandle(payload.author || payload.actor || actor);
+      const author = normalizeHandle(actor);
       requireEnrolled(state, author, channel);
       const text = limitText(payload.text, 4000, 'progress text').trim();
       if (!text) throw new ApiError(400, 'progress text required');
@@ -1469,7 +1489,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'progress.check': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(payload.viewer || payload.actor || actor);
+      const viewer = normalizeHandle(actor);
       const viewerAgent = requireEnrolled(state, viewer, channel);
       const health = auditProgressLog(state, channel.id, viewerAgent.nick);
       const passed = health.checks.filter((check) => check.ok).length;
@@ -1485,7 +1505,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'progress.commit': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const author = normalizeHandle(payload.author || payload.actor || actor);
+      const author = normalizeHandle(actor);
       requireEnrolled(state, author, channel);
       const message = String(payload.message ?? '').trim();
       if (!message) throw new ApiError(400, 'commit message required');
@@ -1505,7 +1525,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'progress.session.start': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(payload.viewer || payload.actor || actor);
+      const viewer = normalizeHandle(actor);
       const viewerAgent = requireEnrolled(state, viewer, channel);
 
       // Session protocol: check the working IRC chat, read recent progress
@@ -1538,7 +1558,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     // ------------------------------------------------- vulnerability reports
     case 'report.read': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(payload.viewer || payload.actor || actor);
+      const viewer = normalizeHandle(actor);
       const viewerAgent = requireAgent(state, viewer);
       if (!canAccessChannel(state, viewerAgent.nick, channel)) {
         return {
@@ -1555,7 +1575,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'report.create': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const author = normalizeHandle(payload.author || payload.actor || actor);
+      const author = normalizeHandle(actor);
       requireEnrolled(state, author, channel);
 
       const title = limitText(payload.title, 300, 'report title').trim();

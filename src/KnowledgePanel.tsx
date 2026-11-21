@@ -16,14 +16,6 @@ import type {
   TechniqueIntel,
 } from './types';
 
-function normalizeHandle(value: string) {
-  return value
-    .trim()
-    .replace(/^[@+~]+/, '')
-    .replace(/\s+/g, '_')
-    .toLowerCase();
-}
-
 const KINDS: GraphNodeKind[] = [
   'target',
   'subdomain',
@@ -39,12 +31,10 @@ const KINDS: GraphNodeKind[] = [
 interface KnowledgePanelProps {
   graphs: Record<string, EngagementGraph>;
   agents: Record<string, AgentProfile>;
-  defaultContributor: string;
   formatNick: (nick: string, role?: string) => string;
   onOpenGraph: (channelId: string) => void;
   onUpdateNode: (input: {
     channelId: string;
-    contributor: string;
     nodeId: string;
     label: string;
     kind: GraphNodeKind;
@@ -53,7 +43,6 @@ interface KnowledgePanelProps {
   }) => Promise<{ ok: boolean; error?: string }>;
   onRemoveNode: (input: {
     channelId: string;
-    actor: string;
     nodeId: string;
   }) => Promise<{ ok: boolean; error?: string }>;
   onClose: () => void;
@@ -62,7 +51,6 @@ interface KnowledgePanelProps {
 export default function KnowledgePanel({
   graphs,
   agents,
-  defaultContributor,
   formatNick,
   onOpenGraph,
   onUpdateNode,
@@ -92,8 +80,6 @@ export default function KnowledgePanel({
     references: '',
     tags: '',
   });
-
-  const contributor = useMemo(() => normalizeHandle(defaultContributor), [defaultContributor]);
 
   const mergedGraph = useMemo(() => {
     const nodes: GraphNode[] = [];
@@ -216,7 +202,6 @@ export default function KnowledgePanel({
     }
     const result = await onUpdateNode({
       channelId: targetChannelId,
-      contributor,
       nodeId: selected.id,
       label: form.label.trim(),
       kind: form.kind,
@@ -244,7 +229,6 @@ export default function KnowledgePanel({
     }
     const result = await onRemoveNode({
       channelId: targetChannelId,
-      actor: contributor,
       nodeId: selected.id,
     });
     setBusy(false);

@@ -45,16 +45,14 @@ interface ProgressPanelProps {
   formatNick: (nick: string, role?: string) => string;
   nickColor: (nick: string) => string;
   onClose: () => void;
-  onStartSession: (input: { viewer: string }) => Promise<ProgressActionResult>;
-  onCheck: (input: { viewer: string }) => Promise<ProgressActionResult>;
+  onStartSession: () => Promise<ProgressActionResult>;
+  onCheck: () => Promise<ProgressActionResult>;
   onAddEntry: (input: {
-    author: string;
     status: ProgressStatus;
     kind: ProgressKind;
     text: string;
   }) => Promise<ProgressActionResult>;
   onCommit: (input: {
-    author: string;
     message: string;
     files?: string;
     status: 'ok' | 'failed';
@@ -83,7 +81,7 @@ export default function ProgressPanel({
   onAddEntry,
   onCommit,
 }: ProgressPanelProps) {
-  const [contributor, setContributor] = useState(normalizeHandle(defaultContributor));
+  const contributor = normalizeHandle(defaultContributor);
 
   const [entryStatus, setEntryStatus] = useState<ProgressStatus>('working');
   const [entryKind, setEntryKind] = useState<ProgressKind>('progress');
@@ -151,20 +149,12 @@ export default function ProgressPanel({
           </span>
         </div>
 
-        <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
-          <span>acting as</span>
-          <select
-            value={contributor}
-            onChange={(event) => setContributor(event.target.value)}
-            className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
-          >
-            {Object.values(agents).map((agent) => (
-              <option key={agent.nick} value={agent.nick}>
-                {formatNick(agent.nick, agent.role)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <span className="font-mono text-[14px] text-[#71717a]">
+          acting as{' '}
+          <span className="text-[#18181b] dark:text-[#f4f4f5]">
+            {formatNick(contributor, agents[contributor]?.role)}
+          </span>
+        </span>
       </div>
 
       {error && (
@@ -196,7 +186,7 @@ export default function ProgressPanel({
                 disabled={busy}
                 onClick={() =>
                   void run(
-                    () => onStartSession({ viewer: contributor }),
+                    () => onStartSession(),
                     'session started - recent chat, commits and health check loaded'
                   )
                 }
@@ -209,7 +199,7 @@ export default function ProgressPanel({
                 disabled={busy}
                 onClick={() =>
                   void run(
-                    () => onCheck({ viewer: contributor }),
+                    () => onCheck(),
                     'health/smoke check appended to the log'
                   )
                 }
@@ -295,7 +285,6 @@ export default function ProgressPanel({
                 void run(
                   () =>
                     onAddEntry({
-                      author: contributor,
                       status: entryStatus,
                       kind: entryKind,
                       text,
@@ -347,7 +336,6 @@ export default function ProgressPanel({
                   void run(
                     () =>
                       onCommit({
-                        author: contributor,
                         message,
                         files: files || undefined,
                         status: commitStatus,

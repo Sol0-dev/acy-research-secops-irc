@@ -24,9 +24,17 @@ const PORT = Number(process.env.PORT ?? 8787);
 // proxies /api with a server-side token, so agents cannot reach the backend
 // directly.
 const HOST = process.env.API_HOST ?? '127.0.0.1';
-const JWT_SECRET = process.env.JWT_SECRET ?? 'secops-irc-dev-secret-change-me';
+const JWT_SECRET =
+  process.env.JWT_SECRET ??
+  (process.env.NODE_ENV === 'production' ? '' : 'secops-irc-dev-secret-change-me');
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5180';
-const PROXY_TOKEN = process.env.API_PROXY_TOKEN ?? 'secops-irc-proxy';
+const PROXY_TOKEN =
+  process.env.API_PROXY_TOKEN ??
+  (process.env.NODE_ENV === 'production' ? '' : 'secops-irc-proxy');
+if (!JWT_SECRET || !PROXY_TOKEN) {
+  console.error('[api] JWT_SECRET and API_PROXY_TOKEN are required in production');
+  process.exit(1);
+}
 const ADMIN_USERNAME = String(process.env.ADMIN_USERNAME ?? 'admin').trim() || 'admin';
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD ?? '').trim();
 const ADMIN_PASSWORD_GENERATED = !ADMIN_PASSWORD;
@@ -56,6 +64,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Origin', CLIENT_ORIGIN);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -69,6 +78,11 @@ const rateBuckets = new Map();
 function rateLimit(name, windowMs, max) {
   return (req, res, next) => {
     const now = Date.now();
+    if (rateBuckets.size > 10_000) {
+      for (const [key, value] of rateBuckets) {
+        if (value.reset <= now) rateBuckets.delete(key);
+      }
+    }
     const id = `${name}:${req.ip}`;
     const bucket = rateBuckets.get(id);
     if (!bucket || bucket.reset <= now) {
@@ -85,6 +99,15 @@ function rateLimit(name, windowMs, max) {
 }
 
 app.use('/api/command', rateLimit('command', 60_000, 240));
+// Credential endpoints get a tighter budget than normal workspace writes.
+const authActionLimiter = rateLimit('auth-action', 60_000, 12);
+app.use('/api/command', (req, res, next) => {
+  const action = String(req.body?.action ?? '');
+  if (action === 'auth.login' || action === 'auth.register') {
+    return authActionLimiter(req, res, next);
+  }
+  return next();
+});
 app.use('/api/admin/login', rateLimit('admin-login', 60_000, 5));
 app.use('/api/admin', rateLimit('admin', 60_000, 120));
 
@@ -624,6 +647,31 @@ function enqueue(work) {
   return run;
 }
 
+const SENSITIVE_AUDIT_KEYS = new Set([
+  'passphrase',
+  'password',
+  'token',
+  'secret',
+  'authorization',
+  'apikey',
+  'api_key',
+]);
+
+function redactAudit(value, depth = 0) {
+  if (depth > 12) return '[depth-limit]';
+  if (Array.isArray(value)) return value.map((item) => redactAudit(item, depth + 1));
+  if (value && typeof value === 'object') {
+    const clean = {};
+    for (const [key, item] of Object.entries(value)) {
+      clean[key] = SENSITIVE_AUDIT_KEYS.has(key.toLowerCase())
+        ? '[redacted]'
+        : redactAudit(item, depth + 1);
+    }
+    return clean;
+  }
+  return value;
+}
+
 async function handleCommand(req) {
   const { action, payload = {} } = req.body ?? {};
   if (typeof action !== 'string' || !action) throw new ApiError(400, 'action is required');
@@ -636,7 +684,7 @@ async function handleCommand(req) {
   if (!isPublicAuth && !actor) throw new ApiError(401, 'authentication required');
 
   const outcome = applyCommand(state, action, payload, actor);
-  const version = await persistState(state, action, actor, payload);
+  const version = await persistState(state, action, actor, redactAudit(payload));
 
   const issuedNick = outcome.tokenNick ?? null;
   const nextUser =
@@ -678,14 +726,27 @@ app.use('/api', (_req, res) => {
 });
 
 app.use((error, _req, res, _next) => {
-  const status = error instanceof ApiError ? error.status : 500;
-  res.status(status).json({ error: error.message ?? 'server error' });
+  const status =
+    error instanceof ApiError
+      ? error.status
+      : error?.type === 'entity.parse.failed'
+        ? 400
+        : 500;
+  if (status >= 500) {
+    console.error('[api]', error);
+    return res.status(500).json({ error: 'server error' });
+  }
+  return res.status(status).json({ error: error.message ?? 'request failed' });
 });
 
 async function start() {
   const { seeded } = await initDb();
   console.log(`[db] workspace ${seeded ? 'seeded' : 'loaded'} from ${process.env.DB_NAME ?? 'secops_irc'}`);
   if (ADMIN_PASSWORD_GENERATED) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[admin] ADMIN_PASSWORD is required in production');
+      process.exit(1);
+    }
     console.log(`[admin] no ADMIN_PASSWORD set - generated credentials: ${ADMIN_USERNAME} / ${EFFECTIVE_ADMIN_PASSWORD}`);
   }
   app.listen(PORT, HOST, () => {

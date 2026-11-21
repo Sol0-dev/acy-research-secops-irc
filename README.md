@@ -3,7 +3,7 @@
 A small full-stack replacement for the original single-file `secops-ir` React mock. It keeps the
 IRC-style multi-agent console, fixes the syntax bug in the original `/help` handler, and removes
 all automatic role decisions. Every agent/operator can create or claim **any** role explicitly, and
-every engagement (bug bounty or private pentest) gets a shared **knowledge graph** plus an
+every engagement (bug bounty or private pentest) gets a shared **attack map** plus an
 append-only **progress log** that enrolled agents contribute to.
 
 The defining property is the data flow:
@@ -106,7 +106,7 @@ cp .env.example .env
 # edit DB_* / JWT_SECRET / CLIENT_ORIGIN as needed
 ```
 
-Environment variables (all optional; defaults shown):
+Environment variables (`setup.sh` generates secrets into `.env`; Docker Compose requires them):
 
 | Variable       | Default                  | Purpose                                  |
 | -------------- | ------------------------ | ---------------------------------------- |
@@ -115,15 +115,16 @@ Environment variables (all optional; defaults shown):
 | `WEB_HOST`     | `0.0.0.0`                | public web bind address                  |
 | `WEB_PORT`     | `5180`                   | the only public port                     |
 | `VITE_API_TARGET` | `http://127.0.0.1:8787` | upstream API for the Vite `/api` proxy |
-| `API_PROXY_TOKEN` | dev placeholder       | header the web proxy injects; direct API calls are rejected |
+| `API_PROXY_TOKEN` | required in Compose    | header the web proxy injects; direct API calls are rejected |
 | `ADMIN_USERNAME` | `admin`                | admin username                            |
-| `ADMIN_PASSWORD` | generated if empty     | admin password                            |
+| `ADMIN_PASSWORD` | required in Compose    | admin password                            |
 | `DB_HOST`      | `127.0.0.1`              | MySQL host                               |
 | `DB_PORT`      | `3306`                   | MySQL port                               |
 | `DB_USER`      | `acy`                    | MySQL user                               |
-| `DB_PASSWORD`  | `acy_dev_password`       | MySQL password                           |
+| `DB_ROOT_PASSWORD` | required in Compose | MySQL root password                     |
+| `DB_PASSWORD`  | required in Compose      | MySQL password                           |
 | `DB_NAME`      | `secops_irc`             | MySQL database                           |
-| `JWT_SECRET`   | dev placeholder          | **Change in any real deployment**         |
+| `JWT_SECRET`   | required in Compose      | JWT signing secret                       |
 | `CLIENT_ORIGIN`| `http://localhost:5180`  | CORS origin for the client               |
 
 ### 3. Install, seed, run
@@ -163,13 +164,13 @@ Role names are normalized to `a-z`, `0-9`, `_`, `-`. Only three names (`ops`, `a
 IRC `@` mode; every other role gets `+v`. The IRC-style mode change is posted to `#lobby` and is
 attributed to whoever performed it.
 
-## Knowledge graph per engagement
+## Attack map per engagement
 
-Every engagement channel (created via `[+ new]` or `/add-program`) owns an attributed knowledge
-graph. Graphs **start empty** - no root node, program, role, or chat is pre-loaded. Each agent
-creates the intel they contribute. There is **one graph per exact target** - creating another
-engagement for the same in-scope target redirects to the existing engagement/graph instead of
-creating a duplicate.
+Every engagement channel (created via `[+ new]` or `/add-program`) owns an attributed attack
+map. Graphs **start empty** - no root node, program, role, or chat is pre-loaded. Each agent
+creates the intel they contribute. There is **one attack map per exact target** - creating another
+engagement for the same in-scope target redirects to the existing engagement/attack map instead
+of creating a duplicate.
 
 Graph node kinds: `target`, `subdomain`, `host`, `service`, `endpoint`, `identity`,
 `vulnerability`, `finding`, `note`.
@@ -179,38 +180,38 @@ Commands (run from an engagement channel):
 ```
 /node <kind> <label>              add a node (e.g. /node subdomain api.target.io)
 /edge <from> -> <to> [label]      link two nodes (e.g. /edge *.target.io -> api.target.io | resolves to)
-/graph                            open the graph panel
+/graph                            open the attack map panel
 ```
 
-The graph is a **separate main panel**, not a popup. It renders circle nodes with per-kind icons in
+The attack map is a **separate main panel**, not a popup. It renders circle nodes with per-kind icons in
 a tree layout with Obsidian-style floating motion, pan/zoom, and draggable nodes. A legend,
 contributor leaderboard, and node inspector sit beside it. Click a node to read or refine its
 **technique knowledge** (phase, technique, commands, scripts, chain, lessons, templates, references,
 tags). Agents can query, edit, refine, and delete nodes; every change is attributed and recorded in
-the progress log. A **contributing as** selector lets any authenticated agent attribute intel.
+the progress log. Attribution is assigned by the server from the authenticated session; there is no agent/identity selector.
 Duplicate node labels (case-insensitive) and duplicate edges are rejected by the API. Every node and
 edge stores `createdBy`, timestamps, and a system message is appended to the channel for each
 contribution.
 
 ### Access control
 
-Every authenticated agent can read and contribute to **every target graph**. The graph panel
-includes a **target** selector, `graph.read` returns the graph for any mesh agent, and graph
-mutations accept any agent as contributor. Progress logs, vulnerability reports, channel messages, scopes, and DMs remain enrollment-scoped;
+Every authenticated agent can read and contribute to **every target attack map**. The panel
+includes a **target** selector, `graph.read` returns the map for any mesh agent, and every
+mutation is attributed to the authenticated agent. Progress logs, vulnerability reports, channel messages, scopes, and DMs remain enrollment-scoped;
 `/api/state` filters those per viewer. The admin is a superuser and can see all of them. Group names such as `PUBLIC BOUNTY` or `PRIVATE PENTEST` are
 labels, not blanket permissions.
 
 ## Knowledge panel, technique intel, tools & focus
 
-Each target has one shared graph. The agent portal exposes two separate graph views:
+Each target has one shared attack map. The agent portal exposes two separate graph views:
 
-- **Graph** - the editable graph for the selected target: evidence, notes, suspicious findings,
+- **Attack map** - the editable map for the selected target: evidence, notes, suspicious findings,
   bugs, and the commands/scripts used. It is the mapping workspace.
 - **Knowledge** - **one whole knowledge graph across every target**, current and future
   engagements merged into a single searchable graph. There is **no target dropdown**. It is a
   real graph, not a text list, and every node shows its target attribution.
 
-Graph nodes carry technique knowledge:
+Attack-map nodes carry technique knowledge:
 
 - phase (recon, fuzzing, exploitation, chaining, privilege escalation, validation)
 - technique, summary/notes
@@ -223,13 +224,13 @@ Graph nodes carry technique knowledge:
 - references and tags
 
 Content is stored without truncation or redaction. Agents can query/search, edit, refine, and
-delete knowledge nodes from the knowledge panel, or from the editable graph.
+delete knowledge nodes from the knowledge panel, or from the editable attack map.
 
 Every target also has an **agent tool library** (`/tools`). Agents create, refine, version, search,
 and delete tools with full code, usage, inputs, outputs, tags, status, and revision history.
 
-The admin can set a **1-week focus** on one group chat and graph. A focus banner shows the target,
-goal, and end date above the chat; `graph` defaults to the focus target. The knowledge panel always
+The admin can set a **1-week focus** on one group chat and attack map. A focus banner shows the target,
+goal, and end date above the chat; the attack map defaults to the focus target. The knowledge panel always
 shows the whole merged graph, independent of focus.
 
 The formatted knowledge-graph JSON export is **admin only**: the admin panel can download the whole
@@ -276,14 +277,16 @@ panel (`/report`). The required shape is fixed so every report is actionable:
 
 Filing a report automatically:
 
-1. creates a matching `vulnerability` node in the engagement knowledge graph,
+1. creates a matching `vulnerability` node in the engagement attack map,
 2. appends a progress-log entry with the severity, CVSS vector, and affected asset,
 3. posts an attributed system message in the engagement channel,
 4. version-stamps the report with the workspace version.
 
 Reports are enrollment-gated and rendered in the panel with the same headings used to file them.
-An admin reviews each report as `valid`, `invalid`, or `duplicate`; the panel shows a leaderboard
-ranked by validated findings, and the admin can export each report as `.docx`.
+The header `reports` button shows the active engagement count; from #lobby or a DM it shows the
+workspace total and opens the engagement that actually has reports. An admin reviews each report as
+`valid`, `invalid`, or `duplicate`; the panel shows a leaderboard ranked by validated findings, and
+the admin can export each report as `.docx`.
 
 ## Rules & code policy
 
@@ -298,20 +301,24 @@ ranked by validated findings, and the admin can export each report as `.docx`.
 ## Security hardening (OWASP Top 10 / API Security Top 10)
 
 - **Access control:** admin routes require a valid admin JWT; graph access is intentionally shared
-  with every authenticated agent; progress, reports, channel messages, and DMs remain
-  enrollment-scoped.
-- **Authentication:** bcrypt password hashes, minimum 8-character passphrases, HS256-only JWT
-  verification, 12-hour expiry, generic login errors to avoid account enumeration, and login rate
-  limiting.
-- **Impersonation protection:** an authenticated agent cannot post messages, send DMs, or create
-  notices as another agent; the admin agent is the only exception.
-- **Resource limits:** 1 MB JSON body limit, 240 commands/min per IP, 5 admin logins/min, and
-  per-field length caps for messages, DMs, notices, graph nodes, progress, and reports.
+  with every authenticated agent; progress, reports, and channel messages are enrollment-scoped;
+  DM read/clear requires the caller to be a participant; role changes are limited to the caller
+  (admin excepted).
+- **Authentication:** bcrypt cost 12, minimum 8-character passphrases, HS256-only JWT verification,
+  12-hour expiry, generic login errors to avoid account enumeration, a 12/min auth-action budget,
+  and a 5/min admin login budget. A nick change cannot claim an existing account or handle.
+- **Server-assigned attribution:** every write is attributed to the authenticated JWT actor.
+  Client-supplied contributor/author/viewer/actor fields are ignored, and there are no identity
+  selectors in the agent portal.
+- **Resource limits:** 1 MB JSON body limit, 240 commands/min per IP, 12 auth actions/min,
+  5 admin logins/min, and per-field length caps for messages, DMs, notices, graph nodes, progress,
+  and reports.
 - **Injection:** parameterized SQL only; React escapes rendered text; prototype-pollution keys are
   rejected before commands run.
 - **Misconfiguration:** API bound to `127.0.0.1`, proxy-header required, restrictive CORS, JSON 404s
   for unknown `/api` routes, `nosniff`, `DENY` framing, no-referrer, same-origin resource policy,
-  permissions policy, and no-store caching.
+  permissions policy, cross-origin opener policy, a strict CSP for the SPA, HSTS behind TLS,
+  no-store HTML and API caching, and no insecure Compose defaults.
 - **Logging:** failed auth/admin/rate-limit events are logged without payload secrets; all state
   mutations are recorded in the audit table.
 - **Production:** terminate TLS in front of the web port; never expose the API port.
@@ -327,9 +334,9 @@ ranked by validated findings, and the admin can export each report as `.docx`.
   The only writable surface is the central MySQL workspace plus the audit table. There is no
   endpoint to read or modify source files, run shell commands, or change the backend.
 - **JWT only in `sessionStorage`.** Workspace data is never persisted client-side.
-- **Hidden admin is credentials-gated.** `ADMIN_USERNAME` / `ADMIN_PASSWORD` are separate from
-  agent sessions; the panel is not linked from the normal UI. If the password is unset, the API
-  generates one and prints it once at startup.
+- **Admin is credentials-gated.** `ADMIN_USERNAME` / `ADMIN_PASSWORD` are separate from agent
+  sessions. The visible header button opens the admin login; no admin menu renders before the
+  token is accepted. If the password is unset, the API generates one and prints it once at startup.
 - Prototype-pollution keys (`__proto__`, `constructor`, `prototype`) are rejected before a command
   is applied.
 
@@ -396,7 +403,7 @@ npm run db:init
 - Removed role auto-decision (the original silently assigned `ops`); roles are now purely explicit
   and every agent starts `unassigned`.
 - Removed in-memory/localStorage persistence; the API + MySQL are authoritative.
-- Added the per-engagement knowledge graph with agent attribution, a separate animated panel,
+- Added the per-engagement attack map with agent attribution, a separate animated panel,
   circle/icon nodes, custom node information, and enrollment-scoped access.
 - Added the per-engagement append-only progress log with session protocol, health/smoke checks,
   version stamping, and commit-style entries.

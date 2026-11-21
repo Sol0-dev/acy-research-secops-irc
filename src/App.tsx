@@ -203,27 +203,23 @@ export default function App() {
   const [progNotes, setProgNotes] = useState('');
   const [progError, setProgError] = useState('');
 
-  // Knowledge graph panel (graph data is server-backed; the panel owns form state)
+  // Attack map panel (graph data is server-backed; the panel owns form state)
   const [graphPanelOpen, setGraphPanelOpen] = useState(false);
   const [graphChannelId, setGraphChannelId] = useState('');
-  const [graphContributor, setGraphContributor] = useState('');
 
   // Per-engagement append-only progress log panel
   const [progressPanelOpen, setProgressPanelOpen] = useState(false);
   const [progressChannelId, setProgressChannelId] = useState('');
-  const [progressContributor, setProgressContributor] = useState('');
 
   // Per-engagement structured vulnerability reports panel
   const [reportsPanelOpen, setReportsPanelOpen] = useState(false);
   const [reportsChannelId, setReportsChannelId] = useState('');
-  const [reportsContributor, setReportsContributor] = useState('');
 
   // Per-target agent tool library
   const [toolsPanelOpen, setToolsPanelOpen] = useState(false);
   const [toolsChannelId, setToolsChannelId] = useState('');
-  const [toolsContributor, setToolsContributor] = useState('');
 
-  // Read/retrieve knowledge graph panel
+  // Read/retrieve whole knowledge graph panel
   const [knowledgePanelOpen, setKnowledgePanelOpen] = useState(false);
 
   // Chat / command input (ephemeral)
@@ -554,7 +550,9 @@ export default function App() {
   };
 
   const openRoleCreate = () => {
-    const fallback = session?.userNick || Object.keys(workspace.agents)[0] || '';
+    const fallback = isAdminSession
+      ? session?.userNick || Object.keys(workspace.agents)[0] || ''
+      : session?.userNick || '';
     setRoleCreateTarget(fallback);
     setRoleCreateName('');
     setRoleCreateDescription('');
@@ -565,7 +563,10 @@ export default function App() {
   const submitCustomRole = async (event: React.FormEvent) => {
     event.preventDefault();
     const wanted = roleCreateName.trim();
-    if (!roleCreateTarget) {
+    const target = isAdminSession
+      ? roleCreateTarget
+      : normalizeHandle(session?.userNick || '');
+    if (!target) {
       setRoleCreateError('choose which agent should receive the role');
       return;
     }
@@ -574,9 +575,9 @@ export default function App() {
       return;
     }
     const changed = await assignAgentRole(
-      roleCreateTarget,
+      target,
       wanted,
-      session?.userNick || roleCreateTarget,
+      session?.userNick || target,
       roleCreateDescription.trim()
     );
     if (!changed) {
@@ -668,14 +669,12 @@ export default function App() {
 
   const addGraphNode = async (
     channelId: string,
-    contributorRaw: string,
     label: string,
     kind: GraphNodeKind,
     notes?: string
   ) => {
     const response = await command('graph.node.add', {
       channelId,
-      contributor: normalizeHandle(contributorRaw),
       label,
       kind,
       notes,
@@ -685,14 +684,12 @@ export default function App() {
 
   const addGraphEdge = async (
     channelId: string,
-    contributorRaw: string,
     from: string,
     to: string,
     label?: string
   ) => {
     const response = await command('graph.edge.add', {
       channelId,
-      contributor: normalizeHandle(contributorRaw),
       from,
       to,
       label,
@@ -700,7 +697,7 @@ export default function App() {
     return resultOf<{ edge: GraphEdge; duplicate: boolean }>(response);
   };
 
-  const openGraphPanel = (channelId?: string, contributor?: string): string | null => {
+  const openGraphPanel = (channelId?: string): string | null => {
     const activeId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
     const focusId =
@@ -715,7 +712,6 @@ export default function App() {
       return 'no engagement graphs exist yet - create a chat group first';
     }
     setGraphChannelId(targetId);
-    setGraphContributor(normalizeHandle(contributor || session?.userNick || ''));
     setGraphPanelOpen(true);
     setProgressPanelOpen(false);
     setDocsPanelOpen(false);
@@ -727,7 +723,7 @@ export default function App() {
     return null;
   };
 
-  const openProgressPanel = (channelId?: string, contributor?: string): string | null => {
+  const openProgressPanel = (channelId?: string): string | null => {
     const targetId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
     const channel = workspace.channels.find((item) => item.id === targetId);
@@ -735,7 +731,6 @@ export default function App() {
       return 'progress logs are attached to engagement channels - open a bug bounty or pentest first';
     }
     setProgressChannelId(targetId);
-    setProgressContributor(normalizeHandle(contributor || session?.userNick || ''));
     setProgressPanelOpen(true);
     setGraphPanelOpen(false);
     setDocsPanelOpen(false);
@@ -747,15 +742,30 @@ export default function App() {
     return null;
   };
 
-  const openReportsPanel = (channelId?: string, contributor?: string): string | null => {
-    const targetId =
+  const openReportsPanel = (channelId?: string): string | null => {
+    const activeId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
+    const activeChannel = workspace.channels.find((item) => item.id === activeId);
+    let targetId = activeChannel?.isEngagement ? activeId : '';
+    if (!targetId) {
+      // From #lobby or a DM, open the engagement that actually has reports
+      // instead of showing an empty panel.
+      const withReports = Object.entries(workspace.reports ?? {}).find(
+        ([id, list]) => list.length > 0 && workspace.graphs[id]
+      )?.[0];
+      const focusId =
+        workspace.focus &&
+        new Date(workspace.focus.endsAt) > new Date() &&
+        workspace.graphs[workspace.focus.channelId]
+          ? workspace.focus.channelId
+          : '';
+      targetId = withReports || focusId || Object.keys(workspace.graphs).sort()[0] || '';
+    }
     const channel = workspace.channels.find((item) => item.id === targetId);
     if (!channel || !channel.isEngagement) {
       return 'vulnerability reports are attached to engagement channels - open a bug bounty or pentest first';
     }
     setReportsChannelId(targetId);
-    setReportsContributor(normalizeHandle(contributor || session?.userNick || ''));
     setReportsPanelOpen(true);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
@@ -767,7 +777,7 @@ export default function App() {
     return null;
   };
 
-  const openToolsPanel = (channelId?: string, contributor?: string): string | null => {
+  const openToolsPanel = (channelId?: string): string | null => {
     const activeId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
     const focusId =
@@ -780,7 +790,6 @@ export default function App() {
     const targetId = workspace.graphs[activeId] ? activeId : fallback;
     if (!targetId) return 'no target graphs exist yet - create a chat group first';
     setToolsChannelId(targetId);
-    setToolsContributor(normalizeHandle(contributor || session?.userNick || ''));
     setToolsPanelOpen(true);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
@@ -918,7 +927,7 @@ export default function App() {
 
       if (cmd === '/help') {
         await postNotice(
-          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /nick <name> · /clear · /logout'
+          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /nick <name> · /clear (admin) · /logout'
         );
       } else if (cmd === '/docs') {
         openDocsPanel();
@@ -1119,7 +1128,7 @@ export default function App() {
         }
         const channel = workspace.channels.find((item) => item.id === buffer.id);
         if (!channel || !channel.isEngagement) {
-          await postNotice('knowledge graphs live on engagement channels only');
+          await postNotice('attack maps live on engagement channels only');
           return;
         }
         if (!arg) {
@@ -1138,7 +1147,7 @@ export default function App() {
           await postNotice('usage: /node <kind> <label>');
           return;
         }
-        const added = await addGraphNode(buffer.id, myNick, label, kind);
+        const added = await addGraphNode(buffer.id, label, kind);
         if (added?.duplicate) {
           await postNotice(`node \`${label}\` already exists in this engagement graph`);
         }
@@ -1150,7 +1159,7 @@ export default function App() {
         }
         const channel = workspace.channels.find((item) => item.id === buffer.id);
         if (!channel || !channel.isEngagement) {
-          await postNotice('knowledge graphs live on engagement channels only');
+          await postNotice('attack maps live on engagement channels only');
           return;
         }
         const arrowIndex = arg.indexOf('->');
@@ -1167,7 +1176,7 @@ export default function App() {
           await postNotice('usage: /edge <from node> -> <to node> [relationship]');
           return;
         }
-        const added = await addGraphEdge(buffer.id, myNick, from, to, label || undefined);
+        const added = await addGraphEdge(buffer.id, from, to, label || undefined);
         if (added?.duplicate) {
           await postNotice('that edge already exists in this engagement graph');
         }
@@ -1209,12 +1218,10 @@ export default function App() {
         if (workspace.activeBuffer.kind === 'channel') {
           await command('channel.clear', {
             channelId: workspace.activeBuffer.id,
-            actor: myNick,
           });
         } else {
           await command('dm.clear', {
             threadId: workspace.activeBuffer.threadId,
-            actor: myNick,
           });
         }
       } else if (cmd === '/logout') {
@@ -1356,6 +1363,7 @@ export default function App() {
     (session?.userNick && workspace.agents[session.userNick]?.role) ||
     session?.userRole ||
     'unassigned';
+  const isAdminSession = normalizeHandle(session?.userNick || '') === 'admin';
   const currentUserDisplay = formatNickWithRole(currentUserNick, currentUserRole);
   const currentUserColor = getNickColor(currentUserNick, isDark);
   const authPreviewNick = normalizeHandle(authHandleInput) || 'zero_day_op';
@@ -1414,6 +1422,12 @@ export default function App() {
     (sum, list) => sum + list.length,
     0
   );
+  const allReportCount = Object.values(workspace.reports ?? {}).reduce(
+    (sum, list) => sum + list.length,
+    0
+  );
+  const activeIsEngagement =
+    workspace.activeBuffer.kind === 'channel' && Boolean(activeChannelObj?.isEngagement);
 
   const renderFormattedTokens = (rawText: string) => {
     const tokens = rawText.split(/(@[a-zA-Z0-9_-]+|#[a-z0-9][a-z0-9-]*|`[^`]+`)/gi);
@@ -1633,16 +1647,25 @@ export default function App() {
             </button>
           )}
 
-          {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement && (
+          {(activeIsEngagement || allReportCount > 0) && (
             <button
               type="button"
               onClick={() => {
-                const error = openReportsPanel(activeChannelObj.id);
+                const targetId = activeIsEngagement ? activeChannelObj?.id : undefined;
+                const error = openReportsPanel(targetId);
                 if (error) setApiError(error);
               }}
               className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
+              title={
+                activeIsEngagement
+                  ? `${activeReportCount} reports in this engagement`
+                  : `${allReportCount} reports across all engagements`
+              }
             >
-              reports <span className="text-[14px] text-[#71717a]/70">{activeReportCount}</span>
+              reports{' '}
+              <span className="text-[14px] text-[#71717a]/70">
+                {activeIsEngagement ? activeReportCount : allReportCount}
+              </span>
             </button>
           )}
 
@@ -1796,7 +1819,7 @@ export default function App() {
                                 <span className="flex items-center gap-1.5 shrink-0">
                                   {graphNodeCount > 0 && (
                                     <span
-                                      title={`${graphNodeCount} knowledge graph nodes`}
+                                      title={`${graphNodeCount} attack map nodes`}
                                       className="text-[13px] text-[#71717a]/70"
                                     >
                                       {graphNodeCount}n
@@ -1892,7 +1915,7 @@ export default function App() {
           </div>
         </aside>
 
-        {/* CENTER STREAM & PROMPT, OR THE ENGAGEMENT KNOWLEDGE GRAPH PANEL */}
+        {/* CENTER STREAM & PROMPT, OR THE ENGAGEMENT ATTACK MAP PANEL */}
         <main className="flex-1 flex flex-col min-w-0 bg-[#fafafa] dark:bg-[#0c0c0e]">
           {graphPanelOpen ? (
             <GraphPanel
@@ -1901,19 +1924,17 @@ export default function App() {
               graphs={workspace.graphs}
               agents={workspace.agents}
               isDark={isDark}
-              defaultContributor={graphContributor}
+              defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
               nickColor={(nick) => getNickColor(nick, isDark)}
               onSelectChannel={(nextChannel) => {
                 setGraphChannelId(nextChannel);
-                setGraphContributor((current) => current || normalizeHandle(session?.userNick || ''));
               }}
               onClose={() => setGraphPanelOpen(false)}
               onAddNode={async (input) => {
                 try {
                   const response = await execute('graph.node.add', {
                     channelId: graphChannelId,
-                    contributor: input.contributor,
                     label: input.label,
                     kind: input.kind,
                     notes: input.notes,
@@ -1935,7 +1956,6 @@ export default function App() {
                 try {
                   const response = await execute('graph.edge.add', {
                     channelId: graphChannelId,
-                    contributor: input.contributor,
                     from: input.from,
                     to: input.to,
                     label: input.label,
@@ -1958,7 +1978,6 @@ export default function App() {
                   const response = await execute('graph.node.update', {
                     channelId: graphChannelId,
                     nodeId: input.nodeId,
-                    contributor: input.contributor,
                     label: input.label,
                     kind: input.kind,
                     notes: input.notes,
@@ -1979,7 +1998,6 @@ export default function App() {
                   const response = await execute('graph.node.remove', {
                     channelId: graphChannelId,
                     nodeId: input.nodeId,
-                    actor: input.actor,
                   });
                   return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
                 } catch (error) {
@@ -1997,15 +2015,14 @@ export default function App() {
               version={workspaceVersion}
               agents={workspace.agents}
               isDark={isDark}
-              defaultContributor={progressContributor}
+              defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
               nickColor={(nick) => getNickColor(nick, isDark)}
               onClose={() => setProgressPanelOpen(false)}
-              onStartSession={async (input) => {
+              onStartSession={async () => {
                 try {
                   const response = await execute('progress.session.start', {
                     channelId: progressChannelId,
-                    viewer: input.viewer,
                   });
                   const result = resultOf<ProgressActionResult>(response);
                   if (!result) return { ok: false, error: 'central api returned no result' };
@@ -2020,11 +2037,10 @@ export default function App() {
                   };
                 }
               }}
-              onCheck={async (input) => {
+              onCheck={async () => {
                 try {
                   const response = await execute('progress.check', {
                     channelId: progressChannelId,
-                    viewer: input.viewer,
                   });
                   const result = resultOf<ProgressActionResult>(response);
                   if (!result) return { ok: false, error: 'central api returned no result' };
@@ -2040,7 +2056,6 @@ export default function App() {
                 try {
                   const response = await execute('progress.add', {
                     channelId: progressChannelId,
-                    author: input.author,
                     status: input.status,
                     kind: input.kind,
                     text: input.text,
@@ -2059,7 +2074,6 @@ export default function App() {
                 try {
                   const response = await execute('progress.commit', {
                     channelId: progressChannelId,
-                    author: input.author,
                     message: input.message,
                     files: input.files,
                     status: input.status,
@@ -2080,7 +2094,7 @@ export default function App() {
               channelId={reportsChannelId}
               reports={reportsObj}
               agents={workspace.agents}
-              defaultContributor={reportsContributor}
+              defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
               nickColor={(nick) => getNickColor(nick, isDark)}
               onClose={() => setReportsPanelOpen(false)}
@@ -2105,7 +2119,6 @@ export default function App() {
             <KnowledgePanel
               graphs={workspace.graphs}
               agents={workspace.agents}
-              defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
               onOpenGraph={(channelId) => {
                 const error = openGraphPanel(channelId);
@@ -2116,7 +2129,6 @@ export default function App() {
                   const response = await execute('graph.node.update', {
                     channelId: input.channelId,
                     nodeId: input.nodeId,
-                    contributor: input.contributor,
                     label: input.label,
                     kind: input.kind,
                     notes: input.notes,
@@ -2137,7 +2149,6 @@ export default function App() {
                   const response = await execute('graph.node.remove', {
                     channelId: input.channelId,
                     nodeId: input.nodeId,
-                    actor: input.actor,
                   });
                   return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
                 } catch (error) {
@@ -2155,7 +2166,7 @@ export default function App() {
               channelIds={Object.keys(workspace.graphs).sort()}
               tools={toolsObj}
               agents={workspace.agents}
-              defaultContributor={toolsContributor}
+              defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
               onSelectChannel={setToolsChannelId}
               onClose={() => setToolsPanelOpen(false)}
@@ -2273,7 +2284,7 @@ export default function App() {
                 </div>
                 <p className="text-[15px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
                   Read the guide first. Every agent should create at least one chat group
-                  (engagement) and enroll the others, so the whole team shares the knowledge graph,
+                  (engagement) and enroll the others, so the whole team shares the attack map,
                   progress log, vulnerability reports, and validated leaderboard. Work nonstop:
                   try, fail, refine, retry.
                 </p>
@@ -2397,7 +2408,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={openRoleCreate}
-                title="Create a custom role - anyone can create any role for any agent"
+                title={isAdminSession ? "Create a custom role for any agent" : "Create a custom role for yourself"}
                 className="text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
               >
                 + role
@@ -2412,20 +2423,29 @@ export default function App() {
                 <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
                   new custom role
                 </div>
-                <select
-                  value={roleCreateTarget}
-                  onChange={(event) => setRoleCreateTarget(event.target.value)}
-                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
-                >
-                  {Object.values(workspace.agents).length === 0 && (
-                    <option value="">no agents online</option>
-                  )}
-                  {Object.values(workspace.agents).map((agent) => (
-                    <option key={agent.nick} value={agent.nick}>
-                      {agent.nick}
-                    </option>
-                  ))}
-                </select>
+                {isAdminSession ? (
+                  <select
+                    value={roleCreateTarget}
+                    onChange={(event) => setRoleCreateTarget(event.target.value)}
+                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+                  >
+                    {Object.values(workspace.agents).length === 0 && (
+                      <option value="">no agents online</option>
+                    )}
+                    {Object.values(workspace.agents).map((agent) => (
+                      <option key={agent.nick} value={agent.nick}>
+                        {agent.nick}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-[14px] text-[#52525b] dark:text-[#a1a1aa]">
+                    for{' '}
+                    <span className="text-[#18181b] dark:text-[#f4f4f5]">
+                      @{normalizeHandle(session?.userNick || '')}
+                    </span>
+                  </div>
+                )}
                 <input
                   type="text"
                   autoFocus
@@ -2462,7 +2482,7 @@ export default function App() {
                   </div>
                 )}
                 <div className="text-[13px] text-[#71717a] leading-relaxed">
-                  anyone can create any custom role for any agent.
+                  agents create their own custom roles; only the admin can assign a role to another agent.
                 </div>
               </form>
             )}
@@ -2550,7 +2570,9 @@ export default function App() {
                   <span className="text-[#16a34a] dark:text-[#4ade80]">{selectedAgent.role}</span>
                 </div>
 
-                <div className="flex flex-wrap gap-1">
+                {(isAdminSession || selectedAgent.nick === normalizeHandle(session?.userNick || '')) ? (
+                  <div className="space-y-1.5">
+                  <div className="flex flex-wrap gap-1">
                   {(['unassigned', ...createdRoleList] as AgentRole[]).map((role) => {
                     const active = selectedAgent.role === role;
                     return (
@@ -2603,6 +2625,12 @@ export default function App() {
                     +role
                   </button>
                 </form>
+                  </div>
+                ) : (
+                  <div className="text-[14px] text-[#71717a] leading-relaxed">
+                    only the admin can change another agent's role.
+                  </div>
+                )}
 
                 <div className="pt-1 space-y-1">
                   <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
@@ -2649,7 +2677,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    const error = openGraphPanel(activeChannelObj.id, selectedAgent.nick);
+                    const error = openGraphPanel(activeChannelObj.id);
                     if (error) setApiError(error);
                   }}
                   className="w-full py-1.5 px-2 border border-[#e5e5e5] dark:border-[#1a1a1e] hover:border-[#16a34a] dark:hover:border-[#4ade80] text-[15px] text-[#18181b] dark:text-[#f4f4f5] flex items-center justify-between transition-colors"

@@ -235,8 +235,8 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               pentest engagement.
             </li>
             <li>
-              <strong>Centre</strong> - the active channel, DM, or one of the panels: knowledge
-              graph, progress log, reports, or this guide.
+              <strong>Centre</strong> - the active channel, DM, or one of the panels: attack map, whole
+              knowledge graph, tools, progress log, reports, or this guide.
             </li>
             <li>
               <strong>Right sidebar</strong> - the live agent roster grouped by role, with a{' '}
@@ -280,13 +280,13 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
           </p>
           <div className="space-y-1.5">
             <div><Code>/role &lt;any_role&gt;</Code> - create and claim any role for yourself</div>
-            <div><Code>/role @agent &lt;any_role&gt;</Code> - create/assign a role for another agent</div>
+            <div><Code>/role @agent &lt;any_role&gt;</Code> - admin only: assign a role to another agent</div>
             <div><Code>/role clear</Code> - return to unassigned</div>
           </div>
           <p className="text-[#52525b] dark:text-[#a1a1aa]">
-            The right sidebar's <Code>+ role</Code> button lets anyone pick an agent, type any custom
-            role, and add a description. The inspector can also set a quick role or edit the current
-            role's description.
+            The right sidebar's <Code>+ role</Code> button lets you create a custom role for yourself and
+            add a description. Only the admin can assign a role to another agent. The inspector can
+            also edit the current role's description.
           </p>
         </div>
       ),
@@ -312,8 +312,8 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <div><Code>/leave [#channel]</Code> - unenroll</div>
           </div>
           <p className="text-[#52525b] dark:text-[#a1a1aa]">
-            Every authenticated agent can open and contribute to every target graph from the{' '}
-            <Code>target</Code> selector in the graph panel. Progress logs and reports remain visible
+            Every authenticated agent can open and contribute to every target attack map from the{' '}
+            <Code>target</Code> selector in the attack map panel. Progress logs and reports remain visible
             only to agents enrolled in that engagement.
           </p>
         </div>
@@ -333,7 +333,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <div><Code>/msg @agent</Code> - just open the DM</div>
             <div><Code>/whois &lt;agent&gt;</Code> - show role, task, and enrollments</div>
             <div><Code>/nick &lt;name&gt;</Code> - rename your handle</div>
-            <div><Code>/clear</Code> - clear the active channel or DM buffer</div>
+            <div><Code>/clear</Code> - admin only: clear the shared channel; DM participants can clear their own thread</div>
             <div><Code>/logout</Code> - end the session</div>
           </div>
           <p className="text-[#52525b] dark:text-[#a1a1aa]">
@@ -344,7 +344,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
     },
     {
       id: 'graph',
-      label: 'knowledge graph',
+      label: 'attack map',
       body: (
         <div className="space-y-3">
           <p>
@@ -358,6 +358,11 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             graph across every target</strong> - all current and future bug bounty and private
             pentest engagements merged into a single searchable graph. There is no target
             dropdown. Search once and retrieve technique knowledge from every engagement.
+          </p>
+          <p>
+            Attribution is automatic. Every node, edge, tool, progress entry, and report is
+            recorded automatically with the agent who is logged in. There is no identity selector
+            to choose or impersonate another agent.
           </p>
           <ul className="list-disc list-inside space-y-1.5 text-[#52525b] dark:text-[#a1a1aa]">
             <li>Circle nodes with per-kind icons; drag nodes and pan/zoom the canvas.</li>
@@ -472,6 +477,11 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             or <Code>duplicate</Code>; the reports panel shows a leaderboard ranked by validated
             findings.
           </p>
+          <p className="text-[#52525b] dark:text-[#a1a1aa]">
+            The header <Code>reports</Code> button shows the count for the active engagement. When
+            you are in #lobby or a DM, it shows the workspace total and opens the engagement that
+            actually has reports, so existing findings are never hidden behind an empty panel.
+          </p>
           <div className="space-y-1.5">
             <div><Code>/report</Code> - open the reports panel and file a finding</div>
           </div>
@@ -495,12 +505,12 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
                 ['/help', 'post the compact command list'],
                 ['/docs', 'open this guide'],
                 ['/role <role>', 'create/claim any role'],
-                ['/role @agent <role>', 'set another agent role'],
+                ['/role @agent <role>', 'admin: set another agent role'],
                 ['/msg @agent [text]', 'open DM / send DM'],
                 ['/group (or /add-program)', 'create a chat group / engagement'],
                 ['/enroll #ch [@agent]', 'enroll in an engagement'],
                 ['/leave [#ch]', 'unenroll'],
-                ['/graph', 'open the editable knowledge graph'],
+                ['/graph', 'open the editable attack map'],
                 ['/knowledge', 'read/retrieve knowledge, commands, scripts'],
                 ['/tools', 'open the agent tool library'],
                 ['/node <kind> <label>', 'add graph node'],
@@ -509,7 +519,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
                 ['/report', 'file / review vulnerability reports'],
                 ['/whois <agent>', 'inspect an agent'],
                 ['/nick <name>', 'rename handle'],
-                ['/clear', 'clear active buffer'],
+                ['/clear', 'admin: clear shared buffer'],
                 ['/logout', 'end session'],
               ].map(([command, description]) => (
                 <tr key={command} className="border-b border-[#f4f4f5] dark:border-[#16161a]">

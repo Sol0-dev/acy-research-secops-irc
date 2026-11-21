@@ -70,27 +70,24 @@ interface GraphPanelProps {
   onSelectChannel: (channelId: string) => void;
   onClose: () => void;
   onAddNode: (input: {
-    contributor: string;
     label: string;
     kind: GraphNodeKind;
     notes?: string;
     intel?: TechniqueIntel;
   }) => Promise<GraphActionResult>;
   onAddEdge: (input: {
-    contributor: string;
     from: string;
     to: string;
     label?: string;
   }) => Promise<GraphActionResult>;
   onUpdateNode: (input: {
-    contributor: string;
     nodeId: string;
     label: string;
     kind: GraphNodeKind;
     notes?: string;
     intel?: TechniqueIntel;
   }) => Promise<GraphActionResult>;
-  onRemoveNode: (input: { actor: string; nodeId: string }) => Promise<GraphActionResult>;
+  onRemoveNode: (input: { nodeId: string }) => Promise<GraphActionResult>;
 }
 
 function kindColor(kind: GraphNodeKind, isDark: boolean) {
@@ -121,7 +118,7 @@ export default function GraphPanel({
   onUpdateNode,
   onRemoveNode,
 }: GraphPanelProps) {
-  const [contributor, setContributor] = useState(normalizeHandle(defaultContributor));
+  const contributor = normalizeHandle(defaultContributor);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [nodeLabel, setNodeLabel] = useState('');
@@ -228,7 +225,6 @@ export default function GraphPanel({
     if (nodeResponse.trim()) intel.response = nodeResponse;
     setBusy(true);
     const result = await onAddNode({
-      contributor,
       label,
       kind: nodeKind,
       notes: nodeNotes.trim() || undefined,
@@ -262,7 +258,6 @@ export default function GraphPanel({
     }
     setBusy(true);
     const result = await onAddEdge({
-      contributor,
       from: edgeFrom,
       to: edgeTo,
       label: edgeLabel.trim() || undefined,
@@ -300,7 +295,6 @@ export default function GraphPanel({
     if (tags.length > 0) intel.tags = tags;
     setBusy(true);
     const result = await onUpdateNode({
-      contributor,
       nodeId: selected.id,
       label: editLabel.trim(),
       kind: editKind,
@@ -318,7 +312,7 @@ export default function GraphPanel({
   const deleteNode = async () => {
     if (!selected) return;
     setBusy(true);
-    const result = await onRemoveNode({ actor: contributor, nodeId: selected.id });
+    const result = await onRemoveNode({ nodeId: selected.id });
     setBusy(false);
     if (!result.ok) {
       setError(result.error || 'could not delete node');
@@ -347,7 +341,7 @@ export default function GraphPanel({
           </button>
           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
           <span className="font-mono text-base font-medium truncate">
-            knowledge graph // {channelId}
+            attack map // {channelId}
           </span>
           <span className="font-mono text-[14px] text-[#71717a]">
             {graph.nodes.length} nodes · {graph.edges.length} edges
@@ -370,20 +364,12 @@ export default function GraphPanel({
           </label>
         </div>
 
-        <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
-          <span>contributing as</span>
-          <select
-            value={contributor}
-            onChange={(event) => setContributor(event.target.value)}
-            className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
-          >
-            {Object.values(agents).map((agent) => (
-              <option key={agent.nick} value={agent.nick}>
-                {formatNick(agent.nick, agent.role)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <span className="font-mono text-[14px] text-[#71717a]">
+          acting as{' '}
+          <span className="text-[#18181b] dark:text-[#f4f4f5]">
+            {formatNick(contributor, agents[contributor]?.role)}
+          </span>
+        </span>
       </div>
 
       {error && (

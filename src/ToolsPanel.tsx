@@ -25,7 +25,6 @@ interface ToolsPanelProps {
   onSelectChannel: (channelId: string) => void;
   onClose: () => void;
   onCreate: (input: {
-    author: string;
     name: string;
     category: string;
     language: string;
@@ -39,7 +38,6 @@ interface ToolsPanelProps {
     status: ToolStatus;
   }) => Promise<ToolActionResult>;
   onUpdate: (input: {
-    author: string;
     toolId: string;
     name: string;
     category: string;
@@ -54,7 +52,7 @@ interface ToolsPanelProps {
     status: ToolStatus;
     note: string;
   }) => Promise<ToolActionResult>;
-  onRemove: (input: { actor: string; toolId: string }) => Promise<ToolActionResult>;
+  onRemove: (input: { toolId: string }) => Promise<ToolActionResult>;
 }
 
 function normalizeHandle(value: string) {
@@ -93,7 +91,7 @@ export default function ToolsPanel({
   onUpdate,
   onRemove,
 }: ToolsPanelProps) {
-  const [author, setAuthor] = useState(normalizeHandle(defaultContributor));
+  const author = normalizeHandle(defaultContributor);
   const [selectedId, setSelectedId] = useState<string | null>(tools[0]?.id ?? null);
   const [mode, setMode] = useState<'view' | 'new' | 'edit'>('view');
   const [search, setSearch] = useState('');
@@ -171,7 +169,6 @@ export default function ToolsPanel({
     setError('');
     setNotice('');
     const base = {
-      author,
       name: form.name,
       category: form.category,
       language: form.language,
@@ -201,7 +198,7 @@ export default function ToolsPanel({
   const remove = async () => {
     if (!selected) return;
     setBusy(true);
-    const result = await onRemove({ actor: author, toolId: selected.id });
+    const result = await onRemove({ toolId: selected.id });
     setBusy(false);
     if (!result.ok) {
       setError(result.error || 'could not delete tool');
@@ -244,20 +241,12 @@ export default function ToolsPanel({
           </label>
         </div>
         <div className="flex items-center gap-2 font-mono text-[14px] text-[#71717a]">
-          <label className="flex items-center gap-1.5">
-            <span>as</span>
-            <select
-              value={author}
-              onChange={(event) => setAuthor(event.target.value)}
-              className={inputClass}
-            >
-              {Object.values(agents).map((agent) => (
-                <option key={agent.nick} value={agent.nick}>
-                  {formatNick(agent.nick, agent.role)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <span>
+            as{' '}
+            <span className="text-[#18181b] dark:text-[#f4f4f5]">
+              {formatNick(author, agents[author]?.role)}
+            </span>
+          </span>
           <button
             type="button"
             onClick={startNew}

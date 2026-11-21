@@ -603,7 +603,7 @@ export default function AdminPanel({
 
           <section className={`space-y-2 ${adminTab === 'graphs' ? '' : 'hidden'}`}>
             <h2 className="text-base uppercase tracking-wider text-[#71717a]">
-              knowledge graphs ({snapshot.graphs.length})
+              attack maps ({snapshot.graphs.length})
             </h2>
             {snapshot.graphs.length === 0 ? (
               <div className="text-base text-[#52525b]">no graphs yet.</div>

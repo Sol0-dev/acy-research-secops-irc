@@ -11,16 +11,35 @@ random() {
   fi
 }
 
+ensure_secret() {
+  local key="$1"
+  local length="$2"
+  local current
+  current="$(grep -E "^${key}=" .env | head -1 | cut -d= -f2- || true)"
+  if [ -z "${current}" ] || printf '%s' "${current}" | grep -q '^replace-with'; then
+    local value
+    value="$(random "${length}")"
+    if grep -qE "^${key}=" .env; then
+      sed -i "s|^${key}=.*|${key}=${value}|" .env
+    else
+      printf '\n%s=%s\n' "${key}" "${value}" >> .env
+    fi
+    echo "Generated ${key}."
+  fi
+}
+
 if [ ! -f .env ]; then
   cp .env.example .env
-  PROXY_TOKEN="$(random 24)"
-  ADMIN_PASSWORD="$(random 12)"
-  JWT_SECRET="$(random 32)"
-  sed -i "s|^API_PROXY_TOKEN=.*|API_PROXY_TOKEN=${PROXY_TOKEN}|" .env
-  sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${ADMIN_PASSWORD}|" .env
-  sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${JWT_SECRET}|" .env
-  echo "Created .env with generated secrets."
+  echo "Created .env from .env.example."
 fi
+
+# Backfill any missing or placeholder secrets so an existing .env is upgraded
+# safely and Docker Compose never needs insecure defaults.
+ensure_secret API_PROXY_TOKEN 24
+ensure_secret ADMIN_PASSWORD 12
+ensure_secret JWT_SECRET 32
+ensure_secret DB_ROOT_PASSWORD 16
+ensure_secret DB_PASSWORD 16
 
 ADMIN_USER="$(grep '^ADMIN_USERNAME=' .env | cut -d= -f2-)"
 ADMIN_PASS="$(grep '^ADMIN_PASSWORD=' .env | cut -d= -f2-)"
@@ -30,7 +49,7 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
   docker compose up -d --build
   echo
   echo "acy-research is starting at http://localhost:5180"
-  echo "Admin shortcut: Ctrl+Shift+A"
+  echo "Admin menu: click the admin button in the header"
   echo "Admin username: ${ADMIN_USER:-admin}"
   echo "Admin password: ${ADMIN_PASS:-see .env}"
   exit 0
