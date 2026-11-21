@@ -121,6 +121,8 @@ function parseIntel(raw) {
     technique: 20000,
     commands: 200000,
     scripts: 200000,
+    request: 200000,
+    response: 200000,
     chain: 20000,
     lessons: 20000,
     template: 200000,
@@ -321,7 +323,7 @@ function requireAgent(state, nick) {
 }
 
 // Prevent an authenticated agent from posting or acting as a different agent.
-// The hidden admin agent may act on behalf of others.
+// The admin agent may act on behalf of others.
 function requireSelf(actor, claimed, field = 'agent') {
   if (!actor) return;
   const actorNick = normalizeHandle(actor);
@@ -347,7 +349,7 @@ function canAccessChannel(state, nick, channel) {
   if (!channel) return false;
   if (!channel.isEngagement || channel.id === '#lobby') return true;
   const agent = state.agents[normalizeHandle(nick)];
-  if (agent?.nick === 'admin') return true; // hidden admin superuser
+  if (agent?.nick === 'admin') return true; // admin superuser
   return Boolean(agent && agent.programs.includes(channel.id));
 }
 
@@ -512,7 +514,7 @@ function validateHandle(nick) {
     throw new ApiError(400, 'handle must be 2-32 chars of a-z, 0-9, _ or -');
   }
   if (nick === 'admin') {
-    throw new ApiError(400, 'handle admin is reserved for the hidden admin session');
+    throw new ApiError(400, 'handle admin is reserved for the admin session');
   }
 }
 
@@ -1065,6 +1067,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
           intel.technique ?? '',
           intel.commands ?? '',
           intel.scripts ?? '',
+          intel.request ?? '',
+          intel.response ?? '',
           intel.chain ?? '',
           intel.lessons ?? '',
           intel.template ?? '',
@@ -1604,6 +1608,19 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         label: title,
         kind: 'vulnerability',
         notes: `${severity.toUpperCase()} · ${cvss}\naffected: ${affectedAsset}\n${summary}`,
+        intel: {
+          phase: 'exploitation',
+          technique: cwe.join(', '),
+          commands: steps.join('\n'),
+          scripts: pocScript || undefined,
+          request,
+          response,
+          chain: testedRuledOut.length > 0 ? `tested / ruled out:\n${testedRuledOut.join('\n')}` : undefined,
+          lessons: impact,
+          template: remediation.join('\n'),
+          references: proof || undefined,
+          tags: [severity, 'report'],
+        },
         createdBy: author,
         time,
       };

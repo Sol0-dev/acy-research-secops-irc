@@ -85,6 +85,8 @@ export interface TechniqueIntel {
   technique?: string;
   commands?: string;
   scripts?: string;
+  request?: string;
+  response?: string;
   chain?: string;
   lessons?: string;
   template?: string;

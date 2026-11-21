@@ -127,6 +127,12 @@ export default function GraphPanel({
   const [nodeLabel, setNodeLabel] = useState('');
   const [nodeKind, setNodeKind] = useState<GraphNodeKind>('target');
   const [nodeNotes, setNodeNotes] = useState('');
+  const [nodePhase, setNodePhase] = useState('');
+  const [nodeTechnique, setNodeTechnique] = useState('');
+  const [nodeCommands, setNodeCommands] = useState('');
+  const [nodeScripts, setNodeScripts] = useState('');
+  const [nodeRequest, setNodeRequest] = useState('');
+  const [nodeResponse, setNodeResponse] = useState('');
   const [editLabel, setEditLabel] = useState('');
   const [editKind, setEditKind] = useState<GraphNodeKind>('note');
   const [editNotes, setEditNotes] = useState('');
@@ -134,6 +140,8 @@ export default function GraphPanel({
   const [editTechnique, setEditTechnique] = useState('');
   const [editCommands, setEditCommands] = useState('');
   const [editScripts, setEditScripts] = useState('');
+  const [editRequest, setEditRequest] = useState('');
+  const [editResponse, setEditResponse] = useState('');
   const [editChain, setEditChain] = useState('');
   const [editLessons, setEditLessons] = useState('');
   const [editTemplate, setEditTemplate] = useState('');
@@ -179,6 +187,8 @@ export default function GraphPanel({
     setEditTechnique(selected.intel?.technique ?? '');
     setEditCommands(selected.intel?.commands ?? '');
     setEditScripts(selected.intel?.scripts ?? '');
+    setEditRequest(selected.intel?.request ?? '');
+    setEditResponse(selected.intel?.response ?? '');
     setEditChain(selected.intel?.chain ?? '');
     setEditLessons(selected.intel?.lessons ?? '');
     setEditTemplate(selected.intel?.template ?? '');
@@ -209,12 +219,20 @@ export default function GraphPanel({
       setError('node label is required');
       return;
     }
+    const intel: TechniqueIntel = {};
+    if (nodePhase.trim()) intel.phase = nodePhase.trim();
+    if (nodeTechnique.trim()) intel.technique = nodeTechnique.trim();
+    if (nodeCommands.trim()) intel.commands = nodeCommands;
+    if (nodeScripts.trim()) intel.scripts = nodeScripts;
+    if (nodeRequest.trim()) intel.request = nodeRequest;
+    if (nodeResponse.trim()) intel.response = nodeResponse;
     setBusy(true);
     const result = await onAddNode({
       contributor,
       label,
       kind: nodeKind,
       notes: nodeNotes.trim() || undefined,
+      intel: Object.keys(intel).length > 0 ? intel : undefined,
     });
     setBusy(false);
     if (!result.ok) {
@@ -224,6 +242,12 @@ export default function GraphPanel({
     setError('');
     setNodeLabel('');
     setNodeNotes('');
+    setNodePhase('');
+    setNodeTechnique('');
+    setNodeCommands('');
+    setNodeScripts('');
+    setNodeRequest('');
+    setNodeResponse('');
     if (result.nodeId) setSelectedId(result.nodeId);
   };
 
@@ -263,6 +287,8 @@ export default function GraphPanel({
     if (editTechnique.trim()) intel.technique = editTechnique.trim();
     if (editCommands.trim()) intel.commands = editCommands;
     if (editScripts.trim()) intel.scripts = editScripts;
+    if (editRequest.trim()) intel.request = editRequest;
+    if (editResponse.trim()) intel.response = editResponse;
     if (editChain.trim()) intel.chain = editChain;
     if (editLessons.trim()) intel.lessons = editLessons;
     if (editTemplate.trim()) intel.template = editTemplate;
@@ -308,20 +334,6 @@ export default function GraphPanel({
   const areaClass =
     'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y font-mono';
 
-  const downloadJson = (data: unknown, filename: string) => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#fafafa] dark:bg-[#0c0c0e] overflow-y-auto">
       <div className="px-4 sm:px-5 py-3 border-b border-[#e5e5e5] dark:border-[#1a1a1e] flex flex-wrap items-center justify-between gap-2 shrink-0">
@@ -356,33 +368,6 @@ export default function GraphPanel({
                 ))}
             </select>
           </label>
-          <button
-            type="button"
-            onClick={() =>
-              downloadJson(
-                { exportedAt: new Date().toISOString(), graph },
-                `graph-${channelId.replace(/^#/, '')}.json`
-              )
-            }
-            className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
-          >
-            download graph json
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              downloadJson(
-                {
-                  exportedAt: new Date().toISOString(),
-                  graphs: Object.values(graphs),
-                },
-                'knowledge-graphs.json'
-              )
-            }
-            className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
-          >
-            download all json
-          </button>
         </div>
 
         <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
@@ -585,6 +570,30 @@ export default function GraphPanel({
                         />
                       </label>
                       <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                          full request
+                        </span>
+                        <textarea
+                          rows={5}
+                          value={editRequest}
+                          onChange={(event) => setEditRequest(event.target.value)}
+                          placeholder="no truncation, no redaction"
+                          className={areaClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                          full response
+                        </span>
+                        <textarea
+                          rows={5}
+                          value={editResponse}
+                          onChange={(event) => setEditResponse(event.target.value)}
+                          placeholder="no truncation, no redaction"
+                          className={areaClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
                         <span className="text-[13px] uppercase tracking-wider text-[#71717a]">chain</span>
                         <textarea
                           rows={3}
@@ -710,6 +719,55 @@ export default function GraphPanel({
                 className={inputClass}
               />
             </div>
+            <details className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-2">
+              <summary className="cursor-pointer text-[13px] uppercase tracking-wider text-[#71717a]">
+                commands, scripts, request/response - raw
+              </summary>
+              <div className="space-y-2 pt-2">
+                <input
+                  type="text"
+                  value={nodePhase}
+                  onChange={(event) => setNodePhase(event.target.value)}
+                  placeholder="phase: recon, fuzzing, exploitation, chaining, validation"
+                  className={inputClass}
+                />
+                <textarea
+                  rows={2}
+                  value={nodeTechnique}
+                  onChange={(event) => setNodeTechnique(event.target.value)}
+                  placeholder="technique"
+                  className={areaClass}
+                />
+                <textarea
+                  rows={3}
+                  value={nodeCommands}
+                  onChange={(event) => setNodeCommands(event.target.value)}
+                  placeholder="commands / snippets used"
+                  className={areaClass}
+                />
+                <textarea
+                  rows={3}
+                  value={nodeScripts}
+                  onChange={(event) => setNodeScripts(event.target.value)}
+                  placeholder="scripts used"
+                  className={areaClass}
+                />
+                <textarea
+                  rows={3}
+                  value={nodeRequest}
+                  onChange={(event) => setNodeRequest(event.target.value)}
+                  placeholder="full request - no truncation, no redaction"
+                  className={areaClass}
+                />
+                <textarea
+                  rows={3}
+                  value={nodeResponse}
+                  onChange={(event) => setNodeResponse(event.target.value)}
+                  placeholder="full response - no truncation, no redaction"
+                  className={areaClass}
+                />
+              </div>
+            </details>
             <button
               type="button"
               onClick={() => void addNode()}

@@ -438,8 +438,8 @@ app.post('/api/admin/agent-session', async (req, res) => {
       role: existing?.role ?? 'admin',
       online: true,
       isUser: true,
-      model: 'hidden admin operator',
-      task: 'hidden admin session - full agent capabilities',
+      model: 'admin operator',
+      task: 'admin session - full agent capabilities',
       rate: 'manual / interactive',
       programs: Array.from(new Set([...(existing?.programs ?? []), ...engagements])),
     };

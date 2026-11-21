@@ -225,7 +225,6 @@ export default function App() {
 
   // Read/retrieve knowledge graph panel
   const [knowledgePanelOpen, setKnowledgePanelOpen] = useState(false);
-  const [knowledgeChannelId, setKnowledgeChannelId] = useState('');
 
   // Chat / command input (ephemeral)
   const [inputText, setInputText] = useState('');
@@ -351,8 +350,8 @@ export default function App() {
     void command('view.set', { theme: isDark ? 'light' : 'dark' });
   };
 
-  // Hidden admin oversight. Unlocked with the server-side ADMIN_USERNAME / ADMIN_PASSWORD; the
-  // panel is never linked from the normal interface.
+  // Admin oversight. Opened from the visible admin button and unlocked with the server-side
+  // ADMIN_USERNAME / ADMIN_PASSWORD. Every admin route requires the admin token.
   const loadAdmin = useCallback(async (token: string) => {
     setAdminLoading(true);
     setAdminError('');
@@ -806,7 +805,6 @@ export default function App() {
       ? activeId
       : focusId || Object.keys(workspace.graphs).sort()[0] || '';
     if (!targetId) return 'no target graphs exist yet - create a chat group first';
-    setKnowledgeChannelId(targetId);
     setKnowledgePanelOpen(true);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
@@ -1251,11 +1249,6 @@ export default function App() {
   // Global keyboard shortcuts
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'a') {
-        event.preventDefault();
-        openAdmin();
-        return;
-      }
       if (
         event.key === '/' &&
         document.activeElement !== inputRef.current &&
@@ -1296,7 +1289,6 @@ export default function App() {
     reportsPanelOpen,
     toolsPanelOpen,
     knowledgePanelOpen,
-    openAdmin,
     session,
   ]);
 
@@ -1386,16 +1378,6 @@ export default function App() {
       }
     );
   }, [workspace.graphs, graphChannelId]);
-
-  const knowledgeObj = useMemo<EngagementGraph>(() => {
-    return (
-      workspace.graphs[knowledgeChannelId] ?? {
-        channelId: knowledgeChannelId,
-        nodes: [],
-        edges: [],
-      }
-    );
-  }, [workspace.graphs, knowledgeChannelId]);
 
   const progressObj = useMemo(
     () => workspace.progress?.[progressChannelId],
@@ -1671,6 +1653,15 @@ export default function App() {
             title="Start here: read the guide, create a chat group, and work together"
           >
             docs <span className="text-[14px]">↗</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={openAdmin}
+            title="Admin only: oversight, goals, reports, graphs, accounts, audit, IRC"
+            className="flex items-center gap-1 text-[#dc2626] dark:text-[#f87171] border border-[#dc2626]/40 dark:border-[#f87171]/40 px-2 py-0.5 hover:bg-[#dc2626]/10 dark:hover:bg-[#f87171]/10 transition-colors"
+          >
+            admin
           </button>
 
           <button
@@ -2112,24 +2103,18 @@ export default function App() {
             />
           ) : knowledgePanelOpen ? (
             <KnowledgePanel
-              channelId={knowledgeChannelId}
-              channelIds={Object.keys(workspace.graphs).sort()}
-              graph={knowledgeObj}
               graphs={workspace.graphs}
-              tools={workspace.tools ?? {}}
-              scopes={workspace.scopes}
               agents={workspace.agents}
               defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
-              onSelectChannel={setKnowledgeChannelId}
-              onOpenGraph={() => {
-                const error = openGraphPanel(knowledgeChannelId);
+              onOpenGraph={(channelId) => {
+                const error = openGraphPanel(channelId);
                 if (error) setApiError(error);
               }}
               onUpdateNode={async (input) => {
                 try {
                   const response = await execute('graph.node.update', {
-                    channelId: knowledgeChannelId,
+                    channelId: input.channelId,
                     nodeId: input.nodeId,
                     contributor: input.contributor,
                     label: input.label,
@@ -2150,7 +2135,7 @@ export default function App() {
               onRemoveNode={async (input) => {
                 try {
                   const response = await execute('graph.node.remove', {
-                    channelId: knowledgeChannelId,
+                    channelId: input.channelId,
                     nodeId: input.nodeId,
                     actor: input.actor,
                   });

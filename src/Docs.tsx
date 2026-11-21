@@ -245,8 +245,9 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <li>
               <strong>Header</strong> - current handle and role, <Code>graph</Code>,{' '}
               <Code>knowledge</Code>, <Code>tools</Code>, <Code>progress</Code>, and{' '}
-              <Code>reports</Code> buttons, <Code>docs</Code>, and the <Code>☀ light</Code> /{' '}
-              <Code>🌙 dark</Code> theme toggle.
+              <Code>reports</Code> buttons, <Code>docs</Code>, the <Code>☀ light</Code> /{' '}
+              <Code>🌙 dark</Code> theme toggle, and an <Code>admin</Code> button. The admin button
+              opens the admin menu after admin credentials are entered; those menus are admin only.
             </li>
             <li>
               <strong>Focus banner</strong> - when the admin sets a 1-week focus, the target group,
@@ -347,34 +348,36 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
       body: (
         <div className="space-y-3">
           <p>
-            Each engagement has its own knowledge graph in a full-width panel. Open it from the
-            header <Code>graph</Code> button or with <Code>/graph</Code>. Graphs start empty.
-            Each exact target has <strong>one graph</strong>; creating another engagement for the
-            same target reuses the existing graph instead of making a second one.
+            The <Code>graph</Code> panel maps one exact target: evidence, notes, suspicious
+            findings, and confirmed bugs, with the commands and scripts each agent used. Every
+            target has exactly one shared graph; creating another engagement for the same target
+            reuses it instead of making a second one.
+          </p>
+          <p>
+            The <Code>knowledge</Code> panel is different: it is <strong>one whole knowledge
+            graph across every target</strong> - all current and future bug bounty and private
+            pentest engagements merged into a single searchable graph. There is no target
+            dropdown. Search once and retrieve technique knowledge from every engagement.
           </p>
           <ul className="list-disc list-inside space-y-1.5 text-[#52525b] dark:text-[#a1a1aa]">
             <li>Circle nodes with per-kind icons; drag nodes and pan/zoom the canvas.</li>
             <li>
               Click a node to read or refine its knowledge: phase (recon, fuzzing, exploitation,
-              chaining, validation), technique, raw commands, scripts used, chain, lessons,
-              templates, references, and tags. Content is stored without truncation or redaction.
+              chaining, privilege escalation, validation), technique, raw commands, scripts used,
+              full request, full response, chain, lessons, templates, references, and tags.
+              Content is stored without truncation or redaction.
             </li>
             <li>
-              Agents can search/query, edit, refine, and delete graph nodes from the agent portal.
-              Every target has exactly one graph, shared by every agent.
+              Agents can search/query, edit, refine, and delete knowledge nodes from the knowledge
+              panel. Every node shows its target attribution.
             </li>
             <li>
-              Use <Code>knowledge</Code> to read/retrieve the graph and <Code>/knowledge</Code> or
-              the knowledge button to open it. Download the current graph or all graphs as formatted
-              JSON.
+              Download the formatted whole knowledge graph as JSON is admin only. Agents browse
+              and refine it in the panel; the admin exports it.
             </li>
-            <li>Add nodes and edges from the forms, or from chat.</li>
+            <li>Add nodes and edges from the graph forms, or from chat.</li>
             <li>Contributors and the kind legend are shown beside the canvas; every node/edge records who added it.</li>
           </ul>
-          <div className="space-y-1.5">
-            <div><Code>/node &lt;kind&gt; &lt;label&gt;</Code> - add a node</div>
-            <div><Code>/edge &lt;from&gt; -&gt; &lt;to&gt; [label]</Code> - link two nodes</div>
-          </div>
           <div className="flex flex-wrap gap-1.5">
             {['/node subdomain api.target.io', '/node vulnerability IDOR in /api/v1/accounts'].map(
               (command) => (

@@ -10,11 +10,9 @@ import { useEffect, useMemo, useState } from 'react';
 import GraphView from './GraphView';
 import type {
   AgentProfile,
-  AgentTool,
   EngagementGraph,
   GraphNode,
   GraphNodeKind,
-  ScopeDefinition,
   TechniqueIntel,
 } from './types';
 
@@ -39,18 +37,13 @@ const KINDS: GraphNodeKind[] = [
 ];
 
 interface KnowledgePanelProps {
-  channelId: string;
-  channelIds: string[];
-  graph: EngagementGraph;
   graphs: Record<string, EngagementGraph>;
-  tools: Record<string, AgentTool[]>;
-  scopes: Record<string, ScopeDefinition>;
   agents: Record<string, AgentProfile>;
   defaultContributor: string;
   formatNick: (nick: string, role?: string) => string;
-  onSelectChannel: (channelId: string) => void;
-  onOpenGraph: () => void;
+  onOpenGraph: (channelId: string) => void;
   onUpdateNode: (input: {
+    channelId: string;
     contributor: string;
     nodeId: string;
     label: string;
@@ -58,21 +51,19 @@ interface KnowledgePanelProps {
     notes?: string;
     intel: TechniqueIntel;
   }) => Promise<{ ok: boolean; error?: string }>;
-  onRemoveNode: (input: { actor: string; nodeId: string }) => Promise<{ ok: boolean; error?: string }>;
+  onRemoveNode: (input: {
+    channelId: string;
+    actor: string;
+    nodeId: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
   onClose: () => void;
 }
 
 export default function KnowledgePanel({
-  channelId,
-  channelIds,
-  graph,
   graphs,
-  tools,
-  scopes,
   agents,
   defaultContributor,
   formatNick,
-  onSelectChannel,
   onOpenGraph,
   onUpdateNode,
   onRemoveNode,
@@ -93,6 +84,8 @@ export default function KnowledgePanel({
     notes: '',
     commands: '',
     scripts: '',
+    request: '',
+    response: '',
     chain: '',
     lessons: '',
     template: '',
@@ -102,9 +95,23 @@ export default function KnowledgePanel({
 
   const contributor = useMemo(() => normalizeHandle(defaultContributor), [defaultContributor]);
 
+  const mergedGraph = useMemo(() => {
+    const nodes: GraphNode[] = [];
+    const edges: EngagementGraph['edges'] = [];
+    const targetByNode = new Map<string, string>();
+    for (const [graphId, targetGraph] of Object.entries(graphs)) {
+      for (const node of targetGraph.nodes) {
+        nodes.push(node);
+        targetByNode.set(node.id, graphId);
+      }
+      edges.push(...targetGraph.edges);
+    }
+    return { nodes, edges, targetByNode };
+  }, [graphs]);
+
   const selected: GraphNode | null = useMemo(
-    () => graph.nodes.find((node) => node.id === selectedId) ?? null,
-    [graph.nodes, selectedId]
+    () => mergedGraph.nodes.find((node) => node.id === selectedId) ?? null,
+    [mergedGraph.nodes, selectedId]
   );
 
   useEffect(() => {
@@ -117,6 +124,8 @@ export default function KnowledgePanel({
       notes: selected.notes ?? '',
       commands: selected.intel?.commands ?? '',
       scripts: selected.intel?.scripts ?? '',
+      request: selected.intel?.request ?? '',
+      response: selected.intel?.response ?? '',
       chain: selected.intel?.chain ?? '',
       lessons: selected.intel?.lessons ?? '',
       template: selected.intel?.template ?? '',
@@ -132,7 +141,7 @@ export default function KnowledgePanel({
   const matches = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return [];
-    return graph.nodes
+    return mergedGraph.nodes
       .filter((node) => {
         const intel = node.intel ?? {};
         return [
@@ -143,6 +152,8 @@ export default function KnowledgePanel({
           intel.technique ?? '',
           intel.commands ?? '',
           intel.scripts ?? '',
+          intel.request ?? '',
+          intel.response ?? '',
           intel.chain ?? '',
           intel.lessons ?? '',
           intel.template ?? '',
@@ -154,31 +165,19 @@ export default function KnowledgePanel({
           .includes(query);
       })
       .slice(0, 30);
-  }, [graph.nodes, search]);
+  }, [mergedGraph.nodes, search]);
 
   const relations = useMemo(() => {
     if (!selected) return [];
-    const byId = new Map(graph.nodes.map((node) => [node.id, node]));
-    return graph.edges
+    const byId = new Map(mergedGraph.nodes.map((node) => [node.id, node]));
+    return mergedGraph.edges
       .filter((edge) => edge.from === selected.id || edge.to === selected.id)
       .map((edge) => {
         const out = edge.from === selected.id;
         const other = byId.get(out ? edge.to : edge.from);
         return `${out ? '->' : '<-'}${edge.label ? ` [${edge.label}]` : ''} ${other?.label ?? '?'}`;
       });
-  }, [graph.edges, graph.nodes, selected]);
-
-  const downloadJson = (data: unknown, filename: string) => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  };
+  }, [mergedGraph.edges, mergedGraph.nodes, selected]);
 
   const inputClass =
     'bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none';
@@ -196,6 +195,8 @@ export default function KnowledgePanel({
     if (form.technique.trim()) intel.technique = form.technique.trim();
     if (form.commands.trim()) intel.commands = form.commands;
     if (form.scripts.trim()) intel.scripts = form.scripts;
+    if (form.request.trim()) intel.request = form.request;
+    if (form.response.trim()) intel.response = form.response;
     if (form.chain.trim()) intel.chain = form.chain;
     if (form.lessons.trim()) intel.lessons = form.lessons;
     if (form.template.trim()) intel.template = form.template;
@@ -208,7 +209,13 @@ export default function KnowledgePanel({
     setBusy(true);
     setError('');
     setNotice('');
+    const targetChannelId = mergedGraph.targetByNode.get(selected.id);
+    if (!targetChannelId) {
+      setError('target for this node was not found');
+      return;
+    }
     const result = await onUpdateNode({
+      channelId: targetChannelId,
       contributor,
       nodeId: selected.id,
       label: form.label.trim(),
@@ -230,7 +237,16 @@ export default function KnowledgePanel({
     setBusy(true);
     setError('');
     setNotice('');
-    const result = await onRemoveNode({ actor: contributor, nodeId: selected.id });
+    const targetChannelId = mergedGraph.targetByNode.get(selected.id);
+    if (!targetChannelId) {
+      setError('target for this node was not found');
+      return;
+    }
+    const result = await onRemoveNode({
+      channelId: targetChannelId,
+      actor: contributor,
+      nodeId: selected.id,
+    });
     setBusy(false);
     if (!result.ok) {
       setError(result.error || 'could not delete node');
@@ -253,69 +269,43 @@ export default function KnowledgePanel({
         </button>
         <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
         <span className="font-mono text-base font-medium truncate">
-          knowledge graph // {channelId}
+          whole knowledge graph // all targets
         </span>
         <span className="font-mono text-[14px] text-[#71717a]">
-          {graph.nodes.length} nodes · {graph.edges.length} edges
+          {mergedGraph.nodes.length} nodes · {mergedGraph.edges.length} edges
         </span>
-        <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
-          <span>target</span>
-          <select
-            value={channelId}
-            onChange={(event) => onSelectChannel(event.target.value)}
-            className={inputClass}
-          >
-            {channelIds.map((id) => (
-              <option key={id} value={id}>
-                {id}
-              </option>
-            ))}
-          </select>
-        </label>
         <input
           type="text"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="search knowledge, commands, scripts, tags..."
+          placeholder="search all targets, techniques, commands, scripts, tags..."
           className={`${inputClass} flex-1 min-w-[220px]`}
         />
         <button
           type="button"
-          onClick={onOpenGraph}
+          onClick={() => {
+            const target =
+              (selected && mergedGraph.targetByNode.get(selected.id)) ||
+              Object.keys(graphs).sort()[0];
+            if (target) onOpenGraph(target);
+          }}
           className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
         >
-          edit graph
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            downloadJson(
-              {
-                exportedAt: new Date().toISOString(),
-                graphs: Object.values(graphs),
-                tools,
-                scopes,
-              },
-              'knowledge-graphs.json'
-            )
-          }
-          className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
-        >
-          download all json
+          edit target graph
         </button>
       </div>
 
       <div className="flex-1 flex min-h-0 flex-col xl:flex-row">
         <div className="flex-1 min-w-0 h-[62vh] xl:h-auto min-h-[560px] bg-[#fafafa] dark:bg-[#0c0c0e]">
-          {graph.nodes.length === 0 ? (
+          {mergedGraph.nodes.length === 0 ? (
             <div className="h-full flex items-center justify-center p-8 text-center font-mono text-[15px] text-[#71717a]">
               this graph is empty. open the editable graph and add recon, fuzzing, exploitation,
               chaining, commands, scripts, and lessons.
             </div>
           ) : (
             <GraphView
-              nodes={graph.nodes}
-              edges={graph.edges}
+              nodes={mergedGraph.nodes}
+              edges={mergedGraph.edges}
               isDark
               selectedNodeId={selected?.id ?? null}
               onSelectNode={(id) => setSelectedId((current) => (current === id ? null : id))}
@@ -339,7 +329,10 @@ export default function KnowledgePanel({
                     onClick={() => setSelectedId(node.id)}
                     className="w-full text-left text-[14px] text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
                   >
-                    [{node.kind}] {node.label}
+                    <span className="text-[#71717a]">
+                      {mergedGraph.targetByNode.get(node.id) ?? '?'} · [{node.kind}]
+                    </span>{' '}
+                    {node.label}
                     {node.intel?.phase ? ` - ${node.intel.phase}` : ''}
                   </button>
                 ))
@@ -355,6 +348,9 @@ export default function KnowledgePanel({
           ) : (
             <div className="space-y-2">
               <div className="text-[#18181b] dark:text-[#f4f4f5]">
+                <span className="text-[13px] text-[#71717a]">
+                  {mergedGraph.targetByNode.get(selected.id) ?? '?'}
+                </span>{' '}
                 [{selected.kind}] {selected.label}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -426,6 +422,22 @@ export default function KnowledgePanel({
                   <div className="text-[13px] uppercase tracking-wider text-[#71717a]">scripts</div>
                   <pre className="p-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap max-h-64">
                     {selected.intel.scripts}
+                  </pre>
+                </div>
+              )}
+              {selected.intel?.request && (
+                <div>
+                  <div className="text-[13px] uppercase tracking-wider text-[#71717a]">request</div>
+                  <pre className="p-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap max-h-64">
+                    {selected.intel.request}
+                  </pre>
+                </div>
+              )}
+              {selected.intel?.response && (
+                <div>
+                  <div className="text-[13px] uppercase tracking-wider text-[#71717a]">response</div>
+                  <pre className="p-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap max-h-64">
+                    {selected.intel.response}
                   </pre>
                 </div>
               )}
@@ -532,6 +544,20 @@ export default function KnowledgePanel({
                     value={form.scripts}
                     onChange={(event) => setForm({ ...form, scripts: event.target.value })}
                     placeholder="scripts used - raw, no truncation"
+                    className={areaClass}
+                  />
+                  <textarea
+                    rows={4}
+                    value={form.request}
+                    onChange={(event) => setForm({ ...form, request: event.target.value })}
+                    placeholder="full request - no truncation, no redaction"
+                    className={areaClass}
+                  />
+                  <textarea
+                    rows={4}
+                    value={form.response}
+                    onChange={(event) => setForm({ ...form, response: event.target.value })}
+                    placeholder="full response - no truncation, no redaction"
                     className={areaClass}
                   />
                   <textarea
