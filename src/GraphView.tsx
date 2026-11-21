@@ -126,9 +126,10 @@ export default function GraphView({
   const lastMoveRef = useRef(0);
 
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, k: 1 });
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
   const [size, setSize] = useState({ width: 720, height: 420 });
   const [tick, setTick] = useState(0);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const colors = isDark ? COLORS_DARK : COLORS_LIGHT;
 
@@ -274,21 +275,32 @@ export default function GraphView({
     };
   };
 
-  const handleWheel = (event: React.WheelEvent<SVGSVGElement>) => {
-    event.preventDefault();
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const nextK = Math.min(2.6, Math.max(0.35, viewport.k * (event.deltaY < 0 ? 1.12 : 1 / 1.12)));
-    const mx = event.clientX - rect.left;
-    const my = event.clientY - rect.top;
-    const worldX = (mx - viewport.x) / viewport.k;
-    const worldY = (my - viewport.y) / viewport.k;
-    setViewport({
-      x: mx - worldX * nextK,
-      y: my - worldY * nextK,
-      k: nextK,
-    });
-  };
+  // Wheel zoom must be non-passive so preventDefault works. React attaches
+  // onWheel passively, which used to throw console errors on every scroll.
+  useEffect(() => {
+    const element = svgRef.current;
+    if (!element) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = element.getBoundingClientRect();
+      const current = viewportRef.current;
+      const nextK = Math.min(
+        2.6,
+        Math.max(0.35, current.k * (event.deltaY < 0 ? 1.12 : 1 / 1.12))
+      );
+      const mx = event.clientX - rect.left;
+      const my = event.clientY - rect.top;
+      const worldX = (mx - current.x) / current.k;
+      const worldY = (my - current.y) / current.k;
+      setViewport({
+        x: mx - worldX * nextK,
+        y: my - worldY * nextK,
+        k: nextK,
+      });
+    };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, []);
 
   const zoomBy = (factor: number) => {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -339,12 +351,13 @@ export default function GraphView({
       }
       return;
     }
-    if (panningRef.current) {
-      setViewport((current) => ({
-        ...current,
-        x: panningRef.current!.startX + (event.clientX - panningRef.current!.pointerX),
-        y: panningRef.current!.startY + (event.clientY - panningRef.current!.pointerY),
-      }));
+    const panning = panningRef.current;
+    if (panning) {
+      // Capture the pan start now. The functional update runs later, after
+      // pointerup may have cleared panningRef, which used to crash the app.
+      const nextX = panning.startX + (event.clientX - panning.pointerX);
+      const nextY = panning.startY + (event.clientY - panning.pointerY);
+      setViewport((current) => ({ ...current, x: nextX, y: nextY }));
     }
   };
 
@@ -360,7 +373,7 @@ export default function GraphView({
 
   const viewBox = `0 0 ${size.width} ${size.height}`;
   const bodies = bodiesRef.current;
-  const activeId = selectedNodeId ?? hoveredId;
+  const activeId = selectedNodeId;
   const activeEdgeIds = new Set<string>();
   const activeNodeIds = new Set<string>();
   if (activeId) {
@@ -381,7 +394,6 @@ export default function GraphView({
         viewBox={viewBox}
         className="w-full h-full touch-none select-none"
         style={{ cursor: panningRef.current ? 'grabbing' : 'grab' }}
-        onWheel={handleWheel}
         onPointerDown={handleCanvasPointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -466,10 +478,6 @@ export default function GraphView({
                 transform={`translate(${body.x + driftX}, ${body.y + driftY})`}
                 className="cursor-pointer"
                 opacity={activeId && !activeNodeIds.has(node.id) ? 0.25 : 1}
-                onPointerEnter={() => setHoveredId(node.id)}
-                onPointerLeave={() =>
-                  setHoveredId((current) => (current === node.id ? null : current))
-                }
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   draggingRef.current = { id: node.id, moved: false };
