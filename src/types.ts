@@ -80,11 +80,24 @@ export type GraphNodeKind =
   | 'finding'
   | 'note';
 
+export interface TechniqueIntel {
+  phase?: string;
+  technique?: string;
+  commands?: string;
+  scripts?: string;
+  chain?: string;
+  lessons?: string;
+  template?: string;
+  references?: string;
+  tags?: string[];
+}
+
 export interface GraphNode {
   id: string;
   label: string;
   kind: GraphNodeKind;
   notes?: string;
+  intel?: TechniqueIntel;
   createdBy: string;
   time: string;
   updatedBy?: string;
@@ -148,6 +161,38 @@ export interface ProgressLog {
   entries: ProgressEntry[];
 }
 
+export type ToolStatus = 'draft' | 'stable' | 'deprecated';
+
+export interface ToolRevision {
+  version: number;
+  by: string;
+  time: string;
+  note: string;
+  code: string;
+}
+
+export interface AgentTool {
+  id: string;
+  channelId: string;
+  name: string;
+  category: string;
+  language: string;
+  description: string;
+  problem: string;
+  code: string;
+  usage: string;
+  inputs: string;
+  outputs: string;
+  tags: string[];
+  status: ToolStatus;
+  version: number;
+  createdBy: string;
+  time: string;
+  updatedBy?: string;
+  updatedTime?: string;
+  revisions: ToolRevision[];
+}
+
 export type VulnSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
 export type ReportStatus = 'draft' | 'final';
@@ -183,6 +228,14 @@ export interface VulnReport {
   graphNodeId?: string;
 }
 
+export interface FocusGoal {
+  channelId: string;
+  goal: string;
+  startsAt: string;
+  endsAt: string;
+  days: number;
+}
+
 export interface WorkspaceState {
   theme: 'dark' | 'light';
   isLive: boolean;
@@ -199,6 +252,8 @@ export interface WorkspaceState {
   progress: Record<string, ProgressLog>;
   reports: Record<string, VulnReport[]>;
   docsGoal: string;
+  tools: Record<string, AgentTool[]>;
+  focus: FocusGoal | null;
 }
 
 export interface CommandResponse {
@@ -263,6 +318,7 @@ export interface AdminReportSummary {
 export interface AdminSnapshot {
   version: number;
   goal: string;
+  focus: FocusGoal | null;
   counts: {
     accounts: number;
     agents: number;

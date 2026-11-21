@@ -11,7 +11,7 @@ import { api } from './lib/api';
 import GraphView from './GraphView';
 import type { AdminSnapshot } from './types';
 
-type AdminTab = 'goal' | 'reports' | 'graphs' | 'accounts' | 'audit' | 'irc';
+type AdminTab = 'goal' | 'reports' | 'graphs' | 'knowledge' | 'accounts' | 'audit' | 'irc';
 
 interface AdminPanelProps {
   open: boolean;
@@ -21,6 +21,7 @@ interface AdminPanelProps {
   loading: boolean;
   onUnlock: (credentials: { username: string; password: string }) => void;
   onSaveGoal: (goal: string) => Promise<{ ok: boolean; error?: string }>;
+  onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onReviewReport: (input: {
     channelId: string;
     reportId: string;
@@ -49,6 +50,7 @@ export default function AdminPanel({
   loading,
   onUnlock,
   onSaveGoal,
+  onSetFocus,
   onReviewReport,
   onOpenAgentPortal,
   onDeleteGraph,
@@ -58,6 +60,10 @@ export default function AdminPanel({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [goalInput, setGoalInput] = useState('');
+  const [focusChannelId, setFocusChannelId] = useState('');
+  const [focusBusy, setFocusBusy] = useState(false);
+  const [focusNotice, setFocusNotice] = useState('');
+  const [focusError, setFocusError] = useState('');
   const [goalNotice, setGoalNotice] = useState('');
   const [goalError, setGoalError] = useState('');
   const [goalBusy, setGoalBusy] = useState(false);
@@ -65,6 +71,7 @@ export default function AdminPanel({
   const [reviewNotice, setReviewNotice] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [pendingDelete, setPendingDelete] = useState('');
+  const [confirmGraphDelete, setConfirmGraphDelete] = useState<string | null>(null);
   const [deleteNotice, setDeleteNotice] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [downloadNotice, setDownloadNotice] = useState('');
@@ -76,6 +83,7 @@ export default function AdminPanel({
   const [graphFocusChannelId, setGraphFocusChannelId] = useState<string | null>(null);
   const [adminTab, setAdminTab] = useState<AdminTab>('goal');
   const [adminGraphChannelId, setAdminGraphChannelId] = useState('');
+  const [knowledgeSearch, setKnowledgeSearch] = useState('');
 
   const downloadFile = async (kind: 'docx' | 'graph', id: string, filename: string) => {
     setDownloadNotice('');
@@ -109,6 +117,11 @@ export default function AdminPanel({
     setGoalInput(snapshot?.goal ?? '');
     setGoalNotice('');
     setGoalError('');
+    setFocusChannelId(
+      snapshot?.focus?.channelId ?? snapshot?.engagements?.[0]?.id ?? ''
+    );
+    setFocusNotice('');
+    setFocusError('');
   }, [snapshot]);
 
   useEffect(() => {
@@ -182,6 +195,48 @@ export default function AdminPanel({
     adminGraph && selectedGraph?.channelId === adminGraph.channelId
       ? adminGraph.nodes.find((node) => node.id === selectedGraph.nodeId) ?? null
       : null;
+
+  const knowledgeQuery = knowledgeSearch.trim().toLowerCase();
+  const knowledgeMatches = adminGraph
+    ? adminGraph.nodes
+        .filter((node) => {
+          if (!knowledgeQuery) return false;
+          const intel = node.intel ?? {};
+          return [
+            node.label,
+            node.kind,
+            node.notes ?? '',
+            intel.phase ?? '',
+            intel.technique ?? '',
+            intel.commands ?? '',
+            intel.scripts ?? '',
+            intel.chain ?? '',
+            intel.lessons ?? '',
+            intel.template ?? '',
+            intel.references ?? '',
+            ...(intel.tags ?? []),
+          ]
+            .join(' ')
+            .toLowerCase()
+            .includes(knowledgeQuery);
+        })
+        .slice(0, 20)
+    : [];
+  const adminGraphRelations =
+    adminGraph && adminGraphNode
+      ? adminGraph.edges
+          .filter((edge) => edge.from === adminGraphNode.id || edge.to === adminGraphNode.id)
+          .map((edge) => {
+            const out = edge.from === adminGraphNode.id;
+            const other = adminGraph.nodes.find(
+              (node) => node.id === (out ? edge.to : edge.from)
+            );
+            return {
+              key: edge.id,
+              text: `${out ? '->' : '<-'}${edge.label ? ` [${edge.label}]` : ''} ${other?.label ?? '?'}`,
+            };
+          })
+      : [];
 
   return (
     <div className="fixed inset-0 z-[60] bg-[#050506] text-[#f4f4f5] font-mono text-lg flex flex-col">
@@ -379,6 +434,7 @@ export default function AdminPanel({
                 ['goal', 'Goal'],
                 ['reports', 'Reports'],
                 ['graphs', 'Graphs'],
+                ['knowledge', 'Knowledge'],
                 ['accounts', 'Accounts'],
                 ['audit', 'Audit logs'],
                 ['irc', 'IRC'],
@@ -450,6 +506,66 @@ export default function AdminPanel({
             <div className="text-[15px] text-[#52525b]">
               only admin credentials can set this. the goal is stored in the central workspace and
               rendered above the docs content for every agent.
+            </div>
+          </section>
+
+          <section className={`space-y-2 ${adminTab === 'goal' ? '' : 'hidden'}`}>
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
+              focus - one group chat and graph for 1 week
+            </h2>
+            <div className="text-[15px] text-[#a1a1aa]">
+              {snapshot.focus
+                ? `current focus: ${snapshot.focus.channelId} until ${new Date(snapshot.focus.endsAt).toLocaleDateString()}`
+                : 'no focus set'}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={focusChannelId}
+                onChange={(event) => setFocusChannelId(event.target.value)}
+                className="bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[15px] text-[#f4f4f5]"
+              >
+                {snapshot.engagements.map((engagement) => (
+                  <option key={engagement.id} value={engagement.id}>
+                    {engagement.id}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={focusBusy || !focusChannelId}
+                onClick={() => {
+                  setFocusBusy(true);
+                  setFocusNotice('');
+                  setFocusError('');
+                  void onSetFocus(focusChannelId, goalInput).then((result) => {
+                    setFocusBusy(false);
+                    if (!result.ok) setFocusError(result.error || 'could not set focus');
+                    else setFocusNotice('focus set for 1 week');
+                  });
+                }}
+                className="px-3 py-1.5 border border-[#2a2a30] text-base text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+              >
+                set 1-week focus
+              </button>
+              <button
+                type="button"
+                disabled={focusBusy}
+                onClick={() => {
+                  setFocusBusy(true);
+                  setFocusNotice('');
+                  setFocusError('');
+                  void onSetFocus('', '').then((result) => {
+                    setFocusBusy(false);
+                    if (!result.ok) setFocusError(result.error || 'could not clear focus');
+                    else setFocusNotice('focus cleared');
+                  });
+                }}
+                className="px-3 py-1.5 border border-[#2a2a30] text-base text-[#71717a] hover:text-[#f87171] disabled:opacity-40"
+              >
+                clear focus
+              </button>
+              {focusNotice && <span className="text-base text-[#4ade80]">{focusNotice}</span>}
+              {focusError && <span className="text-base text-[#f87171]">{focusError}</span>}
             </div>
           </section>
 
@@ -665,35 +781,16 @@ export default function AdminPanel({
                     >
                       download json
                     </button>
-                    {pendingDelete === `graph:${adminGraph.channelId}` ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => void confirmDelete('graph', adminGraph.channelId)}
-                          className="px-1.5 py-0.5 border border-[#f87171] text-[15px] text-[#f87171]"
-                        >
-                          confirm delete
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPendingDelete('')}
-                          className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
-                        >
-                          cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setPendingDelete(`graph:${adminGraph.channelId}`)}
-                        className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
-                      >
-                        delete graph
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setConfirmGraphDelete(adminGraph.channelId)}
+                      className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
+                    >
+                      delete graph
+                    </button>
                   </div>
                 </div>
-                <div className="h-[420px] border border-[#2a2a30] overflow-hidden bg-[#050506]">
+                <div className="h-[72vh] min-h-[620px] border border-[#2a2a30] overflow-hidden bg-[#050506]">
                   {adminGraph.nodes.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-base text-[#52525b]">
                       graph is empty.
@@ -827,6 +924,203 @@ export default function AdminPanel({
                 </table>
               </div>
             )}
+          </section>
+
+          <section className={`space-y-2 ${adminTab === 'knowledge' ? '' : 'hidden'}`}>
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
+              knowledge graph
+            </h2>
+            {snapshot.graphs.length === 0 ? (
+              <div className="text-base text-[#52525b]">no graphs yet.</div>
+            ) : adminGraph ? (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-[15px] text-[#a1a1aa]">
+                    <span>target</span>
+                    <select
+                      value={adminGraph.channelId}
+                      onChange={(event) => {
+                        setAdminGraphChannelId(event.target.value);
+                        setSelectedGraph(null);
+                      }}
+                      className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-[15px] text-[#f4f4f5]"
+                    >
+                      {snapshot.graphs.map((graph) => (
+                        <option key={graph.channelId} value={graph.channelId}>
+                          {graph.channelId} · {graph.nodes.length}n / {graph.edges.length}e
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <span className="text-[15px] text-[#71717a]">
+                    {adminGraph.nodes.length} nodes · {adminGraph.edges.length} edges
+                  </span>
+                  <input
+                    type="text"
+                    value={knowledgeSearch}
+                    onChange={(event) => setKnowledgeSearch(event.target.value)}
+                    placeholder="search knowledge, commands, scripts, tags..."
+                    className="flex-1 min-w-[220px] bg-[#050506] border border-[#2a2a30] px-2 py-1 text-[15px] text-[#f4f4f5]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setGraphFocusChannelId(adminGraph.channelId)}
+                    className="px-1.5 py-0.5 border border-[#2a2a30] text-[14px] text-[#a1a1aa] hover:text-[#4ade80]"
+                  >
+                    open panel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void downloadFile(
+                        'graph',
+                        adminGraph.channelId,
+                        `graph-${adminGraph.channelId.replace(/^#/, '')}.json`
+                      )
+                    }
+                    className="px-1.5 py-0.5 border border-[#2a2a30] text-[14px] text-[#a1a1aa] hover:text-[#4ade80]"
+                  >
+                    download json
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-2">
+                  <div className="h-[70vh] min-h-[600px] border border-[#2a2a30] overflow-hidden bg-[#050506]">
+                    <GraphView
+                      nodes={adminGraph.nodes}
+                      edges={adminGraph.edges}
+                      isDark
+                      selectedNodeId={adminGraphNode?.id ?? null}
+                      onSelectNode={(nodeId) =>
+                        setSelectedGraph({ channelId: adminGraph.channelId, nodeId })
+                      }
+                    />
+                  </div>
+                  <aside className="border border-[#2a2a30] p-3 space-y-2 overflow-y-auto max-h-[70vh] text-[15px] leading-relaxed">
+                    {knowledgeSearch && (
+                      <div className="space-y-1 border-b border-[#2a2a30] pb-2">
+                        <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                          matches ({knowledgeMatches.length})
+                        </div>
+                        {knowledgeMatches.length === 0 ? (
+                          <div className="text-[#52525b]">no matching nodes</div>
+                        ) : (
+                          knowledgeMatches.map((node) => (
+                            <button
+                              key={node.id}
+                              type="button"
+                              onClick={() =>
+                                setSelectedGraph({
+                                  channelId: adminGraph.channelId,
+                                  nodeId: node.id,
+                                })
+                              }
+                              className="w-full text-left text-[14px] text-[#a1a1aa] hover:text-[#4ade80]"
+                            >
+                              [{node.kind}] {node.label}
+                              {node.intel?.phase ? ` - ${node.intel.phase}` : ''}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                    {!adminGraphNode ? (
+                      <div className="text-[#52525b]">
+                        click a node to read its technique knowledge, commands, scripts, and
+                        relations.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="text-[#f4f4f5]">
+                          [{adminGraphNode.kind}] {adminGraphNode.label}
+                        </div>
+                        {adminGraphNode.intel?.phase && (
+                          <div className="text-[#4ade80]">phase: {adminGraphNode.intel.phase}</div>
+                        )}
+                        {adminGraphNode.intel?.technique && (
+                          <div className="whitespace-pre-wrap text-[#d4d4d8]">
+                            technique: {adminGraphNode.intel.technique}
+                          </div>
+                        )}
+                        {adminGraphNode.notes && (
+                          <div className="whitespace-pre-wrap text-[#a1a1aa]">
+                            {adminGraphNode.notes}
+                          </div>
+                        )}
+                        {adminGraphNode.intel?.commands && (
+                          <div>
+                            <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                              commands
+                            </div>
+                            <pre className="p-2 border border-[#2a2a30] bg-[#050506] overflow-x-auto whitespace-pre-wrap max-h-64">
+                              {adminGraphNode.intel.commands}
+                            </pre>
+                          </div>
+                        )}
+                        {adminGraphNode.intel?.scripts && (
+                          <div>
+                            <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                              scripts
+                            </div>
+                            <pre className="p-2 border border-[#2a2a30] bg-[#050506] overflow-x-auto whitespace-pre-wrap max-h-64">
+                              {adminGraphNode.intel.scripts}
+                            </pre>
+                          </div>
+                        )}
+                        {adminGraphNode.intel?.chain && (
+                          <div className="whitespace-pre-wrap text-[#a1a1aa]">
+                            chain: {adminGraphNode.intel.chain}
+                          </div>
+                        )}
+                        {adminGraphNode.intel?.lessons && (
+                          <div className="whitespace-pre-wrap text-[#a1a1aa]">
+                            lessons: {adminGraphNode.intel.lessons}
+                          </div>
+                        )}
+                        {adminGraphNode.intel?.template && (
+                          <div>
+                            <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                              template
+                            </div>
+                            <pre className="p-2 border border-[#2a2a30] bg-[#050506] overflow-x-auto whitespace-pre-wrap max-h-64">
+                              {adminGraphNode.intel.template}
+                            </pre>
+                          </div>
+                        )}
+                        {adminGraphNode.intel?.references && (
+                          <div className="whitespace-pre-wrap text-[#a1a1aa]">
+                            references: {adminGraphNode.intel.references}
+                          </div>
+                        )}
+                        {adminGraphNode.intel?.tags && adminGraphNode.intel.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {adminGraphNode.intel.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[13px] text-[#71717a]"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="border-t border-[#2a2a30] pt-1.5 text-[13px] text-[#71717a]">
+                          relations:
+                          {adminGraphRelations.length === 0
+                            ? ' none'
+                            : ` ${adminGraphRelations.map((relation) => relation.text).join(' | ')}`}
+                        </div>
+                        <div className="text-[13px] text-[#71717a]">
+                          by {adminGraphNode.createdBy} - {adminGraphNode.time}
+                          {adminGraphNode.updatedBy
+                            ? ` - refined by ${adminGraphNode.updatedBy} at ${adminGraphNode.updatedTime}`
+                            : ''}
+                        </div>
+                      </div>
+                    )}
+                  </aside>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <section className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${adminTab === 'accounts' ? '' : 'hidden'}`}>
@@ -964,6 +1258,40 @@ export default function AdminPanel({
           </div>
           </div>
         </>
+      )}
+
+      {confirmGraphDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-sm border border-[#2a2a30] bg-[#09090b] p-4 space-y-3">
+            <div className="text-base text-[#f4f4f5]">
+              Delete graph {confirmGraphDelete}?
+            </div>
+            <p className="text-sm text-[#a1a1aa] leading-relaxed">
+              This removes every node and edge in this graph. The chat group, progress log, and
+              reports stay. This cannot be undone.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const channelId = confirmGraphDelete;
+                  setConfirmGraphDelete(null);
+                  void confirmDelete('graph', channelId);
+                }}
+                className="px-2.5 py-1 border border-[#f87171] text-[15px] text-[#f87171]"
+              >
+                yes, delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmGraphDelete(null)}
+                className="px-2.5 py-1 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
+              >
+                no, cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

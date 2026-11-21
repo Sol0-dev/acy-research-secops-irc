@@ -243,6 +243,7 @@ app.get('/api/admin', async (req, res) => {
     res.json({
       version: getVersion(),
       goal: state.docsGoal ?? '',
+      focus: state.focus ?? null,
       counts,
       accounts,
       agents,
@@ -384,13 +385,42 @@ app.get('/api/admin/graph', (req, res) => {
     'Content-Disposition',
     `attachment; filename="graph-${safeFilename(channelId)}.json"`
   );
-  return res.json({
-    channelId,
-    group: channel.group,
-    platform: channel.platform,
-    scope: state.scopes[channelId] ?? null,
-    graph,
-  });
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  return res.send(
+    JSON.stringify(
+      {
+        exportedAt: new Date().toISOString(),
+        channelId,
+        group: channel.group,
+        platform: channel.platform,
+        scope: state.scopes[channelId] ?? null,
+        graph,
+      },
+      null,
+      2
+    )
+  );
+});
+
+app.get('/api/admin/graphs', (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const state = getState();
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="knowledge-graphs.json"');
+  return res.send(
+    JSON.stringify(
+      {
+        exportedAt: new Date().toISOString(),
+        graphs: Object.values(state.graphs ?? {}),
+        tools: state.tools ?? {},
+        scopes: state.scopes ?? {},
+      },
+      null,
+      2
+    )
+  );
 });
 
 app.post('/api/admin/agent-session', async (req, res) => {
@@ -474,6 +504,7 @@ app.post('/api/admin/channel/delete', async (req, res) => {
     delete state.scopes[channelId];
     delete state.progress[channelId];
     delete state.reports[channelId];
+    delete state.tools[channelId];
 
     for (const agent of Object.values(state.agents)) {
       if (!agent.programs?.includes(channelId)) continue;
@@ -509,6 +540,43 @@ app.post('/api/admin/channel/delete', async (req, res) => {
 
     const version = await persistState(state, 'admin.channel.delete', 'admin', { channelId });
     return res.json({ ok: true, channelId, version });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/focus', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const channelId = String(req.body?.channelId ?? '');
+  const goal = String(req.body?.goal ?? '').trim();
+  const days = Math.min(Math.max(Number(req.body?.days ?? 7) || 7, 1), 30);
+  try {
+    const state = structuredClone(getState());
+    if (!channelId) {
+      state.focus = null;
+    } else {
+      const channel = state.channels.find(
+        (item) => item.id === channelId && item.isEngagement
+      );
+      if (!channel) return res.status(404).json({ error: 'engagement not found' });
+      const startsAt = new Date();
+      const endsAt = new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
+      state.focus = {
+        channelId,
+        goal,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        days,
+      };
+    }
+    const version = await persistState(state, 'admin.focus.set', 'admin', {
+      channelId,
+      goal,
+      days,
+    });
+    return res.json({ ok: true, focus: state.focus, version });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

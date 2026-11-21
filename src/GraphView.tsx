@@ -128,6 +128,7 @@ export default function GraphView({
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, k: 1 });
   const [size, setSize] = useState({ width: 720, height: 420 });
   const [tick, setTick] = useState(0);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const colors = isDark ? COLORS_DARK : COLORS_LIGHT;
 
@@ -359,9 +360,22 @@ export default function GraphView({
 
   const viewBox = `0 0 ${size.width} ${size.height}`;
   const bodies = bodiesRef.current;
+  const activeId = selectedNodeId ?? hoveredId;
+  const activeEdgeIds = new Set<string>();
+  const activeNodeIds = new Set<string>();
+  if (activeId) {
+    activeNodeIds.add(activeId);
+    for (const edge of edges) {
+      if (edge.from === activeId || edge.to === activeId) {
+        activeEdgeIds.add(edge.id);
+        activeNodeIds.add(edge.from);
+        activeNodeIds.add(edge.to);
+      }
+    }
+  }
 
   return (
-    <div ref={containerRef} className="relative w-full h-full min-h-[360px]">
+    <div ref={containerRef} className="relative w-full h-full min-h-[560px]">
       <svg
         ref={svgRef}
         viewBox={viewBox}
@@ -401,27 +415,35 @@ export default function GraphView({
             const y1 = from.y + uy * (RADIUS + 2);
             const x2 = to.x - ux * (RADIUS + 11);
             const y2 = to.y - uy * (RADIUS + 11);
+            const connected = activeEdgeIds.has(edge.id);
+            const dimmed = Boolean(activeId) && !connected;
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            const curve = Math.min(44, length * 0.16);
+            const cx = midX - uy * curve;
+            const cy = midY + ux * curve;
+            const labelX = 0.25 * x1 + 0.5 * cx + 0.25 * x2;
+            const labelY = 0.25 * y1 + 0.5 * cy + 0.25 * y2;
             const showLabel = Boolean(edge.label) && length > 90;
             return (
               <g key={edge.id}>
-                <line
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke={isDark ? '#52525b' : '#a1a1aa'}
-                  strokeOpacity={0.45}
-                  strokeWidth={1.1}
+                <path
+                  d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
+                  fill="none"
+                  stroke={connected ? (isDark ? '#4ade80' : '#16a34a') : isDark ? '#52525b' : '#a1a1aa'}
+                  strokeOpacity={connected ? 0.95 : dimmed ? 0.12 : 0.4}
+                  strokeWidth={connected ? 1.9 : 1.1}
                   markerEnd={`url(#${markerId})`}
                 />
                 {showLabel && (
                   <text
-                    x={(x1 + x2) / 2}
-                    y={(y1 + y2) / 2 - 5}
+                    x={labelX}
+                    y={labelY - 5}
                     textAnchor="middle"
                     fontFamily="ui-monospace, monospace"
                     fontSize={12.5}
-                    fill={isDark ? '#71717a' : '#71717a'}
+                    fill={connected ? (isDark ? '#4ade80' : '#16a34a') : isDark ? '#71717a' : '#71717a'}
+                    fillOpacity={dimmed ? 0.15 : 1}
                     pointerEvents="none"
                   >
                     {edge.label}
@@ -443,6 +465,11 @@ export default function GraphView({
                 key={node.id}
                 transform={`translate(${body.x + driftX}, ${body.y + driftY})`}
                 className="cursor-pointer"
+                opacity={activeId && !activeNodeIds.has(node.id) ? 0.25 : 1}
+                onPointerEnter={() => setHoveredId(node.id)}
+                onPointerLeave={() =>
+                  setHoveredId((current) => (current === node.id ? null : current))
+                }
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   draggingRef.current = { id: node.id, moved: false };

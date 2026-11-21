@@ -6,13 +6,14 @@
  * changes go through the UI/API into the central database.
  * ---------------------------------------------------------------------- */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import GraphView from './GraphView';
 import type {
   AgentProfile,
   EngagementGraph,
   GraphNode,
   GraphNodeKind,
+  TechniqueIntel,
 } from './types';
 
 const KIND_ORDER: GraphNodeKind[] = [
@@ -73,6 +74,7 @@ interface GraphPanelProps {
     label: string;
     kind: GraphNodeKind;
     notes?: string;
+    intel?: TechniqueIntel;
   }) => Promise<GraphActionResult>;
   onAddEdge: (input: {
     contributor: string;
@@ -80,6 +82,15 @@ interface GraphPanelProps {
     to: string;
     label?: string;
   }) => Promise<GraphActionResult>;
+  onUpdateNode: (input: {
+    contributor: string;
+    nodeId: string;
+    label: string;
+    kind: GraphNodeKind;
+    notes?: string;
+    intel?: TechniqueIntel;
+  }) => Promise<GraphActionResult>;
+  onRemoveNode: (input: { actor: string; nodeId: string }) => Promise<GraphActionResult>;
 }
 
 function kindColor(kind: GraphNodeKind, isDark: boolean) {
@@ -107,6 +118,8 @@ export default function GraphPanel({
   onClose,
   onAddNode,
   onAddEdge,
+  onUpdateNode,
+  onRemoveNode,
 }: GraphPanelProps) {
   const [contributor, setContributor] = useState(normalizeHandle(defaultContributor));
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -114,6 +127,19 @@ export default function GraphPanel({
   const [nodeLabel, setNodeLabel] = useState('');
   const [nodeKind, setNodeKind] = useState<GraphNodeKind>('target');
   const [nodeNotes, setNodeNotes] = useState('');
+  const [editLabel, setEditLabel] = useState('');
+  const [editKind, setEditKind] = useState<GraphNodeKind>('note');
+  const [editNotes, setEditNotes] = useState('');
+  const [editPhase, setEditPhase] = useState('');
+  const [editTechnique, setEditTechnique] = useState('');
+  const [editCommands, setEditCommands] = useState('');
+  const [editScripts, setEditScripts] = useState('');
+  const [editChain, setEditChain] = useState('');
+  const [editLessons, setEditLessons] = useState('');
+  const [editTemplate, setEditTemplate] = useState('');
+  const [editReferences, setEditReferences] = useState('');
+  const [editTags, setEditTags] = useState('');
+  const [confirmDeleteNode, setConfirmDeleteNode] = useState(false);
 
   const [edgeFrom, setEdgeFrom] = useState('');
   const [edgeTo, setEdgeTo] = useState('');
@@ -126,6 +152,40 @@ export default function GraphPanel({
     () => graph.nodes.find((node) => node.id === selectedId) ?? null,
     [graph.nodes, selectedId]
   );
+
+
+  const selectedRelations = useMemo(() => {
+    if (!selected) return [];
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]));
+    const rows: Array<{ direction: 'in' | 'out'; label?: string; node: GraphNode }> = [];
+    for (const edge of graph.edges) {
+      if (edge.from === selected.id) {
+        const to = byId.get(edge.to);
+        if (to) rows.push({ direction: 'out', label: edge.label, node: to });
+      } else if (edge.to === selected.id) {
+        const from = byId.get(edge.from);
+        if (from) rows.push({ direction: 'in', label: edge.label, node: from });
+      }
+    }
+    return rows;
+  }, [graph.edges, graph.nodes, selected]);
+
+  useEffect(() => {
+    if (!selected) return;
+    setEditLabel(selected.label);
+    setEditKind(selected.kind);
+    setEditNotes(selected.notes ?? '');
+    setEditPhase(selected.intel?.phase ?? '');
+    setEditTechnique(selected.intel?.technique ?? '');
+    setEditCommands(selected.intel?.commands ?? '');
+    setEditScripts(selected.intel?.scripts ?? '');
+    setEditChain(selected.intel?.chain ?? '');
+    setEditLessons(selected.intel?.lessons ?? '');
+    setEditTemplate(selected.intel?.template ?? '');
+    setEditReferences(selected.intel?.references ?? '');
+    setEditTags((selected.intel?.tags ?? []).join(', '));
+    setConfirmDeleteNode(false);
+  }, [selected]);
 
   const contributorEntries = useMemo(() => {
     const counts = new Map<string, number>();
@@ -192,8 +252,75 @@ export default function GraphPanel({
     setEdgeLabel('');
   };
 
+  const updateNode = async () => {
+    if (!selected) return;
+    if (!editLabel.trim()) {
+      setError('node label is required');
+      return;
+    }
+    const intel: TechniqueIntel = {};
+    if (editPhase.trim()) intel.phase = editPhase.trim();
+    if (editTechnique.trim()) intel.technique = editTechnique.trim();
+    if (editCommands.trim()) intel.commands = editCommands;
+    if (editScripts.trim()) intel.scripts = editScripts;
+    if (editChain.trim()) intel.chain = editChain;
+    if (editLessons.trim()) intel.lessons = editLessons;
+    if (editTemplate.trim()) intel.template = editTemplate;
+    if (editReferences.trim()) intel.references = editReferences;
+    const tags = editTags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    if (tags.length > 0) intel.tags = tags;
+    setBusy(true);
+    const result = await onUpdateNode({
+      contributor,
+      nodeId: selected.id,
+      label: editLabel.trim(),
+      kind: editKind,
+      notes: editNotes.trim() || undefined,
+      intel,
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error || 'could not refine node');
+      return;
+    }
+    setError('');
+  };
+
+  const deleteNode = async () => {
+    if (!selected) return;
+    setBusy(true);
+    const result = await onRemoveNode({ actor: contributor, nodeId: selected.id });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error || 'could not delete node');
+      return;
+    }
+    setError('');
+    setConfirmDeleteNode(false);
+    setSelectedId(null);
+  };
+
   const inputClass =
     'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a]';
+  const areaClass =
+    'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y font-mono';
+
+  const downloadJson = (data: unknown, filename: string) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#fafafa] dark:bg-[#0c0c0e] overflow-y-auto">
@@ -229,6 +356,33 @@ export default function GraphPanel({
                 ))}
             </select>
           </label>
+          <button
+            type="button"
+            onClick={() =>
+              downloadJson(
+                { exportedAt: new Date().toISOString(), graph },
+                `graph-${channelId.replace(/^#/, '')}.json`
+              )
+            }
+            className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+          >
+            download graph json
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              downloadJson(
+                {
+                  exportedAt: new Date().toISOString(),
+                  graphs: Object.values(graphs),
+                },
+                'knowledge-graphs.json'
+              )
+            }
+            className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+          >
+            download all json
+          </button>
         </div>
 
         <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
@@ -255,7 +409,7 @@ export default function GraphPanel({
 
       <div className="p-4 sm:p-5 space-y-4">
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_250px] gap-3">
-          <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] bg-white/40 dark:bg-[#09090b] h-[420px] sm:h-[500px] overflow-hidden">
+          <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] bg-white/40 dark:bg-[#09090b] h-[72vh] min-h-[620px] overflow-hidden">
             {graph.nodes.length === 0 ? (
               <div className="h-full flex items-center justify-center p-8 text-center font-mono text-[15px] text-[#71717a] leading-relaxed">
                 the graph is empty - each agent creates intel here.
@@ -311,27 +465,215 @@ export default function GraphPanel({
             </div>
 
             <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2">
-              <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                {selected ? 'node intel' : 'select a node'}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                  {selected ? 'node intel - refine' : 'select a node'}
+                </div>
+                {selected &&
+                  (confirmDeleteNode ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void deleteNode()}
+                        className="px-1.5 py-0.5 border border-[#f87171] text-[13px] text-[#f87171]"
+                      >
+                        yes, delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteNode(false)}
+                        className="px-1.5 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[13px] text-[#71717a]"
+                      >
+                        no
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteNode(true)}
+                      className="px-1.5 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[13px] text-[#f87171]"
+                    >
+                      delete node
+                    </button>
+                  ))}
               </div>
               {!selected ? (
                 <div className="text-[14px] text-[#71717a] leading-relaxed">
-                  click a circle to inspect its submitted intel.
+                  click a circle or search result to inspect, refine, and relate knowledge.
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="text-[14px] text-[#18181b] dark:text-[#f4f4f5]">
-                    [{selected.kind}] {selected.label}
+                  <label className="block space-y-1">
+                    <span className="text-[13px] uppercase tracking-wider text-[#71717a]">label</span>
+                    <input
+                      type="text"
+                      value={editLabel}
+                      onChange={(event) => setEditLabel(event.target.value)}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="block space-y-1">
+                    <span className="text-[13px] uppercase tracking-wider text-[#71717a]">kind</span>
+                    <select
+                      value={editKind}
+                      onChange={(event) => setEditKind(event.target.value as GraphNodeKind)}
+                      className={inputClass}
+                    >
+                      {KIND_ORDER.map((kind) => (
+                        <option key={kind} value={kind}>
+                          {kind}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block space-y-1">
+                    <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                      summary / notes
+                    </span>
+                    <textarea
+                      rows={4}
+                      value={editNotes}
+                      onChange={(event) => setEditNotes(event.target.value)}
+                      className={areaClass}
+                    />
+                  </label>
+
+                  <details className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-2">
+                    <summary className="cursor-pointer text-[13px] uppercase tracking-wider text-[#71717a]">
+                      technique knowledge - raw, no truncation
+                    </summary>
+                    <div className="space-y-2 pt-2">
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">phase</span>
+                        <input
+                          type="text"
+                          value={editPhase}
+                          onChange={(event) => setEditPhase(event.target.value)}
+                          placeholder="recon, fuzzing, exploitation, chaining, validation"
+                          className={inputClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">technique</span>
+                        <textarea
+                          rows={2}
+                          value={editTechnique}
+                          onChange={(event) => setEditTechnique(event.target.value)}
+                          className={areaClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                          commands / snippets
+                        </span>
+                        <textarea
+                          rows={5}
+                          value={editCommands}
+                          onChange={(event) => setEditCommands(event.target.value)}
+                          className={areaClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                          scripts used
+                        </span>
+                        <textarea
+                          rows={5}
+                          value={editScripts}
+                          onChange={(event) => setEditScripts(event.target.value)}
+                          className={areaClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">chain</span>
+                        <textarea
+                          rows={3}
+                          value={editChain}
+                          onChange={(event) => setEditChain(event.target.value)}
+                          className={areaClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                          lessons / why faster
+                        </span>
+                        <textarea
+                          rows={3}
+                          value={editLessons}
+                          onChange={(event) => setEditLessons(event.target.value)}
+                          className={areaClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">template</span>
+                        <textarea
+                          rows={4}
+                          value={editTemplate}
+                          onChange={(event) => setEditTemplate(event.target.value)}
+                          className={areaClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">references</span>
+                        <textarea
+                          rows={2}
+                          value={editReferences}
+                          onChange={(event) => setEditReferences(event.target.value)}
+                          className={areaClass}
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                          tags (comma separated)
+                        </span>
+                        <input
+                          type="text"
+                          value={editTags}
+                          onChange={(event) => setEditTags(event.target.value)}
+                          className={inputClass}
+                        />
+                      </label>
+                    </div>
+                  </details>
+
+                  <div className="text-[13px] text-[#71717a] border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5 space-y-0.5">
+                    <div>
+                      submitted by {selected.createdBy} - {selected.time}
+                    </div>
+                    {selected.updatedBy && (
+                      <div>
+                        refined by {selected.updatedBy} - {selected.updatedTime}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[14px] text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap leading-relaxed">
-                    {selected.notes || 'no custom information'}
+
+                  <div className="space-y-1 border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5">
+                    <div className="text-[13px] uppercase tracking-wider text-[#71717a]">relations</div>
+                    {selectedRelations.length === 0 ? (
+                      <div className="text-[13px] text-[#71717a]">no relations yet</div>
+                    ) : (
+                      selectedRelations.map((relation, index) => (
+                        <button
+                          key={`${relation.node.id}-${index}`}
+                          type="button"
+                          onClick={() => setSelectedId(relation.node.id)}
+                          className="w-full text-left text-[13px] text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                        >
+                          {relation.direction === 'out' ? '->' : '<-'} {relation.label ? `[${relation.label}] ` : ''}
+                          {relation.node.label}
+                        </button>
+                      ))
+                    )}
                   </div>
-                  <div className="text-[13px] text-[#71717a]">
-                    submitted by {selected.createdBy} · {selected.time}
-                  </div>
-                  <div className="text-[13px] text-[#71717a] border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5">
-                    append-only: submitted nodes cannot be edited or removed.
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void updateNode()}
+                    disabled={busy}
+                    className="w-full px-2 py-1.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40"
+                  >
+                    save / refine node
+                  </button>
                 </div>
               )}
             </div>

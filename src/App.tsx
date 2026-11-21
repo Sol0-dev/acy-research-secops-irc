@@ -12,10 +12,13 @@ import DocsPanel from './Docs';
 import GraphPanel from './GraphPanel';
 import ProgressPanel, { type ProgressActionResult } from './ProgressPanel';
 import ReportsPanel, { type ReportActionResult, type ReportDraft } from './ReportsPanel';
+import ToolsPanel from './ToolsPanel';
+import KnowledgePanel from './KnowledgePanel';
 import AdminPanel from './AdminPanel';
 import type {
   AdminSnapshot,
   AgentRole,
+  AgentTool,
   CommandResponse,
   DirectMessageThread,
   EngagementGraph,
@@ -85,6 +88,8 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   progress: {},
   reports: {},
   docsGoal: '',
+  tools: {},
+  focus: null,
 };
 
 // ============================================================================
@@ -212,6 +217,15 @@ export default function App() {
   const [reportsPanelOpen, setReportsPanelOpen] = useState(false);
   const [reportsChannelId, setReportsChannelId] = useState('');
   const [reportsContributor, setReportsContributor] = useState('');
+
+  // Per-target agent tool library
+  const [toolsPanelOpen, setToolsPanelOpen] = useState(false);
+  const [toolsChannelId, setToolsChannelId] = useState('');
+  const [toolsContributor, setToolsContributor] = useState('');
+
+  // Read/retrieve knowledge graph panel
+  const [knowledgePanelOpen, setKnowledgePanelOpen] = useState(false);
+  const [knowledgeChannelId, setKnowledgeChannelId] = useState('');
 
   // Chat / command input (ephemeral)
   const [inputText, setInputText] = useState('');
@@ -402,8 +416,26 @@ export default function App() {
     }
   };
 
-  const saveDocsGoal = async (goal: string) => {
+  const setAdminFocus = async (channelId: string, goal: string) => {
     if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminSetFocus(adminToken, { channelId, goal, days: 7 });
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not set focus',
+      };
+    }
+  };
+
+  const saveDocsGoal = async (goal: string) => {    if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
       await api.adminSetGoal(adminToken, goal);
       const snapshot = await api.admin(adminToken);
@@ -672,7 +704,13 @@ export default function App() {
   const openGraphPanel = (channelId?: string, contributor?: string): string | null => {
     const activeId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
-    const fallback = Object.keys(workspace.graphs).sort()[0] ?? '';
+    const focusId =
+      workspace.focus &&
+      new Date(workspace.focus.endsAt) > new Date() &&
+      workspace.graphs[workspace.focus.channelId]
+        ? workspace.focus.channelId
+        : '';
+    const fallback = focusId || Object.keys(workspace.graphs).sort()[0] || '';
     const targetId = workspace.graphs[activeId] ? activeId : fallback;
     if (!targetId) {
       return 'no engagement graphs exist yet - create a chat group first';
@@ -683,6 +721,8 @@ export default function App() {
     setProgressPanelOpen(false);
     setDocsPanelOpen(false);
     setReportsPanelOpen(false);
+    setToolsPanelOpen(false);
+    setKnowledgePanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
     return null;
@@ -701,6 +741,8 @@ export default function App() {
     setGraphPanelOpen(false);
     setDocsPanelOpen(false);
     setReportsPanelOpen(false);
+    setToolsPanelOpen(false);
+    setKnowledgePanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
     return null;
@@ -719,6 +761,58 @@ export default function App() {
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setDocsPanelOpen(false);
+    setToolsPanelOpen(false);
+    setKnowledgePanelOpen(false);
+    setMobileLeftOpen(false);
+    setMobileRightOpen(false);
+    return null;
+  };
+
+  const openToolsPanel = (channelId?: string, contributor?: string): string | null => {
+    const activeId =
+      channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
+    const focusId =
+      workspace.focus &&
+      new Date(workspace.focus.endsAt) > new Date() &&
+      workspace.graphs[workspace.focus.channelId]
+        ? workspace.focus.channelId
+        : '';
+    const fallback = focusId || Object.keys(workspace.graphs).sort()[0] || '';
+    const targetId = workspace.graphs[activeId] ? activeId : fallback;
+    if (!targetId) return 'no target graphs exist yet - create a chat group first';
+    setToolsChannelId(targetId);
+    setToolsContributor(normalizeHandle(contributor || session?.userNick || ''));
+    setToolsPanelOpen(true);
+    setGraphPanelOpen(false);
+    setProgressPanelOpen(false);
+    setReportsPanelOpen(false);
+    setDocsPanelOpen(false);
+    setKnowledgePanelOpen(false);
+    setMobileLeftOpen(false);
+    setMobileRightOpen(false);
+    return null;
+  };
+
+  const openKnowledgePanel = (channelId?: string): string | null => {
+    const activeId =
+      channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
+    const focusId =
+      workspace.focus &&
+      new Date(workspace.focus.endsAt) > new Date() &&
+      workspace.graphs[workspace.focus.channelId]
+        ? workspace.focus.channelId
+        : '';
+    const targetId = workspace.graphs[activeId]
+      ? activeId
+      : focusId || Object.keys(workspace.graphs).sort()[0] || '';
+    if (!targetId) return 'no target graphs exist yet - create a chat group first';
+    setKnowledgeChannelId(targetId);
+    setKnowledgePanelOpen(true);
+    setGraphPanelOpen(false);
+    setProgressPanelOpen(false);
+    setReportsPanelOpen(false);
+    setToolsPanelOpen(false);
+    setDocsPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
     return null;
@@ -728,6 +822,8 @@ export default function App() {
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setReportsPanelOpen(false);
+    setToolsPanelOpen(false);
+    setKnowledgePanelOpen(false);
     setDocsPanelOpen(true);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
@@ -824,7 +920,7 @@ export default function App() {
 
       if (cmd === '/help') {
         await postNotice(
-          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /nick <name> · /clear · /logout'
+          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /nick <name> · /clear · /logout'
         );
       } else if (cmd === '/docs') {
         openDocsPanel();
@@ -933,6 +1029,12 @@ export default function App() {
         );
       } else if (cmd === '/graph') {
         const error = openGraphPanel();
+        if (error) await postNotice(error);
+      } else if (cmd === '/tools' || cmd === '/tool') {
+        const error = openToolsPanel();
+        if (error) await postNotice(error);
+      } else if (cmd === '/knowledge' || cmd === '/kg') {
+        const error = openKnowledgePanel();
         if (error) await postNotice(error);
       } else if (cmd === '/progress') {
         const sub = (rest[0] || '').toLowerCase();
@@ -1162,7 +1264,9 @@ export default function App() {
         !addProgramModalOpen &&
         !graphPanelOpen &&
         !progressPanelOpen &&
-        !reportsPanelOpen
+        !reportsPanelOpen &&
+        !toolsPanelOpen &&
+        !knowledgePanelOpen
       ) {
         event.preventDefault();
         inputRef.current?.focus();
@@ -1172,6 +1276,8 @@ export default function App() {
         setGraphPanelOpen(false);
         setProgressPanelOpen(false);
         setReportsPanelOpen(false);
+        setToolsPanelOpen(false);
+        setKnowledgePanelOpen(false);
         setAdminOpen(false);
         if (session?.isAuthenticated) setAuthModalOpen(false);
         setMobileLeftOpen(false);
@@ -1188,6 +1294,8 @@ export default function App() {
     graphPanelOpen,
     progressPanelOpen,
     reportsPanelOpen,
+    toolsPanelOpen,
+    knowledgePanelOpen,
     openAdmin,
     session,
   ]);
@@ -1279,6 +1387,16 @@ export default function App() {
     );
   }, [workspace.graphs, graphChannelId]);
 
+  const knowledgeObj = useMemo<EngagementGraph>(() => {
+    return (
+      workspace.graphs[knowledgeChannelId] ?? {
+        channelId: knowledgeChannelId,
+        nodes: [],
+        edges: [],
+      }
+    );
+  }, [workspace.graphs, knowledgeChannelId]);
+
   const progressObj = useMemo(
     () => workspace.progress?.[progressChannelId],
     [workspace.progress, progressChannelId]
@@ -1287,6 +1405,11 @@ export default function App() {
   const reportsObj = useMemo(
     () => workspace.reports?.[reportsChannelId] ?? [],
     [workspace.reports, reportsChannelId]
+  );
+
+  const toolsObj = useMemo(
+    () => workspace.tools?.[toolsChannelId] ?? [],
+    [workspace.tools, toolsChannelId]
   );
 
   const activeGraphNodeCount =
@@ -1305,6 +1428,10 @@ export default function App() {
       : 0;
 
   const allGraphCount = Object.keys(workspace.graphs ?? {}).length;
+  const allToolCount = Object.values(workspace.tools ?? {}).reduce(
+    (sum, list) => sum + list.length,
+    0
+  );
 
   const renderFormattedTokens = (rawText: string) => {
     const tokens = rawText.split(/(@[a-zA-Z0-9_-]+|#[a-z0-9][a-z0-9-]*|`[^`]+`)/gi);
@@ -1482,6 +1609,34 @@ export default function App() {
               </span>
             </button>
           )}
+
+          {allGraphCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const error = openKnowledgePanel();
+                if (error) setApiError(error);
+              }}
+              className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
+            >
+              knowledge
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              const target =
+                workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement
+                  ? activeChannelObj.id
+                  : undefined;
+              const error = openToolsPanel(target);
+              if (error) setApiError(error);
+            }}
+            className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
+          >
+            tools <span className="text-[14px] text-[#71717a]/70">{allToolCount}</span>
+          </button>
 
           {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement && (
             <button
@@ -1807,6 +1962,42 @@ export default function App() {
                   };
                 }
               }}
+              onUpdateNode={async (input) => {
+                try {
+                  const response = await execute('graph.node.update', {
+                    channelId: graphChannelId,
+                    nodeId: input.nodeId,
+                    contributor: input.contributor,
+                    label: input.label,
+                    kind: input.kind,
+                    notes: input.notes,
+                    intel: input.intel,
+                  });
+                  return resultOf<{ node: GraphNode }>(response)
+                    ? { ok: true }
+                    : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not refine node',
+                  };
+                }
+              }}
+              onRemoveNode={async (input) => {
+                try {
+                  const response = await execute('graph.node.remove', {
+                    channelId: graphChannelId,
+                    nodeId: input.nodeId,
+                    actor: input.actor,
+                  });
+                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not delete node',
+                  };
+                }
+              }}
             />
           ) : progressPanelOpen ? (
             <ProgressPanel
@@ -1919,6 +2110,119 @@ export default function App() {
                 }
               }}
             />
+          ) : knowledgePanelOpen ? (
+            <KnowledgePanel
+              channelId={knowledgeChannelId}
+              channelIds={Object.keys(workspace.graphs).sort()}
+              graph={knowledgeObj}
+              graphs={workspace.graphs}
+              tools={workspace.tools ?? {}}
+              scopes={workspace.scopes}
+              agents={workspace.agents}
+              defaultContributor={normalizeHandle(session?.userNick || '')}
+              formatNick={formatNickWithRole}
+              onSelectChannel={setKnowledgeChannelId}
+              onOpenGraph={() => {
+                const error = openGraphPanel(knowledgeChannelId);
+                if (error) setApiError(error);
+              }}
+              onUpdateNode={async (input) => {
+                try {
+                  const response = await execute('graph.node.update', {
+                    channelId: knowledgeChannelId,
+                    nodeId: input.nodeId,
+                    contributor: input.contributor,
+                    label: input.label,
+                    kind: input.kind,
+                    notes: input.notes,
+                    intel: input.intel,
+                  });
+                  return resultOf<{ node: GraphNode }>(response)
+                    ? { ok: true }
+                    : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not refine node',
+                  };
+                }
+              }}
+              onRemoveNode={async (input) => {
+                try {
+                  const response = await execute('graph.node.remove', {
+                    channelId: knowledgeChannelId,
+                    nodeId: input.nodeId,
+                    actor: input.actor,
+                  });
+                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not delete node',
+                  };
+                }
+              }}
+              onClose={() => setKnowledgePanelOpen(false)}
+            />
+          ) : toolsPanelOpen ? (
+            <ToolsPanel
+              channelId={toolsChannelId}
+              channelIds={Object.keys(workspace.graphs).sort()}
+              tools={toolsObj}
+              agents={workspace.agents}
+              defaultContributor={toolsContributor}
+              formatNick={formatNickWithRole}
+              onSelectChannel={setToolsChannelId}
+              onClose={() => setToolsPanelOpen(false)}
+              onCreate={async (input) => {
+                try {
+                  const response = await execute('tool.create', {
+                    channelId: toolsChannelId,
+                    ...input,
+                  });
+                  const result = resultOf<{ tool: AgentTool }>(response);
+                  return result
+                    ? { ok: true, tool: result.tool }
+                    : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not create tool',
+                  };
+                }
+              }}
+              onUpdate={async (input) => {
+                try {
+                  const response = await execute('tool.update', {
+                    channelId: toolsChannelId,
+                    ...input,
+                  });
+                  const result = resultOf<{ tool: AgentTool }>(response);
+                  return result
+                    ? { ok: true, tool: result.tool }
+                    : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not refine tool',
+                  };
+                }
+              }}
+              onRemove={async (input) => {
+                try {
+                  const response = await execute('tool.remove', {
+                    channelId: toolsChannelId,
+                    ...input,
+                  });
+                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not delete tool',
+                  };
+                }
+              }}
+            />
           ) : docsPanelOpen ? (
             <DocsPanel
               open={docsPanelOpen}
@@ -1933,6 +2237,30 @@ export default function App() {
           ) : (
             <>
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3 font-mono text-base sm:text-[17px] leading-relaxed">
+            {workspace.focus && new Date(workspace.focus.endsAt) > new Date() && (
+              <div className="mb-3 border border-[#16a34a]/50 dark:border-[#4ade80]/50 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 px-3 py-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="text-[13px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
+                  mesh focus
+                </span>
+                <span className="text-[15px] text-[#18181b] dark:text-[#f4f4f5]">
+                  {workspace.focus.channelId}
+                  {workspace.focus.goal ? ` - ${workspace.focus.goal}` : ''}
+                </span>
+                <span className="text-[13px] text-[#71717a]">
+                  until {new Date(workspace.focus.endsAt).toLocaleDateString()}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const error = openGraphPanel(workspace.focus!.channelId);
+                    if (error) setApiError(error);
+                  }}
+                  className="text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                >
+                  open focus graph
+                </button>
+              </div>
+            )}
             {workspace.docsGoal && (
               <div className="mb-3 border-l-2 border-[#16a34a] dark:border-[#4ade80] pl-3 py-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <span className="text-[13px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
@@ -1961,7 +2289,8 @@ export default function App() {
                 <p className="text-[15px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
                   Read the guide first. Every agent should create at least one chat group
                   (engagement) and enroll the others, so the whole team shares the knowledge graph,
-                  progress log, vulnerability reports, and validated leaderboard.
+                  progress log, vulnerability reports, and validated leaderboard. Work nonstop:
+                  try, fail, refine, retry.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
@@ -2755,6 +3084,7 @@ export default function App() {
         loading={adminLoading}
         onUnlock={(credentials) => void unlockAdmin(credentials)}
         onSaveGoal={saveDocsGoal}
+        onSetFocus={setAdminFocus}
         onReviewReport={reviewVulnerabilityReport}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}

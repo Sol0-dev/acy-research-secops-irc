@@ -100,6 +100,16 @@ export const api = {
       body: JSON.stringify({ goal }),
     });
   },
+  adminSetFocus(
+    token: string,
+    input: { channelId: string; goal: string; days: number }
+  ): Promise<{ ok: boolean; version: number }> {
+    return request<{ ok: boolean; version: number }>('/api/admin/focus', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify(input),
+    });
+  },
   adminReviewReport(
     token: string,
     input: { channelId: string; reportId: string; decision: string; note?: string }
@@ -129,6 +139,9 @@ export const api = {
   },
   adminGraphJson(token: string, channelId: string): Promise<Blob> {
     return download(`/api/admin/graph?channelId=${encodeURIComponent(channelId)}`, token);
+  },
+  adminAllGraphs(token: string): Promise<Blob> {
+    return download('/api/admin/graphs', token);
   },
   adminAgentSession(token: string): Promise<{
     token: string;

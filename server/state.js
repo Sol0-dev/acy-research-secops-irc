@@ -114,6 +114,33 @@ function limitText(value, max, field) {
   return text;
 }
 
+function parseIntel(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const fields = {
+    phase: 200,
+    technique: 20000,
+    commands: 200000,
+    scripts: 200000,
+    chain: 20000,
+    lessons: 20000,
+    template: 200000,
+    references: 20000,
+  };
+  const intel = {};
+  for (const [key, max] of Object.entries(fields)) {
+    const value = limitText(raw[key], max, `intel.${key}`).trim();
+    if (value) intel[key] = value;
+  }
+  if (Array.isArray(raw.tags)) {
+    const tags = raw.tags
+      .map((tag) => limitText(tag, 80, 'intel tag').trim())
+      .filter(Boolean)
+      .slice(0, 50);
+    if (tags.length > 0) intel.tags = tags;
+  }
+  return Object.keys(intel).length > 0 ? intel : undefined;
+}
+
 // Reduce an in-scope asset to its exact target so one target cannot grow
 // multiple competing graphs. Different subdomains/repos remain different
 // targets; descriptions in parentheses are ignored.
@@ -171,6 +198,8 @@ export function createInitialState() {
     progress: {},
     reports: {},
     docsGoal: '',
+    tools: {},
+    focus: null,
   };
 }
 
@@ -202,9 +231,10 @@ export function toPublicState(state, viewerNick = null) {
     if (accessible(channelId)) scopes[channelId] = scope;
   }
 
-  // Every authenticated agent can read every target graph. Unauthenticated
-  // state requests receive no graph data.
+  // Every authenticated agent can read every target graph and tool library.
+  // Unauthenticated state requests receive no graph or tool data.
   const graphs = viewer ? { ...(state.graphs ?? {}) } : {};
+  const tools = viewer ? { ...(state.tools ?? {}) } : {};
 
   const progress = {};
   for (const [channelId, log] of Object.entries(state.progress ?? {})) {
@@ -245,6 +275,7 @@ export function toPublicState(state, viewerNick = null) {
     graphs,
     progress,
     reports,
+    tools,
     dmThreads,
   };
 }
@@ -490,6 +521,13 @@ function validateHandle(nick) {
 // ============================================================================
 
 export function applyCommand(state, action, payload = {}, actor = null) {
+  // Migrate workspaces created before newer collections existed.
+  if (!state.tools || typeof state.tools !== 'object') state.tools = {};
+  if (!state.progress) state.progress = {};
+  if (!state.reports) state.reports = {};
+  if (!state.graphs) state.graphs = {};
+  if (state.focus === undefined) state.focus = null;
+
   switch (action) {
     // ------------------------------------------------------------------ auth
     case 'auth.register': {
@@ -1006,6 +1044,47 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       return { result: { access: true, graph, viewer: viewerAgent.nick } };
     }
 
+    case 'graph.query': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const viewer = normalizeHandle(payload.viewer || actor);
+      requireAgent(state, viewer);
+      const graph =
+        state.graphs[channel.id] ||
+        (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
+      const query = String(payload.query ?? '').trim().toLowerCase();
+      const kind = String(payload.kind ?? '').trim().toLowerCase();
+      const tags = parseList(payload.tags).map((tag) => tag.toLowerCase());
+      const nodes = graph.nodes.filter((node) => {
+        if (kind && node.kind !== kind) return false;
+        const intel = node.intel ?? {};
+        const haystack = [
+          node.label,
+          node.kind,
+          node.notes ?? '',
+          intel.phase ?? '',
+          intel.technique ?? '',
+          intel.commands ?? '',
+          intel.scripts ?? '',
+          intel.chain ?? '',
+          intel.lessons ?? '',
+          intel.template ?? '',
+          intel.references ?? '',
+          ...(intel.tags ?? []),
+        ]
+          .join(' ')
+          .toLowerCase();
+        if (query && !haystack.includes(query)) return false;
+        if (tags.length > 0) {
+          const nodeTags = (intel.tags ?? []).map((tag) => tag.toLowerCase());
+          if (!tags.every((tag) => nodeTags.includes(tag))) return false;
+        }
+        return true;
+      });
+      return {
+        result: { access: true, channelId: channel.id, total: nodes.length, nodes },
+      };
+    }
+
     case 'graph.node.add': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const label = limitText(payload.label, 200, 'node label').trim();
@@ -1014,6 +1093,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
       const contributor = normalizeHandle(payload.contributor || actor);
       requireAgent(state, contributor);
+      const intel = parseIntel(payload.intel);
       const graph =
         state.graphs[channel.id] ||
         (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
@@ -1026,6 +1106,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         label,
         kind,
         notes: limitText(payload.notes, 4000, 'node notes').trim() || undefined,
+        intel,
         createdBy: contributor,
         time: nowHHMM(),
       };
@@ -1092,17 +1173,246 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     }
 
     case 'graph.node.update': {
-      throw new ApiError(
-        403,
-        'graph nodes are append-only; submitted node information cannot be edited'
-      );
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const graph = state.graphs[channel.id];
+      const node = graph?.nodes.find((item) => item.id === String(payload.nodeId ?? ''));
+      if (!graph || !node) throw new ApiError(404, 'graph node not found');
+      const contributor = normalizeHandle(payload.contributor || payload.actor || actor);
+      requireAgent(state, contributor);
+
+      if (payload.label !== undefined) {
+        const label = limitText(payload.label, 200, 'node label').trim();
+        if (!label) throw new ApiError(400, 'node label required');
+        const duplicate = graph.nodes.find(
+          (item) => item.id !== node.id && item.label.toLowerCase() === label.toLowerCase()
+        );
+        if (duplicate) throw new ApiError(409, `node ${label} already exists in this graph`);
+        node.label = label;
+      }
+      if (payload.kind !== undefined) {
+        const kind = String(payload.kind).toLowerCase();
+        if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
+        node.kind = kind;
+      }
+      if (payload.notes !== undefined) {
+        node.notes = limitText(payload.notes, 20000, 'node notes').trim() || undefined;
+      }
+      if (payload.intel !== undefined) {
+        const intel = parseIntel(payload.intel);
+        if (intel) node.intel = { ...(node.intel ?? {}), ...intel };
+      }
+      node.updatedBy = contributor;
+      node.updatedTime = nowHHMM();
+
+      appendChannelMessage(state, channel.id, {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `${formatNick(contributor, state.agents[contributor]?.role)} refined graph node \`${node.label}\``,
+      });
+      appendProgressEntry(state, channel.id, {
+        author: contributor,
+        status: 'ok',
+        kind: 'progress',
+        text: `refined graph node \`${node.label}\` [${node.kind}]${node.notes ? ` - ${node.notes}` : ''}`,
+      });
+      return { result: { node } };
     }
 
     case 'graph.node.remove': {
-      throw new ApiError(
-        403,
-        'graph nodes are append-only; submitted nodes cannot be removed or edited out'
-      );
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const graph = state.graphs[channel.id];
+      const nodeId = String(payload.nodeId ?? '');
+      const node = graph?.nodes.find((item) => item.id === nodeId);
+      if (!graph || !node) throw new ApiError(404, 'graph node not found');
+      graph.nodes = graph.nodes.filter((item) => item.id !== nodeId);
+      graph.edges = graph.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
+      const remover = normalizeHandle(payload.actor || actor);
+      requireAgent(state, remover);
+      appendChannelMessage(state, channel.id, {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `${formatNick(remover, state.agents[remover]?.role)} deleted graph node \`${node.label}\` and its relations`,
+      });
+      appendProgressEntry(state, channel.id, {
+        author: remover,
+        status: 'note',
+        kind: 'change',
+        text: `deleted graph node \`${node.label}\` and its relations`,
+      });
+      return { result: { nodeId } };
+    }
+
+    // ------------------------------------------------------- agent tool library
+    case 'tool.read': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const viewer = normalizeHandle(payload.viewer || actor);
+      requireAgent(state, viewer);
+      return {
+        result: { access: true, channelId: channel.id, tools: state.tools[channel.id] ?? [] },
+      };
+    }
+
+    case 'tool.query': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const viewer = normalizeHandle(payload.viewer || actor);
+      requireAgent(state, viewer);
+      const query = String(payload.query ?? '').trim().toLowerCase();
+      const category = String(payload.category ?? '').trim().toLowerCase();
+      const status = String(payload.status ?? '').trim().toLowerCase();
+      const tools = (state.tools[channel.id] ?? []).filter((tool) => {
+        if (category && tool.category.toLowerCase() !== category) return false;
+        if (status && tool.status !== status) return false;
+        if (!query) return true;
+        return [
+          tool.name,
+          tool.category,
+          tool.language,
+          tool.description,
+          tool.problem,
+          tool.code,
+          tool.usage,
+          tool.inputs,
+          tool.outputs,
+          ...tool.tags,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(query);
+      });
+      return { result: { access: true, channelId: channel.id, total: tools.length, tools } };
+    }
+
+    case 'tool.create': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const author = normalizeHandle(payload.author || payload.actor || actor);
+      requireAgent(state, author);
+      const name = limitText(payload.name, 200, 'tool name').trim();
+      if (!name) throw new ApiError(400, 'tool name required');
+      const code = limitText(payload.code, 500000, 'tool code');
+      if (!code.trim()) throw new ApiError(400, 'tool code required');
+      const status = String(payload.status ?? 'draft').toLowerCase();
+      if (!['draft', 'stable', 'deprecated'].includes(status)) {
+        throw new ApiError(400, `invalid tool status: ${status}`);
+      }
+      const list = state.tools[channel.id] || (state.tools[channel.id] = []);
+      if (list.some((tool) => tool.name.toLowerCase() === name.toLowerCase())) {
+        throw new ApiError(409, `a tool named "${name}" already exists in this target`);
+      }
+      const time = nowHHMM();
+      const tool = {
+        id: makeId('tl'),
+        channelId: channel.id,
+        name,
+        category: limitText(payload.category, 100, 'tool category').trim() || 'utility',
+        language: limitText(payload.language, 50, 'tool language').trim() || 'bash',
+        description: limitText(payload.description, 20000, 'tool description').trim(),
+        problem: limitText(payload.problem, 20000, 'tool problem').trim(),
+        code,
+        usage: limitText(payload.usage, 50000, 'tool usage').trim(),
+        inputs: limitText(payload.inputs, 20000, 'tool inputs').trim(),
+        outputs: limitText(payload.outputs, 20000, 'tool outputs').trim(),
+        tags: parseList(payload.tags).slice(0, 50),
+        status,
+        version: 1,
+        createdBy: author,
+        time,
+        revisions: [],
+      };
+      list.push(tool);
+      appendProgressEntry(state, channel.id, {
+        author,
+        status: 'ok',
+        kind: 'progress',
+        text: `created tool \`${name}\` [${tool.category}/${tool.language}] v1`,
+      });
+      return { result: { tool } };
+    }
+
+    case 'tool.update': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const author = normalizeHandle(payload.author || payload.actor || actor);
+      requireAgent(state, author);
+      const list = state.tools[channel.id] ?? [];
+      const tool = list.find((item) => item.id === String(payload.toolId ?? ''));
+      if (!tool) throw new ApiError(404, 'tool not found');
+      if (payload.name !== undefined) {
+        const name = limitText(payload.name, 200, 'tool name').trim();
+        if (!name) throw new ApiError(400, 'tool name required');
+        const duplicate = list.find(
+          (item) => item.id !== tool.id && item.name.toLowerCase() === name.toLowerCase()
+        );
+        if (duplicate) throw new ApiError(409, `a tool named "${name}" already exists`);
+        tool.name = name;
+      }
+      if (payload.category !== undefined) {
+        tool.category = limitText(payload.category, 100, 'tool category').trim() || 'utility';
+      }
+      if (payload.language !== undefined) {
+        tool.language = limitText(payload.language, 50, 'tool language').trim() || 'bash';
+      }
+      if (payload.description !== undefined) {
+        tool.description = limitText(payload.description, 20000, 'tool description').trim();
+      }
+      if (payload.problem !== undefined) {
+        tool.problem = limitText(payload.problem, 20000, 'tool problem').trim();
+      }
+      if (payload.code !== undefined) {
+        tool.code = limitText(payload.code, 500000, 'tool code');
+        if (!tool.code.trim()) throw new ApiError(400, 'tool code required');
+      }
+      if (payload.usage !== undefined) {
+        tool.usage = limitText(payload.usage, 50000, 'tool usage').trim();
+      }
+      if (payload.inputs !== undefined) {
+        tool.inputs = limitText(payload.inputs, 20000, 'tool inputs').trim();
+      }
+      if (payload.outputs !== undefined) {
+        tool.outputs = limitText(payload.outputs, 20000, 'tool outputs').trim();
+      }
+      if (payload.tags !== undefined) {
+        tool.tags = parseList(payload.tags).slice(0, 50);
+      }
+      if (payload.status !== undefined) {
+        const status = String(payload.status).toLowerCase();
+        if (!['draft', 'stable', 'deprecated'].includes(status)) {
+          throw new ApiError(400, `invalid tool status: ${status}`);
+        }
+        tool.status = status;
+      }
+      tool.revisions.push({
+        version: tool.version,
+        by: tool.updatedBy ?? tool.createdBy,
+        time: tool.updatedTime ?? tool.time,
+        note: String(payload.note ?? '').trim(),
+        code: tool.code,
+      });
+      tool.version += 1;
+      tool.updatedBy = author;
+      tool.updatedTime = nowHHMM();
+      appendProgressEntry(state, channel.id, {
+        author,
+        status: 'ok',
+        kind: 'progress',
+        text: `refined tool \`${tool.name}\` to v${tool.version}`,
+      });
+      return { result: { tool } };
+    }
+
+    case 'tool.remove': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const actorNick = normalizeHandle(payload.actor || actor);
+      requireAgent(state, actorNick);
+      const list = state.tools[channel.id] ?? [];
+      const tool = list.find((item) => item.id === String(payload.toolId ?? ''));
+      if (!tool) throw new ApiError(404, 'tool not found');
+      state.tools[channel.id] = list.filter((item) => item.id !== tool.id);
+      appendProgressEntry(state, channel.id, {
+        author: actorNick,
+        status: 'note',
+        kind: 'change',
+        text: `deleted tool \`${tool.name}\``,
+      });
+      return { result: { toolId: tool.id } };
     }
 
     // -------------------------------------------------- progress log (per engagement)
