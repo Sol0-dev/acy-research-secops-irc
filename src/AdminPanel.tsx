@@ -19,7 +19,7 @@ interface AdminPanelProps {
   snapshot: AdminSnapshot | null;
   error: string;
   loading: boolean;
-  onUnlock: (credentials: { username: string; password: string }) => void;
+  onRequestLogin: () => void;
   onSaveGoal: (goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onReviewReport: (input: {
@@ -48,7 +48,7 @@ export default function AdminPanel({
   snapshot,
   error,
   loading,
-  onUnlock,
+  onRequestLogin,
   onSaveGoal,
   onSetFocus,
   onReviewReport,
@@ -57,8 +57,6 @@ export default function AdminPanel({
   onDeleteChannel,
   onClose,
 }: AdminPanelProps) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [goalInput, setGoalInput] = useState('');
   const [focusChannelId, setFocusChannelId] = useState('');
   const [focusBusy, setFocusBusy] = useState(false);
@@ -255,49 +253,32 @@ export default function AdminPanel({
 
       {!snapshot ? (
         <div className="flex-1 flex items-center justify-center p-6">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!username.trim() || !password) return;
-              onUnlock({ username: username.trim(), password });
-            }}
-            className="w-full max-w-sm border border-[#2a2a30] bg-[#09090b] p-4 space-y-3"
-          >
+          <div className="w-full max-w-sm border border-[#2a2a30] bg-[#09090b] p-4 space-y-3">
             <div className="text-base uppercase tracking-wider text-[#71717a]">
-              admin login
+              admin session required
             </div>
             <p className="text-base text-[#71717a] leading-relaxed">
-              Admin credentials are required to open this panel.
+              Use the main login form with the{' '}
+              <span className="text-[#f4f4f5]">admin</span> handle. Admin credentials sign you in
+              as @admin and open this menu.
             </p>
-            <input
-              type="text"
-              autoFocus
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              autoComplete="off"
-              placeholder="admin username"
-              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-lg text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="new-password"
-              placeholder="admin password"
-              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-lg text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full px-3 py-1.5 border border-[#2a2a30] text-base text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
-            >
-              {loading ? 'unlocking…' : 'unlock oversight'}
-            </button>
+            {loading && <div className="text-base text-[#a1a1aa]">checking admin session...</div>}
             {error && <div className="text-base text-[#f87171] leading-relaxed">{error}</div>}
-            <div className="text-[15px] text-[#52525b] leading-relaxed">
-              read-only: no code, file, or backend-mutation controls are exposed here.
-            </div>
-          </form>
+            <button
+              type="button"
+              onClick={onRequestLogin}
+              className="w-full px-3 py-1.5 border border-[#4ade80]/40 text-base text-[#4ade80] hover:text-[#f4f4f5]"
+            >
+              open admin login
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full px-3 py-1.5 border border-[#2a2a30] text-base text-[#a1a1aa] hover:text-[#f4f4f5]"
+            >
+              close
+            </button>
+          </div>
         </div>
       ) : (
         <>

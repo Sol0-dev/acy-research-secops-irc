@@ -6,7 +6,7 @@
  * changes go through the UI/API into the central database.
  * ---------------------------------------------------------------------- */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AgentProfile, ReportStatus, VulnReport, VulnSeverity } from './types';
 
 const SEVERITIES: VulnSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
@@ -60,7 +60,9 @@ export interface ReportActionResult {
 
 interface ReportsPanelProps {
   channelId: string;
-  reports: VulnReport[];
+  channelIds: string[];
+  reportsByChannel: Record<string, VulnReport[]>;
+  onSelectChannel: (channelId: string) => void;
   agents: Record<string, AgentProfile>;
   defaultContributor: string;
   formatNick: (nick: string, role?: string) => string;
@@ -98,7 +100,9 @@ const EMPTY_DRAFT: ReportDraft = {
 
 export default function ReportsPanel({
   channelId,
-  reports,
+  channelIds,
+  reportsByChannel,
+  onSelectChannel,
   agents,
   defaultContributor,
   formatNick,
@@ -106,24 +110,46 @@ export default function ReportsPanel({
   onClose,
   onCreate,
 }: ReportsPanelProps) {
+  // One merged report feed across every accessible engagement. This is how a
+  // new report from any agent appears immediately in the agent portal.
+  const allReports = useMemo(() => {
+    const rows: Array<VulnReport & { target: string }> = [];
+    for (const [target, list] of Object.entries(reportsByChannel ?? {})) {
+      for (const report of list ?? []) rows.push({ ...report, target });
+    }
+    return rows.sort(
+      (a, b) => b.version - a.version || b.time.localeCompare(a.time)
+    );
+  }, [reportsByChannel]);
+
   const [mode, setMode] = useState<'list' | 'new'>('list');
-  const [selectedId, setSelectedId] = useState<string | null>(reports[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(allReports[0]?.id ?? null);
   const author = normalizeHandle(defaultContributor);
   const [draft, setDraft] = useState<ReportDraft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const selected = useMemo(
-    () => reports.find((report) => report.id === selectedId) ?? reports[0] ?? null,
-    [reports, selectedId]
+    () => allReports.find((report) => report.id === selectedId) ?? allReports[0] ?? null,
+    [allReports, selectedId]
   );
+
+  useEffect(() => {
+    if (allReports.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!allReports.some((report) => report.id === selectedId)) {
+      setSelectedId(allReports[0].id);
+    }
+  }, [allReports, selectedId]);
 
   const leaderboard = useMemo(() => {
     const rows = new Map<
       string,
       { nick: string; valid: number; total: number; pending: number; points: number }
     >();
-    for (const report of reports) {
+    for (const report of allReports) {
       const row = rows.get(report.createdBy) ?? {
         nick: report.createdBy,
         valid: 0,
@@ -143,7 +169,7 @@ export default function ReportsPanel({
     return Array.from(rows.values()).sort(
       (a, b) => b.points - a.points || b.valid - a.valid || a.nick.localeCompare(b.nick)
     );
-  }, [reports]);
+  }, [allReports]);
 
   const setField = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -191,9 +217,30 @@ export default function ReportsPanel({
           </button>
           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
           <span className="font-mono text-base font-medium truncate">
-            vulnerability reports // {channelId}
+            vulnerability reports // workspace
           </span>
-          <span className="font-mono text-[14px] text-[#71717a]">{reports.length} filed</span>
+          <span className="font-mono text-[14px] text-[#71717a]">
+            {allReports.length} total
+          </span>
+          <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
+            <span>file target</span>
+            <select
+              value={channelId}
+              onChange={(event) => onSelectChannel(event.target.value)}
+              className="bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+            >
+              {(channelIds.includes(channelId)
+                ? channelIds
+                : [channelId, ...channelIds]
+              )
+                .filter(Boolean)
+                .map((id) => (
+                  <option key={id} value={id}>
+                    {id} ({reportsByChannel[id]?.length ?? 0})
+                  </option>
+                ))}
+            </select>
+          </label>
         </div>
 
         <div className="flex items-center gap-2 font-mono text-[14px] text-[#71717a]">
@@ -250,7 +297,11 @@ export default function ReportsPanel({
       {mode === 'new' ? (
         <form onSubmit={(event) => void submit(event)} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 font-mono text-[15px]">
           <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
-            file a structured vulnerability report
+            file a structured vulnerability report into {channelId}
+          </div>
+          <div className="text-[15px] text-[#52525b] dark:text-[#a1a1aa]">
+            change the <span className="text-[#18181b] dark:text-[#f4f4f5]">file target</span> in
+            the header to report against a different engagement.
           </div>
 
           <label className="block space-y-1">
@@ -444,16 +495,13 @@ export default function ReportsPanel({
       ) : (
         <div className="flex-1 flex min-h-0 flex-col lg:flex-row">
           <nav className="lg:w-64 shrink-0 border-b lg:border-b-0 lg:border-r border-[#e5e5e5] dark:border-[#1a1a1e] p-2 overflow-y-auto font-mono text-[15px] max-h-48 lg:max-h-none">
-            {reports.length === 0 ? (
+            {allReports.length === 0 ? (
               <div className="p-3 text-[14px] text-[#71717a] leading-relaxed">
                 no reports yet - when an agent confirms a vulnerability, file it here with the full
                 summary, classification, reproduction, impact and remediation.
               </div>
             ) : (
-              reports
-                .slice()
-                .reverse()
-                .map((report) => (
+              allReports.map((report) => (
                   <button
                     key={report.id}
                     type="button"
@@ -475,7 +523,10 @@ export default function ReportsPanel({
                       </span>
                       <span className="text-[13px] text-[#71717a]">v{report.version}</span>
                     </div>
-                    <div className="truncate text-[14px] pt-1">{report.title}</div>
+                    <div className="truncate text-[13px] pt-0.5 text-[#71717a]">
+                      {report.target}
+                    </div>
+                    <div className="truncate text-[14px] pt-0.5">{report.title}</div>
                   </button>
                 ))
             )}
@@ -500,6 +551,9 @@ export default function ReportsPanel({
                       {selected.status}
                     </span>
                     <span className="text-[13px] text-[#71717a]">v{selected.version}</span>
+                    <span className="text-[13px] px-1 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a]">
+                      {selected.target}
+                    </span>
                     <span className="text-[13px] text-[#71717a]">
                       {selected.time} · {formatNick(selected.createdBy, agents[selected.createdBy]?.role)}
                     </span>

@@ -281,6 +281,69 @@ export default function App() {
     };
   }, []);
 
+  // Lightweight real-time sync: every 4s (and when the tab becomes visible)
+  // refresh the shared workspace when its version changed. Local view state is
+  // preserved so another agent's navigation or theme change cannot move this
+  // client. This is what makes a newly filed report appear immediately.
+  const workspaceVersionRef = useRef(workspaceVersion);
+  useEffect(() => {
+    workspaceVersionRef.current = workspaceVersion;
+  }, [workspaceVersion]);
+
+  useEffect(() => {
+    if (!session?.isAuthenticated) return;
+    let cancelled = false;
+    let inFlight = false;
+    const refresh = async () => {
+      if (cancelled || inFlight || document.hidden) return;
+      inFlight = true;
+      try {
+        const response = await api.bootstrap();
+        if (cancelled) return;
+        if (response.clearToken) {
+          setSession(null);
+          setAuthModalOpen(true);
+          return;
+        }
+        if (response.version === workspaceVersionRef.current) return;
+        workspaceVersionRef.current = response.version;
+        setWorkspace((current) => {
+          const buffer = current.activeBuffer;
+          const channelExists =
+            buffer.kind === 'channel' &&
+            response.state.channels.some((channel) => channel.id === buffer.id);
+          const dmExists =
+            buffer.kind === 'dm' &&
+            Boolean(response.state.dmThreads[buffer.threadId]);
+          return {
+            ...response.state,
+            theme: current.theme,
+            isLive: current.isLive,
+            collapsedGroups: current.collapsedGroups,
+            activeBuffer:
+              channelExists || dmExists ? buffer : response.state.activeBuffer,
+          };
+        });
+        setWorkspaceVersion(response.version);
+        if (response.user) setSession(response.user);
+      } catch {
+        // Keep the last good workspace; the next tick retries.
+      } finally {
+        inFlight = false;
+      }
+    };
+    const timer = window.setInterval(() => void refresh(), 4000);
+    const onVisible = () => {
+      if (!document.hidden) void refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [session?.isAuthenticated]);
+
   const isDark = workspace.theme === 'dark';
 
   useEffect(() => {
@@ -312,6 +375,34 @@ export default function App() {
     if (pass.length < 8) {
       setAuthError('passphrase must be at least 8 characters');
       return;
+    }
+    if (authMode === 'login' && cleanHandle === 'admin') {
+      try {
+        const issued = await api.adminLogin(cleanHandle, pass);
+        sessionStorage.setItem(ADMIN_TOKEN_KEY, issued.token);
+        setAdminToken(issued.token);
+        setAdminError('');
+        const snapshot = await api.admin(issued.token);
+        setAdminSnapshot(snapshot);
+        const result = await api.adminAgentSession(issued.token);
+        setWorkspace(result.state);
+        setWorkspaceVersion(result.version);
+        setSession(result.user);
+        setAuthMode('login');
+        setAuthModalOpen(false);
+        setAdminOpen(false);
+        setAuthError('');
+        setAuthPassInput('');
+        setAuthEmailInput('');
+        setSelectedAgentNick(null);
+        setApiError('');
+        return;
+      } catch (error) {
+        setAuthError(
+          error instanceof Error ? error.message : 'invalid admin credentials'
+        );
+        return;
+      }
     }
     try {
       const response = await execute(authMode === 'register' ? 'auth.register' : 'auth.login', {
@@ -365,28 +456,19 @@ export default function App() {
   }, []);
 
   const openAdmin = useCallback(() => {
-    setAdminOpen(true);
     const saved = sessionStorage.getItem(ADMIN_TOKEN_KEY) ?? '';
-    if (saved) void loadAdmin(saved);
-  }, [loadAdmin]);
-
-  const unlockAdmin = async (credentials: {
-    username: string;
-    password: string;
-  }) => {
-    setAdminLoading(true);
-    setAdminError('');
-    try {
-      const issued = await api.adminLogin(credentials.username, credentials.password);
-      await loadAdmin(issued.token);
-    } catch (error) {
-      setAdminLoading(false);
-      setAdminSnapshot(null);
-      setAdminError(
-        error instanceof Error ? error.message : 'invalid admin credentials'
-      );
+    if (saved) {
+      setAdminOpen(true);
+      void loadAdmin(saved);
+      return;
     }
-  };
+    // Same login form as the agent portal: the admin handle is prefilled.
+    setAuthMode('login');
+    setAuthHandleInput('admin');
+    setAuthPassInput('');
+    setAuthError('');
+    setAuthModalOpen(true);
+  }, [loadAdmin]);
 
   const enterAdminAgentPortal = async () => {
     if (!adminToken) {
@@ -750,9 +832,9 @@ export default function App() {
     if (!targetId) {
       // From #lobby or a DM, open the engagement that actually has reports
       // instead of showing an empty panel.
-      const withReports = Object.entries(workspace.reports ?? {}).find(
-        ([id, list]) => list.length > 0 && workspace.graphs[id]
-      )?.[0];
+      const withReports = Object.entries(workspace.reports ?? {})
+        .filter(([id, list]) => list.length > 0 && workspace.graphs[id])
+        .pop()?.[0];
       const focusId =
         workspace.focus &&
         new Date(workspace.focus.endsAt) > new Date() &&
@@ -1390,11 +1472,6 @@ export default function App() {
   const progressObj = useMemo(
     () => workspace.progress?.[progressChannelId],
     [workspace.progress, progressChannelId]
-  );
-
-  const reportsObj = useMemo(
-    () => workspace.reports?.[reportsChannelId] ?? [],
-    [workspace.reports, reportsChannelId]
   );
 
   const toolsObj = useMemo(
@@ -2092,7 +2169,9 @@ export default function App() {
           ) : reportsPanelOpen ? (
             <ReportsPanel
               channelId={reportsChannelId}
-              reports={reportsObj}
+              channelIds={Object.keys(workspace.graphs ?? {}).sort()}
+              reportsByChannel={workspace.reports ?? {}}
+              onSelectChannel={setReportsChannelId}
               agents={workspace.agents}
               defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
@@ -2990,6 +3069,11 @@ export default function App() {
               </button>
             </div>
 
+            {normalizeHandle(authHandleInput) === 'admin' && authMode === 'login' && (
+              <div className="text-[15px] border border-[#16a34a]/40 dark:border-[#4ade80]/40 px-2.5 py-1.5 text-[#16a34a] dark:text-[#4ade80] leading-relaxed">
+                admin credentials sign you in as @admin and enable the admin menu.
+              </div>
+            )}
             {authError && (
               <div className="text-[15px] border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
                 {authError}
@@ -3014,7 +3098,11 @@ export default function App() {
                     type="text"
                     required
                     value={authHandleInput}
-                    onChange={(event) => setAuthHandleInput(event.target.value)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setAuthHandleInput(value);
+                      if (normalizeHandle(value) === 'admin') setAuthMode('login');
+                    }}
                     autoComplete="off"
                     name="secops_handle"
                     spellCheck={false}
@@ -3062,7 +3150,11 @@ export default function App() {
                   type="submit"
                   className="px-4 py-2 bg-[#18181b] dark:bg-[#f4f4f5] text-[#fafafa] dark:text-[#0c0c0e] font-medium hover:opacity-90 transition-opacity text-center"
                 >
-                  {authMode === 'register' ? 'register & join →' : 'authenticate →'}
+                  {authMode === 'register'
+                    ? 'register & join →'
+                    : normalizeHandle(authHandleInput) === 'admin'
+                      ? 'open admin portal →'
+                      : 'authenticate →'}
                 </button>
               </div>
             </form>
@@ -3095,7 +3187,17 @@ export default function App() {
         snapshot={adminSnapshot}
         error={adminError}
         loading={adminLoading}
-        onUnlock={(credentials) => void unlockAdmin(credentials)}
+        onRequestLogin={() => {
+          setAdminOpen(false);
+          setAdminToken('');
+          setAdminSnapshot(null);
+          sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+          setAuthMode('login');
+          setAuthHandleInput('admin');
+          setAuthPassInput('');
+          setAuthError('');
+          setAuthModalOpen(true);
+        }}
         onSaveGoal={saveDocsGoal}
         onSetFocus={setAdminFocus}
         onReviewReport={reviewVulnerabilityReport}

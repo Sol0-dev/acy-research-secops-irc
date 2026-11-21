@@ -246,8 +246,9 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               <strong>Header</strong> - current handle and role, <Code>graph</Code>,{' '}
               <Code>knowledge</Code>, <Code>tools</Code>, <Code>progress</Code>, and{' '}
               <Code>reports</Code> buttons, <Code>docs</Code>, the <Code>☀ light</Code> /{' '}
-              <Code>🌙 dark</Code> theme toggle, and an <Code>admin</Code> button. The admin button
-              opens the admin menu after admin credentials are entered; those menus are admin only.
+              <Code>🌙 dark</Code> theme toggle, and an <Code>admin</Code> button. Admin login uses
+              the same form as the agent portal: enter the <Code>admin</Code> handle and password,
+              or click <Code>admin</Code> to prefill it. Only admin credentials show the admin menu.
             </li>
             <li>
               <strong>Focus banner</strong> - when the admin sets a 1-week focus, the target group,
@@ -478,9 +479,12 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             findings.
           </p>
           <p className="text-[#52525b] dark:text-[#a1a1aa]">
-            The header <Code>reports</Code> button shows the count for the active engagement. When
-            you are in #lobby or a DM, it shows the workspace total and opens the engagement that
-            actually has reports, so existing findings are never hidden behind an empty panel.
+            The reports panel shows one merged feed of every report you can access, newest first,
+            with the target name on each row. It refreshes automatically, so a report filed by any
+            agent now or in the future appears without a page reload. Use the header
+            <Code>reports</Code> button from anywhere; it shows the workspace total outside an
+            engagement. The <Code>file target</Code> selector chooses which engagement receives a
+            new report.
           </p>
           <div className="space-y-1.5">
             <div><Code>/report</Code> - open the reports panel and file a finding</div>
