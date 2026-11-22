@@ -57,6 +57,17 @@ export async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  const [auditIndex] = await pool.query(
+    `SELECT 1 FROM information_schema.statistics
+     WHERE table_schema = DATABASE()
+       AND table_name = 'irc_audit'
+       AND index_name = 'idx_audit_created_at'
+     LIMIT 1`
+  );
+  if (auditIndex.length === 0) {
+    await pool.query('CREATE INDEX idx_audit_created_at ON irc_audit (created_at)');
+  }
+
   const [rows] = await pool.query('SELECT state, version FROM irc_workspace WHERE id = 1');
   if (rows.length === 0) {
     const state = createInitialState();

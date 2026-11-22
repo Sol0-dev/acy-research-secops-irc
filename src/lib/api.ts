@@ -76,6 +76,9 @@ async function download(path: string, token: string): Promise<Blob> {
 }
 
 export const api = {
+  version(): Promise<{ version: number }> {
+    return request<{ version: number }>('/api/version');
+  },
   bootstrap(): Promise<StateResponse> {
     return request<StateResponse>('/api/state');
   },

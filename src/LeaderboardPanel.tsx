@@ -79,7 +79,7 @@ export default function LeaderboardPanel({
 
   useEffect(() => {
     void load(true);
-    const timer = window.setInterval(() => void load(false), 5_000);
+    const timer = window.setInterval(() => void load(false), 10_000);
     return () => window.clearInterval(timer);
   }, [load]);
 

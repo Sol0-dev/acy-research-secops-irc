@@ -340,7 +340,7 @@ export default function App() {
     };
   }, []);
 
-  // Lightweight real-time sync: every 4s (and when the tab becomes visible)
+  // Lightweight real-time sync: every 5s (and when the tab becomes visible)
   // refresh the shared workspace when its version changed. Local view state is
   // preserved so another agent's navigation or theme change cannot move this
   // client. This is what makes a newly filed report appear immediately.
@@ -357,6 +357,8 @@ export default function App() {
       if (cancelled || inFlight || document.hidden) return;
       inFlight = true;
       try {
+        const version = await api.version();
+        if (version.version === workspaceVersionRef.current) return;
         const response = await api.bootstrap();
         if (cancelled) return;
         if (response.clearToken) {
@@ -391,7 +393,7 @@ export default function App() {
         inFlight = false;
       }
     };
-    const timer = window.setInterval(() => void refresh(), 4000);
+    const timer = window.setInterval(() => void refresh(), 5000);
     const onVisible = () => {
       if (!document.hidden) void refresh();
     };

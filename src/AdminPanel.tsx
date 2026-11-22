@@ -169,7 +169,7 @@ export default function AdminPanel({
 
   useEffect(() => {
     if (!open || adminTab !== 'audit') return;
-    const timer = window.setInterval(() => void onRefresh(), 10_000);
+    const timer = window.setInterval(() => void onRefresh(), 20_000);
     return () => window.clearInterval(timer);
   }, [open, adminTab, onRefresh]);
 

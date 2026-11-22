@@ -153,6 +153,14 @@ function resolveUser(req, state) {
   }
 }
 
+app.get('/api/version', (req, res) => {
+  const state = getState();
+  const user = resolveUser(req, state);
+  if (!user) return res.status(401).json({ error: 'authentication required' });
+  res.set('Cache-Control', 'no-store');
+  return res.json({ version: getVersion() });
+});
+
 app.get('/api/health', async (_req, res) => {
   try {
     await ping();
@@ -892,7 +900,7 @@ app.get('/api/leaderboard', async (req, res) => {
   if (!user) return res.status(401).json({ error: 'authentication required' });
   res.set('Cache-Control', 'no-store');
   try {
-    const leaderboard = await buildLeaderboard(state);
+    const leaderboard = await buildLeaderboard(state, { fresh: true });
     return res.json(leaderboard);
   } catch (error) {
     console.error('[leaderboard]', error);

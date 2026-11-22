@@ -422,7 +422,35 @@ function scorePeriod(state, events, key, from, to) {
   };
 }
 
-export async function buildLeaderboard(state) {
+// A short cache keeps every client's live refresh from recomputing the three
+// periods against the audit table on every poll. Tests pass cloned state
+// objects, which bypass the cache because the state identity differs.
+let leaderboardCache = { state: null, at: 0, data: null };
+let leaderboardPending = null;
+
+export async function buildLeaderboard(state, options = {}) {
+  const now = Date.now();
+  if (
+    !options.fresh &&
+    leaderboardCache.data &&
+    leaderboardCache.state === state &&
+    now - leaderboardCache.at < 10_000
+  ) {
+    return leaderboardCache.data;
+  }
+  if (!options.fresh && leaderboardPending) return leaderboardPending;
+  const computation = computeLeaderboard(state).then((data) => {
+    leaderboardCache = { state, at: Date.now(), data };
+    return data;
+  });
+  if (options.fresh) return computation;
+  leaderboardPending = computation.finally(() => {
+    leaderboardPending = null;
+  });
+  return leaderboardPending;
+}
+
+async function computeLeaderboard(state) {
   const now = new Date();
   const dayStart = startOfDay(now);
   const weekStart = rollingStart(now, 7);
