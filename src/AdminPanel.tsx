@@ -40,7 +40,7 @@ function auditPhase(action: string) {
   ) {
     return 'chat';
   }
-  if (action.startsWith('graph.')) return 'graph/knowledge';
+  if (action.startsWith('graph.') || action.startsWith('knowledge.')) return 'graph/knowledge';
   if (action.startsWith('tool.')) return 'tools';
   if (action.startsWith('progress.')) return 'progress';
   if (action.startsWith('report.')) return 'reports';

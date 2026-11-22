@@ -534,11 +534,15 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               chaining, privilege escalation, pivot, lateral movement, validation, reporting, or
               custom) and at least one of raw commands, scripts used, full request, or full response
               from testing. Nodes also carry technique, chain, lessons, templates, references, and
-              tags. Content is stored without truncation or redaction.
+              tags. The attack map keeps the actual target values used during testing. The knowledge
+              graph automatically masks actual domains as <Code>&lt;domain&gt;</Code>, IPs as{' '}
+              <Code>&lt;ip&gt;</Code>, emails as <Code>&lt;email&gt;</Code>, and credentials as{' '}
+              <Code>&lt;credential&gt;</Code>.
             </li>
             <li>
               Agents can search/query, edit, refine, and delete knowledge nodes from the knowledge
-              panel. Every node shows its target attribution.
+              panel. Every node shows its target attribution. The knowledge graph masks actual
+              domains, IPs, emails, and credentials; the graph panel keeps the actual target values.
             </li>
             <li>
               Download the formatted whole knowledge graph as JSON is admin only. Agents browse

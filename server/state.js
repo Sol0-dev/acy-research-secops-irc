@@ -272,6 +272,52 @@ export function createInitialState() {
   };
 }
 
+const KNOWLEDGE_EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+const KNOWLEDGE_IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
+const KNOWLEDGE_DOMAIN_RE =
+  /\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}\b/g;
+const KNOWLEDGE_BEARER_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
+const KNOWLEDGE_AUTH_RE = /\bAuthorization\s*:\s*(Bearer\s+)?[^\s,;"']+/gi;
+const KNOWLEDGE_CREDENTIAL_RE =
+  /\b(password|passwd|pwd|token|api[_-]?key|apikey|secret)\b(\s*[:=]\s*)([^\s,;"']+)/gi;
+
+function redactKnowledgeText(value) {
+  let text = String(value ?? '');
+  text = text.replace(KNOWLEDGE_EMAIL_RE, '<email>');
+  text = text.replace(KNOWLEDGE_IPV4_RE, '<ip>');
+  text = text.replace(KNOWLEDGE_DOMAIN_RE, '<domain>');
+  text = text.replace(KNOWLEDGE_AUTH_RE, (_match, scheme) =>
+    `Authorization: ${scheme ? 'Bearer ' : ''}<credential>`
+  );
+  text = text.replace(KNOWLEDGE_BEARER_RE, 'Bearer <credential>');
+  text = text.replace(
+    KNOWLEDGE_CREDENTIAL_RE,
+    (_match, key, separator) => `${key}${separator}<credential>`
+  );
+  return text;
+}
+
+function createKnowledgeCopy(node) {
+  const intel = node.intel
+    ? Object.fromEntries(
+        Object.entries(node.intel).map(([key, value]) => {
+          if (key === 'tags' && Array.isArray(value)) {
+            return [key, value.map((tag) => redactKnowledgeText(tag))];
+          }
+          return [key, redactKnowledgeText(value)];
+        })
+      )
+    : undefined;
+  return {
+    label: redactKnowledgeText(node.label),
+    kind: node.kind,
+    notes: node.notes ? redactKnowledgeText(node.notes) : undefined,
+    intel,
+    updatedBy: node.knowledge?.updatedBy,
+    updatedTime: node.knowledge?.updatedTime,
+  };
+}
+
 // Project the canonical state for one viewer. Engagement channels, scopes,
 // knowledge graphs and progress logs are only included when that viewer is
 // enrolled; direct messages are only included for their participants.
@@ -303,7 +349,22 @@ export function toPublicState(state, viewerNick = null) {
 
   // Every authenticated agent can read every target graph and tool library.
   // Unauthenticated state requests receive no graph or tool data.
-  const graphs = viewer ? { ...(state.graphs ?? {}) } : {};
+  const graphs = {};
+  if (viewer) {
+    for (const [channelId, graph] of Object.entries(state.graphs ?? {})) {
+      graphs[channelId] = {
+        ...graph,
+        nodes: (graph.nodes ?? []).map((node) => ({
+          ...node,
+          knowledge: node.knowledge ?? createKnowledgeCopy(node),
+        })),
+        edges: (graph.edges ?? []).map((edge) => ({
+          ...edge,
+          knowledgeLabel: edge.knowledgeLabel ?? (edge.label ? redactKnowledgeText(edge.label) : undefined),
+        })),
+      };
+    }
+  }
   const tools = viewer ? { ...(state.tools ?? {}) } : {};
 
   const progress = {};
@@ -1434,6 +1495,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         createdBy: contributor,
         time: nowHHMM(),
       };
+      node.knowledge = createKnowledgeCopy(node);
       graph.nodes.push(node);
       appendChannelMessage(state, channel.id, {
         type: 'sys',
@@ -1543,6 +1605,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       }
       node.updatedBy = contributor;
       node.updatedTime = nowHHMM();
+      node.knowledge = createKnowledgeCopy(node);
 
       appendChannelMessage(state, channel.id, {
         type: 'sys',
@@ -1554,6 +1617,54 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         status: 'ok',
         kind: 'progress',
         text: `refined graph node \`${node.label}\` [${node.kind}]${node.notes ? ` - ${node.notes}` : ''}`,
+      });
+      return { result: { node } };
+    }
+
+    case 'knowledge.update': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const graph = state.graphs[channel.id];
+      const node = graph?.nodes.find((item) => item.id === String(payload.nodeId ?? ''));
+      if (!graph || !node) throw new ApiError(404, 'graph node not found');
+      const contributor = normalizeHandle(actor);
+      requireAgent(state, contributor);
+      const label = limitText(
+        payload.label ?? node.knowledge?.label ?? node.label,
+        200,
+        'node label'
+      ).trim();
+      if (!label) throw new ApiError(400, 'node label required');
+      const kind = String(payload.kind ?? node.knowledge?.kind ?? node.kind).toLowerCase();
+      if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
+      const notes = limitText(
+        payload.notes ?? node.knowledge?.notes ?? node.notes ?? '',
+        20000,
+        'node notes'
+      ).trim();
+      const intel =
+        parseIntel(payload.intel) ??
+        node.knowledge?.intel ??
+        node.intel;
+      requireNodeIntel(intel, 'update');
+      node.knowledge = createKnowledgeCopy({
+        ...node,
+        label,
+        kind,
+        notes: notes || undefined,
+        intel,
+      });
+      node.knowledge.updatedBy = contributor;
+      node.knowledge.updatedTime = nowHHMM();
+      appendChannelMessage(state, channel.id, {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `${formatNick(contributor, state.agents[contributor]?.role)} refined knowledge node \`${node.knowledge.label}\``,
+      });
+      appendProgressEntry(state, channel.id, {
+        author: contributor,
+        status: 'ok',
+        kind: 'progress',
+        text: `refined knowledge node \`${node.knowledge.label}\` [${kind}]`,
       });
       return { result: { node } };
     }

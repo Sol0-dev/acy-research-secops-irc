@@ -60,7 +60,7 @@ function parsePayload(raw) {
 function actionKind(action) {
   if (action === 'message.send') return 'chat';
   if (action === 'graph.node.add' || action === 'graph.edge.add') return 'graph';
-  if (action === 'graph.node.update') return 'knowledge';
+  if (action === 'graph.node.update' || action === 'knowledge.update') return 'knowledge';
   if (action === 'tool.create' || action === 'tool.update') return 'tools';
   if (action === 'report.create') return 'reports';
   if (action === 'progress.add') return 'progress';

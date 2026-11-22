@@ -96,12 +96,22 @@ export interface TechniqueIntel {
   tags?: string[];
 }
 
+export interface KnowledgeCopy {
+  label: string;
+  kind: GraphNodeKind;
+  notes?: string;
+  intel?: TechniqueIntel;
+  updatedBy?: string;
+  updatedTime?: string;
+}
+
 export interface GraphNode {
   id: string;
   label: string;
   kind: GraphNodeKind;
   notes?: string;
   intel?: TechniqueIntel;
+  knowledge?: KnowledgeCopy;
   createdBy: string;
   time: string;
   updatedBy?: string;
@@ -113,6 +123,7 @@ export interface GraphEdge {
   from: string;
   to: string;
   label?: string;
+  knowledgeLabel?: string;
   createdBy: string;
   time: string;
 }

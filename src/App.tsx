@@ -1681,6 +1681,28 @@ export default function App() {
     );
   }, [workspace.graphs, graphChannelId]);
 
+  const knowledgeGraphs = useMemo<Record<string, EngagementGraph>>(() => {
+    const out: Record<string, EngagementGraph> = {};
+    for (const [channelId, graph] of Object.entries(workspace.graphs ?? {})) {
+      out[channelId] = {
+        ...graph,
+        nodes: graph.nodes.map((node) => ({
+          ...node,
+          label: node.knowledge?.label ?? node.label,
+          kind: node.knowledge?.kind ?? node.kind,
+          notes: node.knowledge?.notes ?? node.notes,
+          intel: node.knowledge?.intel ?? node.intel,
+        })),
+        edges: graph.edges.map((edge) => ({
+          ...edge,
+          label: edge.knowledgeLabel ?? edge.label,
+        })),
+      };
+    }
+    return out;
+  }, [workspace.graphs]);
+
+
   const progressObj = useMemo(
     () => workspace.progress?.[progressChannelId],
     [workspace.progress, progressChannelId]
@@ -2464,7 +2486,7 @@ export default function App() {
             />
           ) : knowledgePanelOpen ? (
             <KnowledgePanel
-              graphs={workspace.graphs}
+              graphs={knowledgeGraphs}
               agents={workspace.agents}
               formatNick={formatNickWithRole}
               onOpenGraph={(channelId) => {
@@ -2473,7 +2495,7 @@ export default function App() {
               }}
               onUpdateNode={async (input) => {
                 try {
-                  const response = await execute('graph.node.update', {
+                  const response = await execute('knowledge.update', {
                     channelId: input.channelId,
                     nodeId: input.nodeId,
                     label: input.label,
