@@ -692,37 +692,18 @@ export default function ReportsPanel({
                         onClick={() => void downloadReport()}
                         className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#52525b] dark:text-[#a1a1aa] disabled:opacity-40"
                       >
-                        download docx
+                        docx
                       </button>
                     )}
-                    {onAdminDelete &&
-                      (confirmDeleteId === selected.id ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={adminBusy === 'delete'}
-                            onClick={() => void deleteReport()}
-                            className="px-2 py-0.5 border border-[#f87171] text-[14px] text-[#f87171] disabled:opacity-40"
-                          >
-                            yes, delete
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a]"
-                          >
-                            no
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(selected.id)}
-                          className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#f87171]"
-                        >
-                          delete report
-                        </button>
-                      ))}
+                    {onAdminDelete && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(selected.id)}
+                        className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#f87171]"
+                      >
+                        delete
+                      </button>
+                    )}
                     {adminNotice && (
                       <span className="text-[14px] text-[#16a34a] dark:text-[#4ade80]">
                         {adminNotice}
@@ -876,6 +857,38 @@ export default function ReportsPanel({
           </div>
         </div>
       )}
+      {isAdmin && confirmDeleteId && selected && confirmDeleteId === selected.id && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-md border border-[#e5e5e5] dark:border-[#2a2a30] bg-[#fafafa] dark:bg-[#09090b] p-4 space-y-3 font-mono">
+            <div className="text-lg text-[#18181b] dark:text-[#f4f4f5]">
+              Delete report "{selected.title}"?
+            </div>
+            <p className="text-[15px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
+              Admin only. This removes the report and its linked vulnerability node(s) and edges
+              from all graphs and the knowledge graph. The audit log keeps the action. This cannot
+              be undone.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={adminBusy === 'delete'}
+                onClick={() => void deleteReport()}
+                className="px-3 py-1.5 border border-[#f87171] text-[15px] text-[#f87171] disabled:opacity-40"
+              >
+                yes, delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-3 py-1.5 border border-[#e5e5e5] dark:border-[#2a2a30] text-[15px] text-[#71717a]"
+              >
+                no, cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
