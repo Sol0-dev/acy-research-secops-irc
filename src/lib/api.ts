@@ -143,6 +143,13 @@ export const api = {
       body: JSON.stringify({ channelId }),
     });
   },
+  adminDeleteAccount(token: string, nick: string): Promise<{ ok: boolean; version: number }> {
+    return request<{ ok: boolean; version: number }>('/api/admin/account/delete', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify({ nick }),
+    });
+  },
   adminReportDocx(token: string, reportId: string): Promise<Blob> {
     return download(`/api/admin/report/${encodeURIComponent(reportId)}/docx`, token);
   },

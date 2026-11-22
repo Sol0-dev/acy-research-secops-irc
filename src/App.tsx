@@ -256,6 +256,15 @@ export default function App() {
     return run;
   }, []);
 
+  const logUiEvent = useCallback(
+    (panel: string, detail?: string, channelId?: string) => {
+      void api
+        .command('ui.event', { panel, detail, channelId })
+        .catch(() => undefined);
+    },
+    []
+  );
+
   const command = useCallback(
     (action: string, payload: Record<string, unknown> = {}) =>
       execute(action, payload).catch((error: unknown) => {
@@ -600,6 +609,36 @@ export default function App() {
     }
   };
 
+  const refreshAdminSnapshot = useCallback(async () => {
+    if (!adminToken) return;
+    try {
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      setAdminError('');
+    } catch (error) {
+      setAdminError(error instanceof Error ? error.message : 'could not refresh admin data');
+    }
+  }, [adminToken]);
+
+  const deleteAdminAccount = async (nick: string) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminDeleteAccount(adminToken, nick);
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not remove account',
+      };
+    }
+  };
+
   const toggleLive = () => {
     void command('view.set', { isLive: !workspace.isLive });
   };
@@ -804,6 +843,7 @@ export default function App() {
     }
     setGraphChannelId(targetId);
     setGraphPanelOpen(true);
+    logUiEvent('graph', undefined, targetId);
     setProgressPanelOpen(false);
     setDocsPanelOpen(false);
     setReportsPanelOpen(false);
@@ -825,6 +865,7 @@ export default function App() {
     }
     setProgressChannelId(targetId);
     setProgressPanelOpen(true);
+    logUiEvent('progress', undefined, targetId);
     setGraphPanelOpen(false);
     setDocsPanelOpen(false);
     setReportsPanelOpen(false);
@@ -862,6 +903,7 @@ export default function App() {
     }
     setReportsChannelId(targetId);
     setReportsPanelOpen(true);
+    logUiEvent('reports', undefined, targetId);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setDocsPanelOpen(false);
@@ -888,6 +930,7 @@ export default function App() {
     if (!targetId) return 'no target graphs exist yet - create a chat group first';
     setToolsChannelId(targetId);
     setToolsPanelOpen(true);
+    logUiEvent('tools', undefined, targetId);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setReportsPanelOpen(false);
@@ -914,6 +957,7 @@ export default function App() {
       : focusId || Object.keys(workspace.graphs).sort()[0] || '';
     if (!targetId) return 'no target graphs exist yet - create a chat group first';
     setKnowledgePanelOpen(true);
+    logUiEvent('knowledge', undefined, targetId);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setReportsPanelOpen(false);
@@ -935,6 +979,7 @@ export default function App() {
     setResearchPanelOpen(false);
     setLeaderboardPanelOpen(false);
     setDocsPanelOpen(true);
+    logUiEvent('docs');
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
   };
@@ -948,6 +993,7 @@ export default function App() {
     setDocsPanelOpen(false);
     setLeaderboardPanelOpen(false);
     setResearchPanelOpen(true);
+    logUiEvent('research');
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
   };
@@ -961,6 +1007,7 @@ export default function App() {
     setDocsPanelOpen(false);
     setResearchPanelOpen(false);
     setLeaderboardPanelOpen(true);
+    logUiEvent('leaderboard');
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
   };
@@ -1497,6 +1544,12 @@ export default function App() {
     }
     setRoleDescriptionInput(workspace.roleDescriptions?.[selectedAgent.role] ?? '');
   }, [selectedAgent, workspace.roleDescriptions]);
+  useEffect(() => {
+    if (session?.isAuthenticated && selectedAgentNick) {
+      logUiEvent('inspector', selectedAgentNick);
+    }
+  }, [selectedAgentNick, session?.isAuthenticated, logUiEvent]);
+
   const currentUserNick = session?.userNick || 'anonymous';
   const currentUserRole =
     (session?.userNick && workspace.agents[session.userNick]?.role) ||
@@ -3346,6 +3399,8 @@ export default function App() {
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}
+        onDeleteAccount={deleteAdminAccount}
+        onRefresh={refreshAdminSnapshot}
         onClose={() => setAdminOpen(false)}
       />
     </div>

@@ -133,6 +133,16 @@ export async function getLeaderboardEvents(from) {
   });
 }
 
+// Append an audit-only event without writing the workspace or bumping the
+// version. Used for UI navigation events so agents' panel usage is visible in
+// the admin audit log without creating state churn.
+export async function appendAudit(action, actor, payload) {
+  await pool.query(
+    'INSERT INTO irc_audit (version, action, actor, payload) VALUES (?, ?, ?, ?)',
+    [getVersion(), action, actor, JSON.stringify(payload ?? {})]
+  );
+}
+
 function stampProgress(nextState, version) {
   if (!nextState || !nextState.progress) return;
   for (const log of Object.values(nextState.progress)) {

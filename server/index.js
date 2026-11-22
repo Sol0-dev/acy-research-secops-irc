@@ -10,7 +10,7 @@ import 'dotenv/config';
 import crypto from 'node:crypto';
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import { initDb, getState, getVersion, getAudit, persistState, ping } from './db.js';
+import { initDb, getState, getVersion, getAudit, persistState, appendAudit, ping } from './db.js';
 import { buildReportDocx, safeFilename } from './docx.js';
 import { buildLeaderboard } from './leaderboard.js';
 import {
@@ -177,7 +177,7 @@ app.get('/api/admin', async (req, res) => {
   }
   try {
     const state = getState();
-    const audit = await getAudit(200);
+    const audit = await getAudit(500);
     const accounts = Object.values(state.accounts).map((account) => ({
       nick: account.nick,
       role: account.role,
@@ -513,6 +513,41 @@ app.post('/api/admin/graph/delete', async (req, res) => {
   }
 });
 
+app.post('/api/admin/account/delete', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const nick = normalizeHandle(req.body?.nick ?? '');
+  if (!nick) return res.status(400).json({ error: 'account nick required' });
+  if (nick === 'admin') return res.status(400).json({ error: 'the admin account cannot be removed' });
+  try {
+    const state = structuredClone(getState());
+    if (!state.accounts[nick]) return res.status(404).json({ error: 'registered account not found' });
+    delete state.accounts[nick];
+    delete state.agents[nick];
+    if (state.quotaWatch) delete state.quotaWatch[nick];
+
+    const time = new Date().toTimeString().slice(0, 5);
+    const lobby = state.channels.find((item) => item.id === '#lobby');
+    if (lobby) {
+      lobby.messages = [
+        ...lobby.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: `admin removed registered account ${nick}`,
+        },
+      ];
+    }
+
+    const version = await persistState(state, 'admin.account.delete', 'admin', { nick });
+    return res.json({ ok: true, nick, version });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/admin/channel/delete', async (req, res) => {
   if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });
@@ -698,9 +733,8 @@ async function handleCommand(req) {
   if (!isPublicAuth && !actor) throw new ApiError(401, 'authentication required');
 
   const outcome = applyCommand(state, action, payload, actor);
-  const version = await persistState(state, action, actor, redactAudit(payload));
-
   const issuedNick = outcome.tokenNick ?? null;
+  const auditActor = issuedNick ?? actor;
   const nextUser =
     issuedNick != null
       ? makeUser(state, issuedNick)
@@ -711,6 +745,19 @@ async function handleCommand(req) {
           : null;
   const token = issuedNick != null ? jwt.sign({ nick: issuedNick }, JWT_SECRET, { expiresIn: '12h', algorithm: 'HS256' }) : undefined;
 
+  if (outcome.auditOnly) {
+    await appendAudit(action, auditActor, redactAudit(payload));
+    return {
+      state: toPublicState(state, issuedNick ?? actor),
+      version: getVersion(),
+      user: nextUser,
+      token,
+      clearToken: Boolean(outcome.clearToken),
+      result: outcome.result ?? null,
+    };
+  }
+
+  const version = await persistState(state, action, auditActor, redactAudit(payload));
   return {
     state: toPublicState(state, issuedNick ?? actor),
     version,

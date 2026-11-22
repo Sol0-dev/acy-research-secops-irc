@@ -6,7 +6,7 @@
  * changes go through the UI/API into the central database.
  * ---------------------------------------------------------------------- */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from './lib/api';
 import GraphView from './GraphView';
 import type { AdminSnapshot } from './types';
@@ -30,6 +30,8 @@ interface AdminPanelProps {
   onOpenAgentPortal: () => void;
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
+  onDeleteAccount: (nick: string) => Promise<{ ok: boolean; error?: string }>;
+  onRefresh: () => Promise<void>;
   onClose: () => void;
 }
 
@@ -55,6 +57,8 @@ export default function AdminPanel({
   onOpenAgentPortal,
   onDeleteGraph,
   onDeleteChannel,
+  onDeleteAccount,
+  onRefresh,
   onClose,
 }: AdminPanelProps) {
   const [goalInput, setGoalInput] = useState('');
@@ -69,6 +73,9 @@ export default function AdminPanel({
   const [reviewNotice, setReviewNotice] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [pendingDelete, setPendingDelete] = useState('');
+  const [confirmAccountDelete, setConfirmAccountDelete] = useState<string | null>(null);
+  const [accountNotice, setAccountNotice] = useState('');
+  const [accountError, setAccountError] = useState('');
   const [confirmGraphDelete, setConfirmGraphDelete] = useState<string | null>(null);
   const [deleteNotice, setDeleteNotice] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -81,6 +88,9 @@ export default function AdminPanel({
   const [adminTab, setAdminTab] = useState<AdminTab>('goal');
   const [adminGraphChannelId, setAdminGraphChannelId] = useState('');
   const [knowledgeSearch, setKnowledgeSearch] = useState('');
+  const [auditActorFilter, setAuditActorFilter] = useState('');
+  const [auditActionFilter, setAuditActionFilter] = useState('');
+  const [auditSearch, setAuditSearch] = useState('');
 
   const downloadFile = async (kind: 'docx' | 'graph' | 'all', id: string, filename: string) => {
     setDownloadNotice('');
@@ -133,6 +143,26 @@ export default function AdminPanel({
     }
   }, [snapshot, adminGraphChannelId]);
 
+  useEffect(() => {
+    if (!open || adminTab !== 'audit') return;
+    const timer = window.setInterval(() => void onRefresh(), 10_000);
+    return () => window.clearInterval(timer);
+  }, [open, adminTab, onRefresh]);
+
+  const filteredAudit = useMemo(() => {
+    const actor = auditActorFilter.trim().toLowerCase();
+    const action = auditActionFilter.trim().toLowerCase();
+    const query = auditSearch.trim().toLowerCase();
+    return (snapshot?.audit ?? []).filter((entry) => {
+      if (actor && !String(entry.actor ?? '').toLowerCase().includes(actor)) return false;
+      if (action && !String(entry.action ?? '').toLowerCase().includes(action)) return false;
+      if (query && !JSON.stringify(entry.payload ?? {}).toLowerCase().includes(query)) {
+        return false;
+      }
+      return true;
+    });
+  }, [snapshot, auditActorFilter, auditActionFilter, auditSearch]);
+
   if (!open) return null;
 
   const reviewReport = async (channelId: string, reportId: string, decision: string) => {
@@ -160,6 +190,18 @@ export default function AdminPanel({
         ? `graph deleted: ${channelId}`
         : `chat group deleted: ${channelId}`
     );
+  };
+
+  const deleteAccount = async (nick: string) => {
+    setAccountNotice('');
+    setAccountError('');
+    const result = await onDeleteAccount(nick);
+    if (!result.ok) {
+      setAccountError(result.error || 'could not remove account');
+      return;
+    }
+    setConfirmAccountDelete(null);
+    setAccountNotice(`account removed: ${nick}`);
   };
 
   const th = 'text-left py-1 pr-3 text-[15px] uppercase tracking-wider text-[#71717a] font-normal';
@@ -291,7 +333,6 @@ export default function AdminPanel({
                 ['knowledge', 'Knowledge'],
                 ['accounts', 'Accounts'],
                 ['audit', 'Audit logs'],
-                ['irc', 'IRC'],
               ] as Array<[AdminTab, string]>
             ).map(([tab, label]) => (
               <button
@@ -946,6 +987,7 @@ export default function AdminPanel({
                         <th className={th}>role</th>
                         <th className={th}>programs</th>
                         <th className={th}>email</th>
+                        <th className={th}>actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -955,6 +997,34 @@ export default function AdminPanel({
                           <td className={td}>{account.role}</td>
                           <td className={td}>{account.programs.join(', ') || '-'}</td>
                           <td className={td}>{account.email || '-'}</td>
+                          <td className={td}>
+                            {confirmAccountDelete === account.nick ? (
+                              <div className="flex flex-wrap gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteAccount(account.nick)}
+                                  className="px-1.5 py-0.5 border border-[#f87171] text-[15px] text-[#f87171]"
+                                >
+                                  yes, remove
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmAccountDelete(null)}
+                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
+                                >
+                                  no
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmAccountDelete(account.nick)}
+                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
+                              >
+                                remove account
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -962,6 +1032,9 @@ export default function AdminPanel({
                 </div>
               )}
             </div>
+
+            {accountNotice && <div className="text-base text-[#4ade80]">{accountNotice}</div>}
+            {accountError && <div className="text-base text-[#f87171]">{accountError}</div>}
 
             <div className="space-y-2">
               <h2 className="text-base uppercase tracking-wider text-[#71717a]">
@@ -1026,8 +1099,41 @@ export default function AdminPanel({
 
           <section className={`space-y-2 ${adminTab === 'audit' ? '' : 'hidden'}`}>
             <h2 className="text-base uppercase tracking-wider text-[#71717a]">
-              audit / version history (latest {snapshot.audit.length})
+              audit / agent activity (latest {snapshot.audit.length})
             </h2>
+            <div className="flex flex-wrap items-center gap-2 text-[15px]">
+              <input
+                type="text"
+                value={auditActorFilter}
+                onChange={(event) => setAuditActorFilter(event.target.value)}
+                placeholder="filter actor"
+                className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-[15px] text-[#f4f4f5]"
+              />
+              <input
+                type="text"
+                value={auditActionFilter}
+                onChange={(event) => setAuditActionFilter(event.target.value)}
+                placeholder="filter action"
+                className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-[15px] text-[#f4f4f5]"
+              />
+              <input
+                type="text"
+                value={auditSearch}
+                onChange={(event) => setAuditSearch(event.target.value)}
+                placeholder="search payload"
+                className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-[15px] text-[#f4f4f5]"
+              />
+              <span className="text-[#71717a]">
+                {filteredAudit.length} / {snapshot.audit.length} entries
+              </span>
+              <button
+                type="button"
+                onClick={() => void onRefresh()}
+                className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
+              >
+                refresh
+              </button>
+            </div>
             {snapshot.audit.length === 0 ? (
               <div className="text-base text-[#52525b]">no audit entries.</div>
             ) : (
@@ -1043,14 +1149,21 @@ export default function AdminPanel({
                     </tr>
                   </thead>
                   <tbody>
-                    {snapshot.audit.map((entry, index) => (
+                    {filteredAudit.map((entry, index) => (
                       <tr key={`${entry.version}-${index}`} className="border-b border-[#16161a]">
                         <td className={td}>{entry.version}</td>
                         <td className={td}>{entry.action}</td>
                         <td className={td}>{entry.actor || '-'}</td>
                         <td className={td}>{String(entry.createdAt).replace('T', ' ').slice(0, 19)}</td>
-                        <td className={`${td} max-w-[380px] truncate`}>
-                          {JSON.stringify(entry.payload)}
+                        <td className={`${td} max-w-[520px]`}>
+                          <details>
+                            <summary className="cursor-pointer text-[#a1a1aa] truncate">
+                              {JSON.stringify(entry.payload)}
+                            </summary>
+                            <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap text-[14px] text-[#71717a]">
+                              {JSON.stringify(entry.payload, null, 2)}
+                            </pre>
+                          </details>
                         </td>
                       </tr>
                     ))}

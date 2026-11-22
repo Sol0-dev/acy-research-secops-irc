@@ -1790,6 +1790,37 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     }
 
     // -------------------------------------------------------------- view/UI
+    case 'ui.event': {
+      if (!actor) throw new ApiError(401, 'authentication required');
+      const panel = String(payload.panel ?? '').trim().toLowerCase();
+      const allowed = new Set([
+        'chat',
+        'dm',
+        'graph',
+        'knowledge',
+        'tools',
+        'progress',
+        'reports',
+        'leaderboard',
+        'research',
+        'docs',
+        'inspector',
+        'admin',
+      ]);
+      if (!allowed.has(panel)) throw new ApiError(400, 'invalid ui panel');
+      const channelId = String(payload.channelId ?? '').trim();
+      const detail = limitText(payload.detail, 200, 'ui detail').trim();
+      return {
+        auditOnly: true,
+        result: {
+          ok: true,
+          panel,
+          channelId: channelId || undefined,
+          detail: detail || undefined,
+        },
+      };
+    }
+
     case 'view.set': {
       if (payload.theme === 'dark' || payload.theme === 'light') state.theme = payload.theme;
       if (typeof payload.isLive === 'boolean') state.isLive = payload.isLive;
