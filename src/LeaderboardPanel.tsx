@@ -158,23 +158,6 @@ export default function LeaderboardPanel({
           </div>
         ) : (
           <>
-            {current.bestPlay && (
-              <div className="border border-[#f59e0b]/70 bg-[#f59e0b]/10 px-3 py-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="text-[16px] uppercase tracking-wider text-[#b45309] dark:text-[#fbbf24]">
-                  best play {period}
-                </span>
-                <span className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
-                  {formatNick(current.bestPlay.nick)}
-                </span>
-                <span className="text-[19px] text-[#16a34a] dark:text-[#4ade80]">
-                  +{current.bestPlay.points}
-                </span>
-                <span className="text-[16px] text-[#52525b] dark:text-[#a1a1aa]">
-                  {current.bestPlay.label}
-                </span>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {top.map((row, index) => (
                 <div
@@ -300,9 +283,6 @@ export default function LeaderboardPanel({
                 <div>
                   graph +5 · knowledge +10 · tools +10 · chat +5 · @tag +10 · report +30 ·
                   refinement +10 · progress +5 · commit +5
-                </div>
-                <div>
-                  best possible: vulnerability report +30 · knowledge/tool +10
                 </div>
                 <div>
                   penalties: no chat 3m -10 · no @tag 5m -10 · no contribution 15m -10

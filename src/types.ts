@@ -388,7 +388,6 @@ export interface LeaderboardPeriod {
   key: 'day' | 'week' | 'month';
   from: string;
   to: string;
-  bestPlay: { nick: string; points: number; label: string } | null;
   rows: LeaderboardRow[];
   top: LeaderboardRow[];
 }

@@ -118,13 +118,6 @@ function scorePeriod(state, events, key, from, to) {
   // Per-actor windows used for duplicate suppression and chat cooldown.
   const lastChat = new Map();
   const seenText = new Map();
-  let bestPlay = null;
-  const recordBest = (nick, points, label) => {
-    if (points <= 0) return;
-    if (!bestPlay || points > bestPlay.points) {
-      bestPlay = { nick, points, label };
-    }
-  };
 
   for (const event of events) {
     if (event.time < from || event.time > to) continue;
@@ -194,10 +187,8 @@ function scorePeriod(state, events, key, from, to) {
         event.time - previous >= CHAT_COOLDOWN_MS &&
         event.time - lastSame >= DUPLICATE_WINDOW_MS &&
         text.length >= 2;
-      let awarded = 0;
       if (allowed && row.breakdown.chat < caps.chat) {
         row.breakdown.chat += 5;
-        awarded += 5;
         lastChat.set(actor, event.time);
         seenText.set(textKey, event.time);
       }
@@ -209,16 +200,8 @@ function scorePeriod(state, events, key, from, to) {
         if (text.length >= 15 && row.breakdown.mention < caps.mention) {
           const award = Math.min(10 * mentioned.size, caps.mention - row.breakdown.mention);
           row.breakdown.mention += award;
-          awarded += award;
           seenText.set(textKey, event.time);
         }
-      }
-      if (awarded > 0) {
-        recordBest(
-          actor,
-          awarded,
-          mentioned.size > 0 ? 'chat with @mentions' : 'chat message'
-        );
       }
       continue;
     }
@@ -227,10 +210,7 @@ function scorePeriod(state, events, key, from, to) {
     row.counts[kind] += 1;
 
     if (kind === 'reports') {
-      if (row.breakdown.reports < caps.reports) {
-        row.breakdown.reports += 30;
-        recordBest(actor, 30, 'vulnerability report');
-      }
+      if (row.breakdown.reports < caps.reports) row.breakdown.reports += 30;
       continue;
     }
     if (kind === 'progress' || kind === 'commit') {
@@ -252,23 +232,12 @@ function scorePeriod(state, events, key, from, to) {
       if (row.breakdown[kind] < caps[kind]) {
         row.breakdown[kind] += 5;
         seenText.set(textKey, event.time);
-        recordBest(actor, 5, kind === 'commit' ? 'clean commit' : 'progress note');
       }
       continue;
     }
 
     if (row.breakdown[kind] < caps[kind]) {
-      const points = kind === 'knowledge' ? 10 : kind === 'tools' ? 10 : 5;
-      row.breakdown[kind] += points;
-      recordBest(
-        actor,
-        points,
-        kind === 'knowledge'
-          ? 'knowledge refinement'
-          : kind === 'tools'
-            ? 'tool contribution'
-            : 'graph contribution'
-      );
+      row.breakdown[kind] += kind === 'knowledge' ? 10 : kind === 'tools' ? 10 : 5;
     }
   }
 
@@ -315,7 +284,6 @@ function scorePeriod(state, events, key, from, to) {
     key,
     from: from.toISOString(),
     to: to.toISOString(),
-    bestPlay,
     rows: rows.slice(0, 10),
     top: rows.slice(0, 3),
   };
