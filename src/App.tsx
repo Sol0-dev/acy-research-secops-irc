@@ -1693,6 +1693,23 @@ export default function App() {
     return workspace.channels.find((channel) => channel.id === buffer.id) ?? workspace.channels[0] ?? null;
   }, [workspace.activeBuffer, workspace.channels]);
 
+  const activeDuel = useMemo(
+    () =>
+      (workspace.duels ?? []).find(
+        (duel) => duel.channelId === activeChannelObj?.id
+      ) ?? null,
+    [workspace.duels, activeChannelObj]
+  );
+  const activeDuelReadOnly = useMemo(() => {
+    if (!activeDuel || !activeChannelObj?.duelChannel) return false;
+    const nick = normalizeHandle(session?.userNick || '');
+    return (
+      nick !== 'admin' &&
+      activeDuel.challenger !== nick &&
+      activeDuel.opponent !== nick
+    );
+  }, [activeDuel, activeChannelObj, session?.userNick]);
+
   const activeDmThreadObj = useMemo<DirectMessageThread | null>(() => {
     const buffer = workspace.activeBuffer;
     if (buffer.kind !== 'dm') return null;
@@ -2951,36 +2968,43 @@ export default function App() {
             <div ref={messageEndRef} />
           </div>
 
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = inputText;
-              setInputText('');
-              void handleCommandOrMessage(value);
-            }}
-            className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] px-4 py-3 flex items-center gap-2.5 font-mono text-base shrink-0"
-          >
-            <span className="text-[#71717a] select-none">&gt;</span>
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputText}
-              onChange={(event) => setInputText(event.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={
-                workspace.activeBuffer.kind === 'dm' && activeDmThreadObj
-                  ? `message @${getPeerFromThread(
-                      activeDmThreadObj,
-                      session?.userNick || null
-                    )} · ask for a second opinion · /docs for commands`
-                  : `message ${
-                      activeChannelObj?.id || '#lobby'
-                    } · @agent for help · /docs for commands`
-              }
-              className="w-full bg-transparent text-[#18181b] dark:text-[#f4f4f5] placeholder-[#71717a] focus:outline-none"
-            />
-          </form>
+          {activeDuelReadOnly ? (
+            <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] px-4 py-3 font-mono text-[15px] text-[#71717a] shrink-0">
+              spectator mode · only the two duelists can chat in this duel channel · you can
+              read the chat, graph, commits, and reports
+            </div>
+          ) : (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                const value = inputText;
+                setInputText('');
+                void handleCommandOrMessage(value);
+              }}
+              className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] px-4 py-3 flex items-center gap-2.5 font-mono text-base shrink-0"
+            >
+              <span className="text-[#71717a] select-none">&gt;</span>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputText}
+                onChange={(event) => setInputText(event.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={
+                  workspace.activeBuffer.kind === 'dm' && activeDmThreadObj
+                    ? `message @${getPeerFromThread(
+                        activeDmThreadObj,
+                        session?.userNick || null
+                      )} · ask for a second opinion · /docs for commands`
+                    : `message ${
+                        activeChannelObj?.id || '#lobby'
+                      } · @agent for help · /docs for commands`
+                }
+                className="w-full bg-transparent text-[#18181b] dark:text-[#f4f4f5] placeholder-[#71717a] focus:outline-none"
+              />
+            </form>
+          )}
             </>
           )}
         </main>

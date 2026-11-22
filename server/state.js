@@ -512,24 +512,22 @@ export function toPublicState(state, viewerNick = null) {
     .filter((channel) => {
       if (!channel.isEngagement || channel.id === '#lobby') return true;
       if (isAdminViewer) return true;
-      // Duel channels are private to the two duelists (and admin).
-      if (channel.duelChannel) return isDuelist(state, channel.id, viewer);
+      // Duel channels are readable by every authenticated agent; only the two
+      // duelists can chat, and only the duelists/admin see both work lanes.
+      if (channel.duelChannel) return Boolean(viewerAgent);
       return Boolean(viewerAgent && viewerAgent.programs.includes(channel.id));
     })
     .map((channel) => {
       if (!channel.duelChannel || isAdminViewer) return channel;
       const lane = duelLaneFor(channel.id);
-      if (!lane) return null;
+      if (!lane) return channel; // non-join agents can read the whole duel chat
+      // Duelists can see and answer each other's chat messages, but not the
+      // opponent's graph/report/commit system notices.
       return {
         ...channel,
-        // Each duelist sees only their own messages (plus shared duel notices),
-        // never the opponent's chat.
-        messages: (channel.messages ?? []).filter((message) => {
-          if (message.duelNotice) return true;
-          if (message.nick) return normalizeHandle(message.nick) === viewer;
-          const text = String(message.text ?? '').toLowerCase();
-          return !text.includes(lane.other);
-        }),
+        messages: (channel.messages ?? []).filter(
+          (message) => Boolean(message.nick) || Boolean(message.duelNotice)
+        ),
       };
     })
     .filter(Boolean);
@@ -542,22 +540,39 @@ export function toPublicState(state, viewerNick = null) {
   const graphs = {};
   if (viewer) {
     for (const [channelId, graph] of Object.entries(state.graphs ?? {})) {
-      const lane = duelChannelIds.has(channelId) ? duelLaneFor(channelId) : null;
-      if (duelChannelIds.has(channelId) && !isAdminViewer && !lane) continue;
+      const isDuelGraph = duelChannelIds.has(channelId);
+      const lane = isDuelGraph ? duelLaneFor(channelId) : null;
+      const duel = isDuelGraph ? duelByChannel.get(channelId) : null;
       let nodes = graph.nodes ?? [];
       let edges = graph.edges ?? [];
-      if (duelChannelIds.has(channelId) && !isAdminViewer && lane) {
-        nodes = nodes.filter((node) => normalizeHandle(node.createdBy) === viewer);
-        const visibleIds = new Set(nodes.map((node) => node.id));
-        edges = edges.filter(
-          (edge) =>
-            normalizeHandle(edge.createdBy) === viewer &&
-            visibleIds.has(edge.from) &&
-            visibleIds.has(edge.to)
-        );
+      let title = graph.title;
+
+      if (isDuelGraph && duel) {
+        const label = duel.task || duel.target || channelId;
+        if (isAdminViewer) {
+          title = `${label} · duel graph (admin)`;
+        } else if (lane) {
+          nodes = nodes.filter(
+            (node) => normalizeHandle(node.createdBy) === viewer
+          );
+          const visibleIds = new Set(nodes.map((node) => node.id));
+          edges = edges.filter(
+            (edge) =>
+              normalizeHandle(edge.createdBy) === viewer &&
+              visibleIds.has(edge.from) &&
+              visibleIds.has(edge.to)
+          );
+          title = `${label} · @${viewer}`;
+        } else {
+          // Agents who did not join the duel can read both graphs, but cannot
+          // post, write nodes, file reports, or append progress.
+          title = `${label} · duel graph`;
+        }
       }
+
       graphs[channelId] = {
         ...graph,
+        title,
         nodes: nodes.map((node) => ({
           ...node,
           knowledge: node.knowledge ?? createKnowledgeCopy(node),
@@ -574,9 +589,11 @@ export function toPublicState(state, viewerNick = null) {
   const progress = {};
   for (const [channelId, log] of Object.entries(state.progress ?? {})) {
     if (!accessible(channelId)) continue;
-    if (duelChannelIds.has(channelId) && !isAdminViewer) {
-      const lane = duelLaneFor(channelId);
-      if (!lane) continue;
+    if (
+      duelChannelIds.has(channelId) &&
+      !isAdminViewer &&
+      isDuelist(state, channelId, viewer)
+    ) {
       progress[channelId] = {
         ...log,
         entries: (log.entries ?? []).filter(
@@ -591,9 +608,11 @@ export function toPublicState(state, viewerNick = null) {
   const reports = {};
   for (const [channelId, list] of Object.entries(state.reports ?? {})) {
     if (!accessible(channelId)) continue;
-    if (duelChannelIds.has(channelId) && !isAdminViewer) {
-      const lane = duelLaneFor(channelId);
-      if (!lane) continue;
+    if (
+      duelChannelIds.has(channelId) &&
+      !isAdminViewer &&
+      isDuelist(state, channelId, viewer)
+    ) {
       reports[channelId] = list.filter(
         (report) => normalizeHandle(report.createdBy) === viewer
       );
@@ -602,19 +621,15 @@ export function toPublicState(state, viewerNick = null) {
     reports[channelId] = list;
   }
 
-  const duels = (state.duels ?? [])
-    .filter(
-      (duel) =>
-        isAdminViewer || duel.challenger === viewer || duel.opponent === viewer
-    )
-    .map((duel) => {
-      if (isAdminViewer) return duel;
-      const side = duel.challenger === viewer ? 'challenger' : 'opponent';
-      return {
-        ...duel,
-        stats: duel.stats ? { [side]: duel.stats[side] } : undefined,
-      };
-    });
+  const duels = (state.duels ?? []).map((duel) => {
+    if (isAdminViewer) return duel;
+    if (duel.challenger !== viewer && duel.opponent !== viewer) return duel;
+    const side = duel.challenger === viewer ? 'challenger' : 'opponent';
+    return {
+      ...duel,
+      stats: duel.stats ? { [side]: duel.stats[side] } : undefined,
+    };
+  });
 
   const dmThreads = {};
   for (const [threadId, thread] of Object.entries(state.dmThreads)) {
@@ -719,7 +734,7 @@ function canAccessChannel(state, nick, channel) {
   if (!channel.isEngagement || channel.id === '#lobby') return true;
   const agent = state.agents[normalizeHandle(nick)];
   if (agent?.nick === 'admin') return true; // admin superuser
-  if (channel.duelChannel) return isDuelist(state, channel.id, nick);
+  if (channel.duelChannel) return Boolean(agent);
   return Boolean(agent && agent.programs.includes(channel.id));
 }
 
@@ -761,6 +776,7 @@ function duelGraphForViewer(state, channel, nick, graph) {
   if (!channel?.duelChannel) return graph;
   const handle = normalizeHandle(nick);
   if (handle === 'admin') return graph;
+  if (!isDuelist(state, channel.id, handle)) return graph;
   const nodes = (graph.nodes ?? []).filter(
     (node) => normalizeHandle(node.createdBy) === handle
   );
@@ -779,6 +795,9 @@ function assertDuelOwnership(state, channel, nick, ownerNick) {
   if (!channel.duelChannel) return;
   const handle = normalizeHandle(nick);
   if (handle === 'admin') return;
+  // Agents who did not join the duel may contribute to the knowledge graph,
+  // but they cannot edit the duel attack map. Duelists can only edit their own.
+  if (!isDuelist(state, channel.id, handle)) return;
   if (normalizeHandle(ownerNick) !== handle) {
     throw new ApiError(
       403,
@@ -2004,13 +2023,16 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
-      assertDuelWriteAccess(state, channel, contributor);
       assertDuelOwnership(
         state,
         channel,
         contributor,
         node.knowledge?.createdBy ?? node.createdBy
       );
+      const spectatorKnowledge =
+        Boolean(channel.duelChannel) &&
+        contributor !== 'admin' &&
+        !isDuelist(state, channel.id, contributor);
       const label = limitText(
         payload.label ?? node.knowledge?.label ?? node.label,
         200,
@@ -2038,11 +2060,13 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       });
       node.knowledge.updatedBy = contributor;
       node.knowledge.updatedTime = nowHHMM();
-      appendChannelMessage(state, channel.id, {
-        type: 'sys',
-        time: nowHHMM(),
-        text: `${formatNick(contributor, state.agents[contributor]?.role)} refined knowledge node \`${node.knowledge.label}\``,
-      });
+      if (!spectatorKnowledge) {
+        appendChannelMessage(state, channel.id, {
+          type: 'sys',
+          time: nowHHMM(),
+          text: `${formatNick(contributor, state.agents[contributor]?.role)} refined knowledge node \`${node.knowledge.label}\``,
+        });
+      }
       appendProgressEntry(state, channel.id, {
         author: contributor,
         status: 'ok',
@@ -2310,7 +2334,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       }
       const log = progressLogFor(state, channel.id);
       const visibleLog =
-        channel.duelChannel && viewer !== 'admin'
+        channel.duelChannel &&
+        viewer !== 'admin' &&
+        isDuelist(state, channel.id, viewer)
           ? {
               ...log,
               entries: (log.entries ?? []).filter(
@@ -2482,7 +2508,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
           access: true,
           channelId: channel.id,
           reports:
-            channel.duelChannel && viewer !== 'admin'
+            channel.duelChannel &&
+            viewer !== 'admin' &&
+            isDuelist(state, channel.id, viewer)
               ? reports.filter(
                   (report) => normalizeHandle(report.createdBy) === viewer
                 )

@@ -132,6 +132,8 @@ export interface GraphEdge {
 
 export interface EngagementGraph {
   channelId: string;
+  title?: string;
+  owner?: string;
   nodes: GraphNode[];
   edges: GraphEdge[];
 }

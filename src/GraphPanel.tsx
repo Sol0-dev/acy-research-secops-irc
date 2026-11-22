@@ -396,7 +396,7 @@ export default function GraphPanel({
           </button>
           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
           <span className="font-mono text-base font-medium truncate">
-            attack map // {channelId}
+            attack map // {graph.title ?? channelId}
           </span>
           <span className="font-mono text-[14px] text-[#71717a]">
             {graph.nodes.length} nodes · {graph.edges.length} edges
@@ -412,7 +412,7 @@ export default function GraphPanel({
                 .sort()
                 .map((id) => (
                   <option key={id} value={id}>
-                    {id}
+                    {graphs[id]?.title ?? id}
                   </option>
                 ))}
             </select>

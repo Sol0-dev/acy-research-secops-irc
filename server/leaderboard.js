@@ -248,7 +248,14 @@ function scorePeriod(state, events, key, from, to) {
         row.mentionTimes.push(event.time);
         row.counts.mention += 1;
         if (text.length >= 15 && row.breakdown.mention < caps.mention) {
-          const award = Math.min(10 * mentioned.size, caps.mention - row.breakdown.mention);
+          const inDuel = (state.duels ?? []).some(
+            (duel) =>
+              duel.channelId === event.payload.channelId &&
+              ['pending', 'active'].includes(duel.status) &&
+              (duel.challenger === actor || duel.opponent === actor)
+          );
+          const perTag = inDuel ? 5 : 10;
+          const award = Math.min(perTag * mentioned.size, caps.mention - row.breakdown.mention);
           row.breakdown.mention += award;
           seenText.set(textKey, event.time);
         }
