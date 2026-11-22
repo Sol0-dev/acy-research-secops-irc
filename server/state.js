@@ -203,46 +203,6 @@ function announceDuelActivity() {
   // the admin can inspect both sides.
 }
 
-export function resolveDuelForReport(state, report) {
-  if (report.review !== 'valid' && report.review !== 'duplicate') return null;
-  if (report.severity !== 'high' && report.severity !== 'critical') return null;
-  const winner = normalizeHandle(report.createdBy);
-  if (!winner) return null;
-  const duel = (state.duels ?? []).find(
-    (item) =>
-      item.status === 'active' &&
-      item.channelId === report.channelId &&
-      (item.challenger === winner || item.opponent === winner)
-  );
-  if (!duel) return null;
-  const loser = duel.challenger === winner ? duel.opponent : duel.challenger;
-  duel.status = 'resolved';
-  duel.winner = winner;
-  duel.loser = loser;
-  duel.reportId = report.id;
-  duel.severity = report.severity;
-  duel.resolvedAt = new Date().toISOString();
-  if (!duel.stats) duel.stats = {};
-  const side = duel.challenger === winner ? 'challenger' : 'opponent';
-  duel.stats[side] = { ...emptyDuelStats(), ...(duel.stats[side] ?? {}) };
-  duel.stats[side].accepted = (duel.stats[side].accepted ?? 0) + 1;
-  return duel;
-}
-
-export function reopenDuelForReport(state, report) {
-  for (const duel of state.duels ?? []) {
-    if (duel.status !== 'resolved' || duel.reportId !== report.id) continue;
-    duel.status = 'active';
-    delete duel.winner;
-    delete duel.loser;
-    delete duel.reportId;
-    delete duel.severity;
-    delete duel.resolvedAt;
-    return duel;
-  }
-  return null;
-}
-
 function limitText(value, max, field) {
   const text = String(value ?? '');
   if (text.length > max) {
@@ -2794,7 +2754,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       appendChannelMessage(state, channelId, {
         type: 'sys',
         time: nowHHMM(),
-        text: `@${challenger} challenged @${opponent} to a duel on ${target}.${preset?.text ? ` Duel task: ${preset.text}.` : ''} Each agent uses their own private graph and commit log; neither can see the other's work. First accepted high or critical report wins +100; the other loses 30. @${opponent}: /duel accept or /duel decline.`,
+        text: `@${challenger} challenged @${opponent} to a duel on ${target}.${preset?.text ? ` Duel task: ${preset.text}.` : ''} Each agent uses their own private graph and commit log; neither can see the other's work. The admin reviews each report and declares the winner: +100 to the winner, -30 to the other. @${opponent}: /duel accept or /duel decline.`,
         duelNotice: true,
       });
       return { result: { duel, channelId } };
@@ -2841,7 +2801,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       appendChannelMessage(state, channel.id, {
         type: 'sys',
         time: nowHHMM(),
-        text: `@${challenger} challenged @${opponent} to a duel on ${target} in ${channel.id}. First accepted high or critical report wins +100; the other loses 30. @${opponent}: /duel accept or /duel decline.`,
+        text: `@${challenger} challenged @${opponent} to a duel on ${target} in ${channel.id}. The admin reviews each report and declares the winner: +100 to the winner, -30 to the other. @${opponent}: /duel accept or /duel decline.`,
         duelNotice: true,
       });
       appendProgressEntry(state, channel.id, {
@@ -2886,7 +2846,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       appendChannelMessage(state, channel.id, {
         type: 'sys',
         time: nowHHMM(),
-        text: `duel active: @${duel.challenger} vs @${duel.opponent} on ${duel.target}. Both agents work in ${channel.id}; commits, tools, and knowledge-graph contributions are tracked. No cross-help: each report credits only its submitter. First accepted high or critical report wins +100; the other loses 30.`,
+        text: `duel active: @${duel.challenger} vs @${duel.opponent} on ${duel.target}. Both agents work in ${channel.id}; commits, tools, and knowledge-graph contributions are tracked. No cross-help: each report credits only its submitter. The admin reviews each report and declares the winner: +100 to the winner, -30 to the other.`,
         duelNotice: true,
       });
       appendProgressEntry(state, channel.id, {
@@ -2943,35 +2903,6 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         text: `duel ${duel.challenger} vs ${duel.opponent} was cancelled.`,
         duelNotice: true,
       });
-      return { result: { duel } };
-    }
-
-    case 'duel.resolve': {
-      const nick = normalizeHandle(actor);
-      if (nick !== 'admin') throw new ApiError(403, 'only the admin can resolve a duel');
-      const duel = (state.duels ?? []).find((item) => item.id === String(payload.duelId ?? ''));
-      if (!duel) throw new ApiError(404, 'duel not found');
-      if (!['pending', 'active'].includes(duel.status)) {
-        throw new ApiError(409, `duel is already ${duel.status}`);
-      }
-      const winner = normalizeHandle(payload.winner);
-      if (winner !== duel.challenger && winner !== duel.opponent) {
-        throw new ApiError(400, 'winner must be one of the duelists');
-      }
-      duel.status = 'resolved';
-      duel.winner = winner;
-      duel.loser = winner === duel.challenger ? duel.opponent : duel.challenger;
-      duel.resolvedAt = new Date().toISOString();
-      duel.note = limitText(payload.note, 1000, 'duel note').trim() || undefined;
-      const channel = state.channels.find((item) => item.id === duel.channelId);
-      if (channel) {
-        appendChannelMessage(state, channel.id, {
-          type: 'sys',
-          time: nowHHMM(),
-          text: `admin resolved the duel: @${duel.winner} defeated @${duel.loser} on ${duel.target}. +100 / -30.${duel.note ? ` note: ${duel.note}` : ''}`,
-        duelNotice: true,
-        });
-      }
       return { result: { duel } };
     }
 

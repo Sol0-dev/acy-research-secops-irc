@@ -16,9 +16,7 @@ import { buildLeaderboard } from './leaderboard.js';
 import {
   applyCommand,
   normalizeHandle,
-  reopenDuelForReport,
   reportContributors,
-  resolveDuelForReport,
   toPublicState,
   ApiError,
 } from './state.js';
@@ -358,14 +356,6 @@ app.post('/api/admin/report/review', async (req, res) => {
       report.awardedContributors = awardedContributors;
     }
 
-    // A duel ends as soon as one duelist lands an accepted high or critical
-    // report. Re-reviewing that report away from valid/duplicate reopens it.
-    let duelOutcome = null;
-    if (decision === 'valid' || decision === 'duplicate') {
-      duelOutcome = resolveDuelForReport(state, report);
-    } else {
-      duelOutcome = reopenDuelForReport(state, report);
-    }
 
     let cleanedNodes = 0;
     let cleanedEdges = 0;
@@ -404,15 +394,10 @@ app.post('/api/admin/report/review', async (req, res) => {
       decision === 'valid' || decision === 'duplicate'
         ? ` - submitter +15 pts${awardedContributors.length > 0 ? `, contributors +10 pts each (${awardedContributors.map((nick) => '@' + nick).join(' ')})` : ''}`
         : '';
-    const duelText = duelOutcome
-      ? duelOutcome.status === 'resolved'
-        ? ` DUEL: @${duelOutcome.winner} defeated @${duelOutcome.loser} on ${duelOutcome.target} (+100 / -30).`
-        : ` DUEL REOPENED: ${duelOutcome.challenger} vs ${duelOutcome.opponent} on ${duelOutcome.target}.`
-      : '';
     const channelText =
       decision === 'invalid'
-        ? `${mentions}${mentions ? ' ' : ''}INVALID report: "${report.title}". Do not follow this rabbit hole again. Removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from all graphs and the knowledge graph. Agents: use Clean contamination in the report if you still see matching nodes.${duelText}`
-        : `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}${rewardText}${duelText}`;
+        ? `${mentions}${mentions ? ' ' : ''}INVALID report: "${report.title}". Do not follow this rabbit hole again. Removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from all graphs and the knowledge graph. Agents: use Clean contamination in the report if you still see matching nodes.`
+        : `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}${rewardText}`;
 
     const log = state.progress[channelId] || (state.progress[channelId] = { channelId, entries: [] });
     log.entries.push({
@@ -437,7 +422,6 @@ app.post('/api/admin/report/review', async (req, res) => {
           type: 'sys',
           time,
           text: channelText,
-          duelNotice: Boolean(duelOutcome),
         },
       ];
     }
@@ -774,6 +758,71 @@ app.post('/api/admin/channel/delete', async (req, res) => {
 
     const version = await persistState(state, 'admin.channel.delete', 'admin', { channelId });
     return res.json({ ok: true, channelId, version });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/duel/resolve', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const duelId = String(req.body?.duelId ?? '');
+  const winner = normalizeHandle(req.body?.winner ?? '');
+  const note = String(req.body?.note ?? '').trim();
+  try {
+    const state = structuredClone(getState());
+    const duel = (state.duels ?? []).find((item) => item.id === duelId);
+    if (!duel) return res.status(404).json({ error: 'duel not found' });
+    if (!['pending', 'active'].includes(duel.status)) {
+      return res.status(409).json({ error: `duel is already ${duel.status}` });
+    }
+    if (winner !== duel.challenger && winner !== duel.opponent) {
+      return res.status(400).json({ error: 'winner must be one of the duelists' });
+    }
+    const accepted = (state.reports?.[duel.channelId] ?? []).filter(
+      (report) =>
+        normalizeHandle(report.createdBy) === winner &&
+        (report.review === 'valid' || report.review === 'duplicate')
+    );
+    if (accepted.length === 0) {
+      return res.status(400).json({
+        error:
+          'winner has no admin-accepted report in this duel channel - validate a report first',
+      });
+    }
+    const severityRank = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
+    const chosen = [...accepted].sort(
+      (a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0)
+    )[0];
+    const time = new Date().toTimeString().slice(0, 5);
+    duel.status = 'resolved';
+    duel.winner = winner;
+    duel.loser = winner === duel.challenger ? duel.opponent : duel.challenger;
+    duel.resolvedAt = new Date().toISOString();
+    duel.reportId = chosen.id;
+    duel.severity = chosen.severity;
+    duel.note = note || undefined;
+    const channel = state.channels.find((item) => item.id === duel.channelId);
+    if (channel) {
+      channel.messages = [
+        ...channel.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: `@${duel.challenger} @${duel.opponent} admin declared @${duel.winner} the duel winner based on the accepted ${duel.severity} report "${chosen.title}". +100 / -30.${note ? ` note: ${note}` : ''}`,
+          duelNotice: true,
+        },
+      ];
+      channel.unread = true;
+    }
+    const version = await persistState(state, 'admin.duel.resolve', 'admin', {
+      duelId,
+      winner,
+      note,
+    });
+    return res.json({ ok: true, duel, version });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

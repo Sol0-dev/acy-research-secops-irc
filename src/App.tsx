@@ -580,6 +580,25 @@ export default function App() {
     }
   };
 
+  const resolveAdminDuel = async (duelId: string, winner: string, note?: string) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminResolveDuel(adminToken, { duelId, winner, note });
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not resolve duel',
+      };
+    }
+  };
+
   const setAdminDuelTask = async (duelId: string, task: string) => {
     if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
@@ -1607,21 +1626,6 @@ export default function App() {
               })
               .join(' | ');
             await postNotice(lines);
-          } else if (sub === 'resolve') {
-            const winner = normalizeHandle(rest[1] || '');
-            const open = (workspace.duels ?? [])
-              .filter(
-                (duel) =>
-                  duel.channelId === channel.id &&
-                  ['pending', 'active'].includes(duel.status)
-              )
-              .slice(-1)[0];
-            if (!open) {
-              await postNotice('no open duel to resolve in this channel');
-              return;
-            }
-            await execute('duel.resolve', { duelId: open.id, winner });
-            await postNotice(`duel resolved: @${winner}`);
           } else {
             await postNotice(
               'usage: /duel @agent | /duel accept | /duel decline | /duel cancel | /duel status'
@@ -3803,6 +3807,7 @@ export default function App() {
         onSaveGoal={saveDocsGoal}
         onSetFocus={setAdminFocus}
         onSetDuelTask={setAdminDuelTask}
+        onResolveDuel={resolveAdminDuel}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}

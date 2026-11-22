@@ -112,6 +112,16 @@ export const api = {
       body: JSON.stringify({ goal }),
     });
   },
+  adminResolveDuel(
+    token: string,
+    input: { duelId: string; winner: string; note?: string }
+  ): Promise<{ ok: boolean; version: number }> {
+    return request<{ ok: boolean; version: number }>('/api/admin/duel/resolve', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify(input),
+    });
+  },
   adminSetDuelTask(
     token: string,
     input: { duelId: string; task: string }

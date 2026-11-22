@@ -25,6 +25,7 @@ interface AdminPanelProps {
   onSaveGoal: (goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetDuelTask: (duelId: string, task: string) => Promise<{ ok: boolean; error?: string }>;
+  onResolveDuel: (duelId: string, winner: string, note?: string) => Promise<{ ok: boolean; error?: string }>;
   onOpenAgentPortal: () => void;
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
@@ -75,6 +76,7 @@ export default function AdminPanel({
   onSaveGoal,
   onSetFocus,
   onSetDuelTask,
+  onResolveDuel,
   onOpenAgentPortal,
   onDeleteGraph,
   onDeleteChannel,
@@ -115,6 +117,9 @@ export default function AdminPanel({
   const [duelTaskBusy, setDuelTaskBusy] = useState('');
   const [duelTaskNotice, setDuelTaskNotice] = useState('');
   const [duelTaskError, setDuelTaskError] = useState('');
+  const [duelResolveBusy, setDuelResolveBusy] = useState('');
+  const [duelResolveNotice, setDuelResolveNotice] = useState('');
+  const [duelResolveError, setDuelResolveError] = useState('');
 
   const downloadFile = async (kind: 'docx' | 'graph' | 'all', id: string, filename: string) => {
     setDownloadNotice('');
@@ -1059,6 +1064,13 @@ export default function AdminPanel({
                       ?.enrolled ?? [],
                 }))
                 .filter((entry) => entry.channel);
+              const nodesFor = (channelId: string, nick: string) =>
+                (snapshot.graphs.find((graph) => graph.channelId === channelId)?.nodes ?? [])
+                  .filter((node) => node.createdBy === nick);
+              const reportsFor = (channelId: string, nick: string) =>
+                (snapshot.reports ?? []).filter(
+                  (report) => report.channelId === channelId && report.createdBy === nick
+                );
               if (duelChannels.length === 0) {
                 return <div className="text-[15px] text-[#71717a]">no duel chat groups yet</div>;
               }
@@ -1106,13 +1118,97 @@ export default function AdminPanel({
                                 {duel.stats.opponent?.reports ?? 0}
                               </div>
                             )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                              {[duel.challenger, duel.opponent].map((nick) => {
+                                const nodes = nodesFor(channel!.id, nick);
+                                const reports = reportsFor(channel!.id, nick);
+                                return (
+                                  <div key={nick} className="border border-[#2a2a30] p-2 space-y-1">
+                                    <div className="text-[#4ade80]">
+                                      @{nick} graph · {nodes.length} nodes
+                                    </div>
+                                    <div className="text-[#71717a]">
+                                      reports: {reports.length}
+                                    </div>
+                                    {reports.length === 0 ? (
+                                      <div className="text-[#71717a]">no reports yet</div>
+                                    ) : (
+                                      reports.map((report) => (
+                                        <div key={report.id} className="text-[13px] text-[#a1a1aa]">
+                                          [{report.review}] {report.severity} · {report.title}
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                             {duel.winner && (
                               <div className="text-[#4ade80]">
                                 winner @{duel.winner} · loser @{duel.loser}
                               </div>
                             )}
+                            {['pending', 'active'].includes(duel.status) && (
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  disabled={Boolean(duelResolveBusy)}
+                                  onClick={() => {
+                                    const key = `${duel.id}:${duel.challenger}`;
+                                    setDuelResolveBusy(key);
+                                    setDuelResolveNotice('');
+                                    setDuelResolveError('');
+                                    void onResolveDuel(duel.id, duel.challenger).then((result) => {
+                                      setDuelResolveBusy('');
+                                      if (!result.ok) {
+                                        setDuelResolveError(result.error || 'could not resolve duel');
+                                        return;
+                                      }
+                                      setDuelResolveNotice(
+                                        `@${duel.challenger} declared winner of ${channel!.id}`
+                                      );
+                                    });
+                                  }}
+                                  className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                                >
+                                  declare @{duel.challenger} winner
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={Boolean(duelResolveBusy)}
+                                  onClick={() => {
+                                    const key = `${duel.id}:${duel.opponent}`;
+                                    setDuelResolveBusy(key);
+                                    setDuelResolveNotice('');
+                                    setDuelResolveError('');
+                                    void onResolveDuel(duel.id, duel.opponent).then((result) => {
+                                      setDuelResolveBusy('');
+                                      if (!result.ok) {
+                                        setDuelResolveError(result.error || 'could not resolve duel');
+                                        return;
+                                      }
+                                      setDuelResolveNotice(
+                                        `@${duel.opponent} declared winner of ${channel!.id}`
+                                      );
+                                    });
+                                  }}
+                                  className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                                >
+                                  declare @{duel.opponent} winner
+                                </button>
+                                {duelResolveBusy.startsWith(duel.id) && (
+                                  <span className="text-[13px] text-[#71717a]">saving…</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))}
+                        {duelResolveNotice && (
+                          <div className="text-[14px] text-[#4ade80]">{duelResolveNotice}</div>
+                        )}
+                        {duelResolveError && (
+                          <div className="text-[14px] text-[#f87171]">{duelResolveError}</div>
+                        )}
                         <div className="max-h-64 overflow-y-auto space-y-1">
                           {channel!.messages.map((message) => (
                             <div key={message.id} className="text-[14px] leading-relaxed">
