@@ -658,6 +658,52 @@ export default function App() {
     }
   };
 
+  const deleteAdminReport = async (input: { channelId: string; reportId: string }) => {
+    if (normalizeHandle(session?.userNick || '') !== 'admin') {
+      return { ok: false, error: 'admin only' };
+    }
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminDeleteReport(adminToken, input.channelId, input.reportId);
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not delete report',
+      };
+    }
+  };
+
+  const downloadReportDocx = async (reportId: string, filename: string) => {
+    if (normalizeHandle(session?.userNick || '') !== 'admin') {
+      return { ok: false, error: 'admin only' };
+    }
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      const blob = await api.adminReportDocx(adminToken, reportId);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not download report',
+      };
+    }
+  };
+
   const toggleLive = () => {
     void command('view.set', { isLive: !workspace.isLive });
   };
@@ -2382,6 +2428,8 @@ export default function App() {
               nickColor={(nick) => getNickColor(nick, isDark)}
               isAdmin={isAdminSession}
               onAdminReview={reviewVulnerabilityReport}
+              onAdminDelete={deleteAdminReport}
+              onDownloadDocx={downloadReportDocx}
               onCleanInvalid={async (input) => {
                 try {
                   const response = await execute('report.cleanup', input);
@@ -3600,6 +3648,7 @@ export default function App() {
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}
         onDeleteAccount={deleteAdminAccount}
+        onDeleteReport={deleteAdminReport}
         onRefresh={refreshAdminSnapshot}
         onClose={() => setAdminOpen(false)}
       />

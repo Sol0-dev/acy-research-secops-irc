@@ -523,6 +523,85 @@ app.post('/api/admin/agent-session', async (req, res) => {
   }
 });
 
+app.post('/api/admin/report/delete', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const channelId = String(req.body?.channelId ?? '');
+  const reportId = String(req.body?.reportId ?? '');
+  try {
+    const state = structuredClone(getState());
+    const reports = state.reports?.[channelId] ?? [];
+    const report = reports.find((item) => item.id === reportId);
+    if (!report) return res.status(404).json({ error: 'report not found' });
+
+    state.reports[channelId] = reports.filter((item) => item.id !== reportId);
+
+    const titleKey = report.title.trim().toLowerCase();
+    let cleanedNodes = 0;
+    let cleanedEdges = 0;
+    for (const graph of Object.values(state.graphs ?? {})) {
+      const nodeIds = new Set();
+      if (report.graphNodeId) nodeIds.add(report.graphNodeId);
+      for (const node of graph.nodes ?? []) {
+        if (node.kind === 'vulnerability' && node.label.trim().toLowerCase() === titleKey) {
+          nodeIds.add(node.id);
+        }
+      }
+      const beforeNodes = graph.nodes?.length ?? 0;
+      const beforeEdges = graph.edges?.length ?? 0;
+      graph.nodes = (graph.nodes ?? []).filter((node) => !nodeIds.has(node.id));
+      graph.edges = (graph.edges ?? []).filter(
+        (edge) => !nodeIds.has(edge.from) && !nodeIds.has(edge.to)
+      );
+      cleanedNodes += beforeNodes - graph.nodes.length;
+      cleanedEdges += beforeEdges - graph.edges.length;
+    }
+
+    const time = new Date().toTimeString().slice(0, 5);
+    const log = state.progress[channelId] || (state.progress[channelId] = { channelId, entries: [] });
+    log.entries.push({
+      id: `pg-${crypto.randomBytes(6).toString('hex')}`,
+      version: 0,
+      time,
+      author: 'admin',
+      status: 'note',
+      kind: 'change',
+      text: `admin deleted report "${report.title}" and removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from the graph and knowledge graph`,
+    });
+
+    const channel = state.channels.find((item) => item.id === channelId);
+    if (channel) {
+      channel.messages = [
+        ...channel.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: `admin deleted report "${report.title}" and removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from the graph and knowledge graph`,
+        },
+      ];
+    }
+
+    const version = await persistState(state, 'admin.report.delete', 'admin', {
+      channelId,
+      reportId,
+      title: report.title,
+    });
+    return res.json({
+      ok: true,
+      channelId,
+      reportId,
+      title: report.title,
+      cleanedNodes,
+      cleanedEdges,
+      version,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/admin/graph/delete', async (req, res) => {
   if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });

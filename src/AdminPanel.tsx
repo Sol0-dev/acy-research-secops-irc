@@ -31,6 +31,7 @@ interface AdminPanelProps {
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteAccount: (nick: string) => Promise<{ ok: boolean; error?: string }>;
+  onDeleteReport: (input: { channelId: string; reportId: string }) => Promise<{ ok: boolean; error?: string }>;
   onRefresh: () => Promise<void>;
   onClose: () => void;
 }
@@ -81,6 +82,7 @@ export default function AdminPanel({
   onDeleteGraph,
   onDeleteChannel,
   onDeleteAccount,
+  onDeleteReport,
   onRefresh,
   onClose,
 }: AdminPanelProps) {
@@ -99,6 +101,13 @@ export default function AdminPanel({
   const [confirmAccountDelete, setConfirmAccountDelete] = useState<string | null>(null);
   const [accountNotice, setAccountNotice] = useState('');
   const [accountError, setAccountError] = useState('');
+  const [confirmReportDelete, setConfirmReportDelete] = useState<{
+    channelId: string;
+    reportId: string;
+    title: string;
+  } | null>(null);
+  const [reportDeleteNotice, setReportDeleteNotice] = useState('');
+  const [reportDeleteError, setReportDeleteError] = useState('');
   const [confirmGraphDelete, setConfirmGraphDelete] = useState<string | null>(null);
   const [deleteNotice, setDeleteNotice] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -243,6 +252,25 @@ export default function AdminPanel({
     }
     setConfirmAccountDelete(null);
     setAccountNotice(`removed: ${nick}`);
+  };
+
+  const deleteReport = async (input: {
+    channelId: string;
+    reportId: string;
+    title: string;
+  }) => {
+    setReportDeleteNotice('');
+    setReportDeleteError('');
+    const result = await onDeleteReport({
+      channelId: input.channelId,
+      reportId: input.reportId,
+    });
+    if (!result.ok) {
+      setReportDeleteError(result.error || 'could not delete report');
+      return;
+    }
+    setConfirmReportDelete(null);
+    setReportDeleteNotice(`report deleted: ${input.title}`);
   };
 
   const th = 'text-left py-1 pr-3 text-[15px] uppercase tracking-wider text-[#71717a] font-normal';
@@ -590,6 +618,19 @@ export default function AdminPanel({
                             >
                               docx
                             </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setConfirmReportDelete({
+                                  channelId: report.channelId,
+                                  reportId: report.id,
+                                  title: report.title,
+                                })
+                              }
+                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
+                            >
+                              delete
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -602,6 +643,8 @@ export default function AdminPanel({
             {reviewError && <div className="text-base text-[#f87171]">{reviewError}</div>}
             {downloadNotice && <div className="text-base text-[#4ade80]">{downloadNotice}</div>}
             {downloadError && <div className="text-base text-[#f87171]">{downloadError}</div>}
+            {reportDeleteNotice && <div className="text-base text-[#4ade80]">{reportDeleteNotice}</div>}
+            {reportDeleteError && <div className="text-base text-[#f87171]">{reportDeleteError}</div>}
           </section>
 
           <section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
@@ -1266,6 +1309,37 @@ export default function AdminPanel({
           </div>
           </div>
         </>
+      )}
+
+      {confirmReportDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-md border border-[#2a2a30] bg-[#09090b] p-4 space-y-3">
+            <div className="text-lg text-[#f4f4f5]">
+              Delete report "{confirmReportDelete.title}"?
+            </div>
+            <p className="text-[15px] text-[#a1a1aa] leading-relaxed">
+              This removes the report and its linked vulnerability node(s) and edges from all
+              graphs and the knowledge graph. The audit log keeps the action. This cannot be
+              undone.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void deleteReport(confirmReportDelete)}
+                className="px-3 py-1.5 border border-[#f87171] text-[15px] text-[#f87171]"
+              >
+                yes, delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmReportDelete(null)}
+                className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
+              >
+                no, cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirmAccountDelete && (

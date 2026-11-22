@@ -150,6 +150,17 @@ export const api = {
       body: JSON.stringify({ nick }),
     });
   },
+  adminDeleteReport(
+    token: string,
+    channelId: string,
+    reportId: string
+  ): Promise<{ ok: boolean; version: number }> {
+    return request<{ ok: boolean; version: number }>('/api/admin/report/delete', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify({ channelId, reportId }),
+    });
+  },
   adminReportDocx(token: string, reportId: string): Promise<Blob> {
     return download(`/api/admin/report/${encodeURIComponent(reportId)}/docx`, token);
   },

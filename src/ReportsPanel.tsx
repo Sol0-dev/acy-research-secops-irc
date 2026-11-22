@@ -74,6 +74,11 @@ interface ReportsPanelProps {
     reportId: string;
     decision: 'triage' | 'valid' | 'invalid' | 'duplicate' | 'pending';
   }) => Promise<ReportActionResult>;
+  onAdminDelete?: (input: {
+    channelId: string;
+    reportId: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  onDownloadDocx?: (reportId: string, filename: string) => Promise<{ ok: boolean; error?: string }>;
   onCleanInvalid?: (input: {
     channelId: string;
     reportId: string;
@@ -120,6 +125,8 @@ export default function ReportsPanel({
   nickColor,
   isAdmin,
   onAdminReview,
+  onAdminDelete,
+  onDownloadDocx,
   onCleanInvalid,
   onClose,
   onCreate,
@@ -146,6 +153,9 @@ export default function ReportsPanel({
   const [reviewNotice, setReviewNotice] = useState('');
   const [cleanBusy, setCleanBusy] = useState(false);
   const [cleanNotice, setCleanNotice] = useState('');
+  const [adminBusy, setAdminBusy] = useState('');
+  const [adminNotice, setAdminNotice] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const selected = useMemo(
     () => allReports.find((report) => report.id === selectedId) ?? allReports[0] ?? null,
@@ -238,6 +248,34 @@ export default function ReportsPanel({
     setCleanNotice(
       `cleaned ${result.nodes ?? 0} node(s) and ${result.edges ?? 0} edge(s)`
     );
+  };
+
+  const downloadReport = async () => {
+    if (!selected || !onDownloadDocx) return;
+    setAdminBusy('download');
+    setAdminNotice('');
+    const filename = `${selected.title.replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 60)}.docx`;
+    const result = await onDownloadDocx(selected.id, filename);
+    setAdminBusy('');
+    setAdminNotice(result.ok ? `downloaded ${filename}` : result.error || 'download failed');
+  };
+
+  const deleteReport = async () => {
+    if (!selected || !onAdminDelete) return;
+    setAdminBusy('delete');
+    setAdminNotice('');
+    const result = await onAdminDelete({
+      channelId: selected.channelId,
+      reportId: selected.id,
+    });
+    setAdminBusy('');
+    if (!result.ok) {
+      setAdminNotice(result.error || 'delete failed');
+      return;
+    }
+    setConfirmDeleteId(null);
+    setSelectedId(null);
+    setAdminNotice('report deleted');
   };
 
   const reviewReport = async (decision: 'triage' | 'valid' | 'invalid' | 'duplicate' | 'pending') => {
@@ -641,6 +679,57 @@ export default function ReportsPanel({
                     </div>
                   )}
                 </header>
+
+                {isAdmin && (onAdminDelete || onDownloadDocx) && (
+                  <div className="flex flex-wrap items-center gap-1.5 border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2">
+                    <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                      admin actions
+                    </span>
+                    {onDownloadDocx && (
+                      <button
+                        type="button"
+                        disabled={adminBusy === 'download'}
+                        onClick={() => void downloadReport()}
+                        className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#52525b] dark:text-[#a1a1aa] disabled:opacity-40"
+                      >
+                        download docx
+                      </button>
+                    )}
+                    {onAdminDelete &&
+                      (confirmDeleteId === selected.id ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={adminBusy === 'delete'}
+                            onClick={() => void deleteReport()}
+                            className="px-2 py-0.5 border border-[#f87171] text-[14px] text-[#f87171] disabled:opacity-40"
+                          >
+                            yes, delete
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a]"
+                          >
+                            no
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(selected.id)}
+                          className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#f87171]"
+                        >
+                          delete report
+                        </button>
+                      ))}
+                    {adminNotice && (
+                      <span className="text-[14px] text-[#16a34a] dark:text-[#4ade80]">
+                        {adminNotice}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {selected.review === 'invalid' && onCleanInvalid && (
                   <div className="border border-[#f59e0b]/60 bg-[#f59e0b]/10 p-3 space-y-2">
