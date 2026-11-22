@@ -765,28 +765,44 @@ export default function ReportsPanel({
                           {decision === 'pending' ? 'unmark' : decision}
                         </button>
                       ))}
-                      {showDuelWinnerButton && (
-                        <>
-                          <button
-                            type="button"
-                            disabled={duelBusy || !duelReportAccepted}
-                            onClick={() => void declareDuelWinner()}
-                            className="px-2 py-0.5 border border-[#16a34a]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80] disabled:opacity-40"
-                          >
-                            {duelBusy
-                              ? 'declaring…'
-                              : `mark @${selected.createdBy} duel winner`}
-                          </button>
-                          {!duelReportAccepted && (
-                            <span className="text-[13px] text-[#71717a]">
-                              validate this report first
-                            </span>
-                          )}
-                        </>
-                      )}
                       {reviewNotice && (
                         <span className="text-[14px] text-[#16a34a] dark:text-[#4ade80]">
                           {reviewNotice}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </header>
+
+                {showDuelWinnerButton && selectedDuel && (
+                  <div className="border border-[#16a34a]/50 bg-[#16a34a]/5 p-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[13px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
+                        duel verdict
+                      </span>
+                      <span className="text-[14px] text-[#52525b] dark:text-[#a1a1aa]">
+                        @{selectedDuel.challenger} vs @{selectedDuel.opponent} ·{' '}
+                        {selectedDuel.status} · target {selectedDuel.target}
+                      </span>
+                      <span className="text-[13px] text-[#71717a]">
+                        report:{' '}
+                        {selected.review === 'triage' ? 'under triage' : selected.review}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={duelBusy || !duelReportAccepted}
+                        onClick={() => void declareDuelWinner()}
+                        className="px-2.5 py-1 border border-[#16a34a]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80] disabled:opacity-40"
+                      >
+                        {duelBusy
+                          ? 'declaring…'
+                          : `mark @${selected.createdBy} duel winner`}
+                      </button>
+                      {!duelReportAccepted && (
+                        <span className="text-[13px] text-[#71717a]">
+                          validate this report first (valid or duplicate)
                         </span>
                       )}
                       {duelNotice && (
@@ -800,8 +816,8 @@ export default function ReportsPanel({
                         </span>
                       )}
                     </div>
-                  )}
-                </header>
+                  </div>
+                )}
 
                 {isAdmin && (onAdminDelete || onDownloadDocx) && (
                   <div className="flex flex-wrap items-center gap-1.5 border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2">
