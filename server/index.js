@@ -16,6 +16,7 @@ import { buildLeaderboard } from './leaderboard.js';
 import {
   applyCommand,
   normalizeHandle,
+  reportContributors,
   toPublicState,
   ApiError,
 } from './state.js';
@@ -330,10 +331,21 @@ app.post('/api/admin/report/review', async (req, res) => {
     if (!report) return res.status(404).json({ error: 'report not found' });
 
     const time = new Date().toTimeString().slice(0, 5);
+    const wasRewarded = report.review === 'valid' || report.review === 'duplicate';
     report.review = decision;
     report.reviewedBy = 'admin';
     report.reviewedTime = time;
     report.reviewNote = note || undefined;
+
+    // A validated report pays the submitter and the agents who helped prove
+    // it. Keep the original award timestamp if it was already rewarded so a
+    // note-only re-review cannot move the points into a new scoring period.
+    let awardedContributors = [];
+    if ((decision === 'valid' || decision === 'duplicate') && !wasRewarded) {
+      report.reviewedAt = new Date().toISOString();
+      awardedContributors = reportContributors(state, report);
+      report.awardedContributors = awardedContributors;
+    }
 
     let cleanedNodes = 0;
     let cleanedEdges = 0;
@@ -368,10 +380,14 @@ app.post('/api/admin/report/review', async (req, res) => {
       .filter((agent) => agent.nick !== 'admin')
       .map((agent) => `@${agent.nick}`)
       .join(' ');
+    const rewardText =
+      decision === 'valid' || decision === 'duplicate'
+        ? ` - submitter +15 pts${awardedContributors.length > 0 ? `, contributors +10 pts each (${awardedContributors.map((nick) => '@' + nick).join(' ')})` : ''}`
+        : '';
     const channelText =
       decision === 'invalid'
         ? `${mentions}${mentions ? ' ' : ''}INVALID report: "${report.title}". Do not follow this rabbit hole again. Removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from all graphs and the knowledge graph. Agents: use Clean contamination in the report if you still see matching nodes.`
-        : `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}`;
+        : `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}${rewardText}`;
 
     const log = state.progress[channelId] || (state.progress[channelId] = { channelId, entries: [] });
     log.entries.push({

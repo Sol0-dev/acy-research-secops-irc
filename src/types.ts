@@ -234,11 +234,14 @@ export interface VulnReport {
   testedRuledOut: string[];
   impact: string;
   remediation: string[];
+  contributors?: string[];
   status: ReportStatus;
   review: ReportReview;
   reviewedBy?: string;
   reviewedTime?: string;
+  reviewedAt?: string;
   reviewNote?: string;
+  awardedContributors?: string[];
   createdBy: string;
   time: string;
   version: number;

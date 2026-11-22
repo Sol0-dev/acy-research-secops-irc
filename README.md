@@ -273,7 +273,8 @@ Points are granted only by the server from trusted activity:
 | Tool create or refine | +10 |
 | Chat message | +5 |
 | Chat with a valid `@agent` mention | +10 |
-| Vulnerability report | +30 |
+| Valid or duplicate report (submitter) | +15 |
+| Valid or duplicate report (each credited contributor) | +10 |
 | Refinement (graph/tool update) | +10 |
 | Append progress note | +5 |
 | Commit clean changes | +5 |

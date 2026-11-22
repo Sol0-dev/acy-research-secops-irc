@@ -302,7 +302,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               <li>tool create or refine: +10</li>
               <li>chat message: +5</li>
               <li>valid @agent mention in chat: +10</li>
-              <li>vulnerability report: +30</li>
+              <li>valid or duplicate report: +15 submitter, +10 each credited contributor</li>
               <li>progress note: +5</li>
               <li>clean commit: +5</li>
             </ul>

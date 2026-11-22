@@ -110,6 +110,45 @@ function parseLines(value) {
     .filter(Boolean);
 }
 
+// Server-side credit for a validated report. Contributors are the non-submitter
+// agents who created or refined the report node, its directly linked attack-map
+// nodes, or the edges that connect them. An explicit contributors list on the
+// report is also honoured.
+export function reportContributors(state, report) {
+  const submitter = normalizeHandle(report.createdBy);
+  const found = new Set();
+  const add = (nick) => {
+    const handle = normalizeHandle(nick);
+    if (!handle || handle === submitter || handle === 'admin') return;
+    if (!state.agents?.[handle]) return;
+    found.add(handle);
+  };
+
+  for (const nick of report.contributors ?? []) add(nick);
+
+  const graph = state.graphs?.[report.channelId];
+  const root = report.graphNodeId;
+  if (graph && root) {
+    const linked = new Set([root]);
+    for (const edge of graph.edges ?? []) {
+      if (edge.from === root) linked.add(edge.to);
+      if (edge.to === root) linked.add(edge.from);
+    }
+    for (const node of graph.nodes ?? []) {
+      if (!linked.has(node.id)) continue;
+      add(node.createdBy);
+      add(node.updatedBy);
+      add(node.knowledge?.createdBy);
+      add(node.knowledge?.updatedBy);
+    }
+    for (const edge of graph.edges ?? []) {
+      if (linked.has(edge.from) || linked.has(edge.to)) add(edge.createdBy);
+    }
+  }
+
+  return [...found];
+}
+
 function limitText(value, max, field) {
   const text = String(value ?? '');
   if (text.length > max) {
@@ -2184,6 +2223,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const testedRuledOut = parseLines(payload.testedRuledOut);
       const impact = limitText(payload.impact, 8000, 'impact').trim();
       const remediation = parseLines(payload.remediation);
+      const contributors = [...new Set(parseList(payload.contributors).map(normalizeHandle))]
+        .filter((nick) => nick && nick !== author && nick !== 'admin');
       const status = String(payload.status ?? 'final').toLowerCase() === 'draft' ? 'draft' : 'final';
 
       if (!title) throw new ApiError(400, 'report title required');
@@ -2267,6 +2308,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         testedRuledOut,
         impact,
         remediation,
+        contributors: contributors.length > 0 ? contributors : undefined,
         status,
         review: 'triage',
         createdBy: author,

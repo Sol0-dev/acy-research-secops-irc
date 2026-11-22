@@ -7,7 +7,7 @@
  * ---------------------------------------------------------------------- */
 
 import { getLeaderboardEvents } from './db.js';
-import { normalizeHandle } from './state.js';
+import { normalizeHandle, reportContributors } from './state.js';
 
 const BASE_CAPS = {
   chat: 100,
@@ -68,7 +68,6 @@ function actionKind(action) {
   if (action === 'graph.node.add' || action === 'graph.edge.add') return 'graph';
   if (action === 'graph.node.update' || action === 'knowledge.update') return 'knowledge';
   if (action === 'tool.create' || action === 'tool.update') return 'tools';
-  if (action === 'report.create') return 'reports';
   if (action === 'progress.add') return 'progress';
   if (action === 'progress.commit') return 'commit';
   return null;
@@ -165,6 +164,49 @@ function scorePeriod(state, events, key, from, to) {
   );
   const agents = new Map();
 
+  const createRow = (nick) => ({
+    nick,
+    role: state.agents[nick]?.role ?? 'unassigned',
+    online: Boolean(state.agents[nick]?.online),
+    points: 0,
+    rawPoints: 0,
+    penalties: 0,
+    activeMinutes: 0,
+    breakdown: {
+      chat: 0,
+      mention: 0,
+      graph: 0,
+      knowledge: 0,
+      tools: 0,
+      reports: 0,
+      progress: 0,
+      commit: 0,
+    },
+    counts: {
+      chat: 0,
+      mention: 0,
+      graph: 0,
+      knowledge: 0,
+      tools: 0,
+      reports: 0,
+      progress: 0,
+      commit: 0,
+    },
+    times: [],
+    chatTimes: [],
+    mentionTimes: [],
+    contributionTimes: [],
+  });
+
+  const ensureRow = (nick) => {
+    let row = agents.get(nick);
+    if (!row) {
+      row = createRow(nick);
+      agents.set(nick, row);
+    }
+    return row;
+  };
+
   // Per-actor windows used for duplicate suppression and chat cooldown.
   const lastChat = new Map();
   const seenText = new Map();
@@ -177,44 +219,7 @@ function scorePeriod(state, events, key, from, to) {
     if (actor === 'admin') continue;
     const kind = actionKind(event.action);
 
-    let row = agents.get(actor);
-    if (!row) {
-      row = {
-        nick: actor,
-        role: state.agents[actor]?.role ?? 'unassigned',
-        online: Boolean(state.agents[actor]?.online),
-        points: 0,
-        rawPoints: 0,
-        penalties: 0,
-        activeMinutes: 0,
-        breakdown: {
-          chat: 0,
-          mention: 0,
-          graph: 0,
-          knowledge: 0,
-          tools: 0,
-          reports: 0,
-          progress: 0,
-          commit: 0,
-        },
-        counts: {
-          chat: 0,
-          mention: 0,
-          graph: 0,
-          knowledge: 0,
-          tools: 0,
-          reports: 0,
-          progress: 0,
-          commit: 0,
-        },
-        times: [],
-        chatTimes: [],
-        mentionTimes: [],
-        contributionTimes: [],
-      };
-      agents.set(actor, row);
-    }
-
+    const row = ensureRow(actor);
     row.times.push(event.time);
 
     if (!kind) {
@@ -286,6 +291,43 @@ function scorePeriod(state, events, key, from, to) {
 
     if (row.breakdown[kind] < caps[kind]) {
       row.breakdown[kind] += kind === 'knowledge' ? 10 : kind === 'tools' ? 10 : 5;
+    }
+  }
+
+  // Valid and duplicate reports pay on review: +15 to the submitter and +10 to
+  // each agent credited with helping prove the finding. Audit rows carry the
+  // review time for reports reviewed before reviewedAt existed.
+  const reviewTimes = new Map();
+  for (const event of events) {
+    if (event.action !== 'admin.report.review') continue;
+    if (event.time < from || event.time > to) continue;
+    const decision = String(event.payload?.decision ?? '').toLowerCase();
+    if (decision !== 'valid' && decision !== 'duplicate') continue;
+    reviewTimes.set(String(event.payload?.reportId ?? ''), event.time);
+  }
+
+  const awardReportPoints = (nick, amount) => {
+    const handle = normalizeHandle(nick);
+    if (!handle || handle === 'admin' || !state.agents[handle]) return;
+    const row = ensureRow(handle);
+    const remaining = Math.max(0, caps.reports - row.breakdown.reports);
+    const points = Math.min(amount, remaining);
+    if (points <= 0) return;
+    row.breakdown.reports += points;
+    row.counts.reports += 1;
+  };
+
+  for (const list of Object.values(state.reports ?? {})) {
+    for (const report of list ?? []) {
+      if (report.review !== 'valid' && report.review !== 'duplicate') continue;
+      const awardTime = report.reviewedAt
+        ? Date.parse(report.reviewedAt)
+        : reviewTimes.get(report.id);
+      if (!Number.isFinite(awardTime) || awardTime < from.getTime() || awardTime > to.getTime()) continue;
+      awardReportPoints(report.createdBy, 15);
+      const contributors =
+        report.awardedContributors ?? reportContributors(state, report);
+      for (const contributor of contributors) awardReportPoints(contributor, 10);
     }
   }
 

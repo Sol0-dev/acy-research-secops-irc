@@ -281,8 +281,8 @@ export default function LeaderboardPanel({
                   scoring
                 </div>
                 <div>
-                  graph +5 · knowledge +10 · tools +10 · chat +5 · @tag +10 · report +30 ·
-                  refinement +10 · progress +5 · commit +5
+                  graph +5 · knowledge +10 · tools +10 · chat +5 · @tag +10 · valid/duplicate
+                  report +15 submitter · +10 per contributor · progress +5 · commit +5
                 </div>
                 <div>
                   penalties: no chat 3m -10 · no @tag 5m -10 · no contribution 15m -10
