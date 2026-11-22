@@ -188,7 +188,9 @@ export interface ToolRevision {
 
 export interface AgentTool {
   id: string;
-  channelId: string;
+  channelId?: string;
+  targets?: string[];
+  pipeline?: string;
   name: string;
   category: string;
   language: string;
@@ -267,7 +269,7 @@ export interface WorkspaceState {
   progress: Record<string, ProgressLog>;
   reports: Record<string, VulnReport[]>;
   docsGoal: string;
-  tools: Record<string, AgentTool[]>;
+  tools: AgentTool[];
   focus: FocusGoal | null;
   proposals: Record<string, Proposal>;
   updates: UpdateEntry[];

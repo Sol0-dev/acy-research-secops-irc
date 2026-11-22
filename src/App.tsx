@@ -91,7 +91,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   progress: {},
   reports: {},
   docsGoal: '',
-  tools: {},
+  tools: [],
   focus: null,
   proposals: {},
   updates: [],
@@ -226,7 +226,6 @@ export default function App() {
 
   // Per-target agent tool library
   const [toolsPanelOpen, setToolsPanelOpen] = useState(false);
-  const [toolsChannelId, setToolsChannelId] = useState('');
 
   // Read/retrieve whole knowledge graph panel
   const [knowledgePanelOpen, setKnowledgePanelOpen] = useState(false);
@@ -984,21 +983,9 @@ export default function App() {
     return null;
   };
 
-  const openToolsPanel = (channelId?: string): string | null => {
-    const activeId =
-      channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
-    const focusId =
-      workspace.focus &&
-      new Date(workspace.focus.endsAt) > new Date() &&
-      workspace.graphs[workspace.focus.channelId]
-        ? workspace.focus.channelId
-        : '';
-    const fallback = focusId || Object.keys(workspace.graphs).sort()[0] || '';
-    const targetId = workspace.graphs[activeId] ? activeId : fallback;
-    if (!targetId) return 'no target graphs exist yet - create a chat group first';
-    setToolsChannelId(targetId);
+  const openToolsPanel = (): string | null => {
     setToolsPanelOpen(true);
-    logUiEvent('tools', undefined, targetId);
+    logUiEvent('tools');
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setReportsPanelOpen(false);
@@ -1708,10 +1695,7 @@ export default function App() {
     [workspace.progress, progressChannelId]
   );
 
-  const toolsObj = useMemo(
-    () => workspace.tools?.[toolsChannelId] ?? [],
-    [workspace.tools, toolsChannelId]
-  );
+  const toolsObj = workspace.tools ?? [];
 
   const activeGraphNodeCount =
     workspace.activeBuffer.kind === 'channel'
@@ -1729,10 +1713,7 @@ export default function App() {
       : 0;
 
   const allGraphCount = Object.keys(workspace.graphs ?? {}).length;
-  const allToolCount = Object.values(workspace.tools ?? {}).reduce(
-    (sum, list) => sum + list.length,
-    0
-  );
+  const allToolCount = workspace.tools?.length ?? 0;
   const allReportCount = Object.values(workspace.reports ?? {}).reduce(
     (sum, list) => sum + list.length,
     0
@@ -1933,11 +1914,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => {
-              const target =
-                workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement
-                  ? activeChannelObj.id
-                  : undefined;
-              const error = openToolsPanel(target);
+              const error = openToolsPanel();
               if (error) setApiError(error);
             }}
             className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
@@ -2614,18 +2591,14 @@ export default function App() {
             />
           ) : toolsPanelOpen ? (
             <ToolsPanel
-              channelId={toolsChannelId}
-              channelIds={Object.keys(workspace.graphs).sort()}
               tools={toolsObj}
               agents={workspace.agents}
               defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
-              onSelectChannel={setToolsChannelId}
               onClose={() => setToolsPanelOpen(false)}
               onCreate={async (input) => {
                 try {
                   const response = await execute('tool.create', {
-                    channelId: toolsChannelId,
                     ...input,
                   });
                   const result = resultOf<{ tool: AgentTool }>(response);
@@ -2642,7 +2615,6 @@ export default function App() {
               onUpdate={async (input) => {
                 try {
                   const response = await execute('tool.update', {
-                    channelId: toolsChannelId,
                     ...input,
                   });
                   const result = resultOf<{ tool: AgentTool }>(response);
@@ -2659,7 +2631,6 @@ export default function App() {
               onRemove={async (input) => {
                 try {
                   const response = await execute('tool.remove', {
-                    channelId: toolsChannelId,
                     ...input,
                   });
                   return response ? { ok: true } : { ok: false, error: 'central api returned no result' };

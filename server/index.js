@@ -481,7 +481,7 @@ app.get('/api/admin/graphs', (req, res) => {
       {
         exportedAt: new Date().toISOString(),
         graphs: Object.values(state.graphs ?? {}),
-        tools: state.tools ?? {},
+        tools: state.tools ?? [],
         scopes: state.scopes ?? {},
       },
       null,
@@ -691,7 +691,11 @@ app.post('/api/admin/channel/delete', async (req, res) => {
     delete state.scopes[channelId];
     delete state.progress[channelId];
     delete state.reports[channelId];
-    delete state.tools[channelId];
+    for (const tool of state.tools ?? []) {
+      if (Array.isArray(tool.targets) && tool.targets.includes(channelId)) {
+        tool.targets = tool.targets.filter((target) => target !== channelId);
+      }
+    }
 
     for (const agent of Object.values(state.agents)) {
       if (!agent.programs?.includes(channelId)) continue;

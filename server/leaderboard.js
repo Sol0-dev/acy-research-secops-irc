@@ -28,6 +28,12 @@ const PENALTY_THRESHOLDS = {
   contribution: 15 * 60_000,
 };
 
+// Daily monitoring runs from the first event of the day (the agent login) for
+// at most two hours. A long inactivity gap closes the day's monitoring window
+// so the gap itself is never scored as an inactivity penalty.
+const DAILY_MONITOR_MS = 2 * 60 * 60_000;
+const MONITOR_CLOSE_GAP_MS = 20 * 60_000;
+
 function startOfDay(now) {
   const date = new Date(now);
   date.setHours(0, 0, 0, 0);
@@ -91,15 +97,59 @@ function penaltyFor(times, activeStart, activeEnd, threshold) {
   return penalty;
 }
 
-function activeMinutesFor(times, periodStart, periodEnd) {
-  if (times.length === 0) return 0;
-  const sorted = [...times].sort((a, b) => a - b);
-  let minutes = 1;
-  for (let index = 1; index < sorted.length; index += 1) {
-    minutes += Math.min((sorted[index] - sorted[index - 1]) / 60_000, 5);
+function startOfLocalDay(time) {
+  const date = new Date(time);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+// Build one monitoring window per local day for an actor. The window opens at
+// the first event of that day and stops at two hours or at the first ~20 minute
+// inactivity gap, whichever comes first. Later activity is still counted for
+// points; only the monitoring window itself closes.
+function monitoringWindowsFor(times) {
+  const byDay = new Map();
+  for (const time of times) {
+    const key = startOfLocalDay(time);
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(time);
   }
-  const periodMinutes = Math.max(0, (periodEnd - periodStart) / 60_000);
-  return Math.round(Math.min(minutes, periodMinutes));
+  const windows = [];
+  for (const list of byDay.values()) {
+    list.sort((a, b) => a - b);
+    const start = list[0];
+    let last = start;
+    for (let index = 1; index < list.length; index += 1) {
+      const time = list[index];
+      if (time - start >= DAILY_MONITOR_MS) break;
+      if (time - last >= MONITOR_CLOSE_GAP_MS) break;
+      last = time;
+    }
+    windows.push({
+      start,
+      end: Math.min(start + DAILY_MONITOR_MS, last + MONITOR_CLOSE_GAP_MS),
+    });
+  }
+  return windows;
+}
+
+function timesInsideWindow(times, window) {
+  return times.filter((time) => time >= window.start && time <= window.end);
+}
+
+function activeMinutesForWindows(times, windows) {
+  let total = 0;
+  for (const window of windows) {
+    const inside = timesInsideWindow(times, window);
+    if (inside.length === 0) continue;
+    let minutes = 1;
+    for (let index = 1; index < inside.length; index += 1) {
+      minutes += Math.min((inside[index] - inside[index - 1]) / 60_000, 5);
+    }
+    const windowMinutes = Math.max(0, (window.end - window.start) / 60_000);
+    total += Math.round(Math.min(minutes, windowMinutes));
+  }
+  return total;
 }
 
 function periodMultiplier(key) {
@@ -161,13 +211,11 @@ function scorePeriod(state, events, key, from, to) {
         chatTimes: [],
         mentionTimes: [],
         contributionTimes: [],
-        lastTime: 0,
       };
       agents.set(actor, row);
     }
 
     row.times.push(event.time);
-    row.lastTime = Math.max(row.lastTime, event.time);
 
     if (!kind) {
       if (event.action === 'progress.session.start' || event.action === 'progress.check') {
@@ -241,26 +289,33 @@ function scorePeriod(state, events, key, from, to) {
     }
   }
 
-  const now = to.getTime();
   for (const row of agents.values()) {
     row.times.sort((a, b) => a - b);
     row.chatTimes.sort((a, b) => a - b);
     row.mentionTimes.sort((a, b) => a - b);
     row.contributionTimes.sort((a, b) => a - b);
 
-    const activeStart = row.times[0] ?? 0;
-    const activeEnd = row.online ? Math.max(now, row.lastTime) : row.lastTime;
-    row.activeMinutes = activeMinutesFor(row.times, from.getTime(), to.getTime());
+    const windows = monitoringWindowsFor(row.times);
+    row.activeMinutes = activeMinutesForWindows(row.times, windows);
 
-    const penalty =
-      penaltyFor(row.chatTimes, activeStart, activeEnd, PENALTY_THRESHOLDS.chat) +
-      penaltyFor(row.mentionTimes, activeStart, activeEnd, PENALTY_THRESHOLDS.mention) +
-      penaltyFor(
-        row.contributionTimes,
-        activeStart,
-        activeEnd,
-        PENALTY_THRESHOLDS.contribution
-      );
+    let penalty = 0;
+    for (const window of windows) {
+      const chatTimes = timesInsideWindow(row.chatTimes, window);
+      const mentionTimes = timesInsideWindow(row.mentionTimes, window);
+      const contributionTimes = timesInsideWindow(row.contributionTimes, window);
+      const inside = timesInsideWindow(row.times, window);
+      const activeStart = inside[0] ?? 0;
+      const activeEnd = inside[inside.length - 1] ?? 0;
+      penalty +=
+        penaltyFor(chatTimes, activeStart, activeEnd, PENALTY_THRESHOLDS.chat) +
+        penaltyFor(mentionTimes, activeStart, activeEnd, PENALTY_THRESHOLDS.mention) +
+        penaltyFor(
+          contributionTimes,
+          activeStart,
+          activeEnd,
+          PENALTY_THRESHOLDS.contribution
+        );
+    }
     row.penalties = Math.max(penalty, -100 * multiplier);
     row.rawPoints = Object.values(row.breakdown).reduce((sum, value) => sum + value, 0);
     const cappedPoints = Math.min(row.rawPoints, 1000 * multiplier);
@@ -270,7 +325,6 @@ function scorePeriod(state, events, key, from, to) {
     delete row.chatTimes;
     delete row.mentionTimes;
     delete row.contributionTimes;
-    delete row.lastTime;
     delete row.rawPoints;
   }
 

@@ -16,13 +16,10 @@ export interface ToolActionResult {
 }
 
 interface ToolsPanelProps {
-  channelId: string;
-  channelIds: string[];
   tools: AgentTool[];
   agents: Record<string, AgentProfile>;
   defaultContributor: string;
   formatNick: (nick: string, role?: string) => string;
-  onSelectChannel: (channelId: string) => void;
   onClose: () => void;
   onCreate: (input: {
     name: string;
@@ -34,6 +31,8 @@ interface ToolsPanelProps {
     usage: string;
     inputs: string;
     outputs: string;
+    pipeline: string;
+    targets: string;
     tags: string;
     status: ToolStatus;
   }) => Promise<ToolActionResult>;
@@ -48,6 +47,8 @@ interface ToolsPanelProps {
     usage: string;
     inputs: string;
     outputs: string;
+    pipeline: string;
+    targets: string;
     tags: string;
     status: ToolStatus;
     note: string;
@@ -73,19 +74,18 @@ const EMPTY_FORM = {
   usage: '',
   inputs: '',
   outputs: '',
+  pipeline: '',
+  targets: '',
   tags: '',
   status: 'draft' as ToolStatus,
   note: '',
 };
 
 export default function ToolsPanel({
-  channelId,
-  channelIds,
   tools,
   agents,
   defaultContributor,
   formatNick,
-  onSelectChannel,
   onClose,
   onCreate,
   onUpdate,
@@ -118,6 +118,8 @@ export default function ToolsPanel({
         tool.problem,
         tool.code,
         tool.usage,
+        tool.pipeline ?? '',
+        ...(tool.targets ?? []),
         ...tool.tags,
       ]
         .join(' ')
@@ -138,6 +140,8 @@ export default function ToolsPanel({
       usage: selected.usage,
       inputs: selected.inputs,
       outputs: selected.outputs,
+      pipeline: selected.pipeline ?? '',
+      targets: (selected.targets ?? []).join(', '),
       tags: selected.tags.join(', '),
       status: selected.status,
       note: '',
@@ -178,6 +182,8 @@ export default function ToolsPanel({
       usage: form.usage,
       inputs: form.inputs,
       outputs: form.outputs,
+      pipeline: form.pipeline,
+      targets: form.targets,
       tags: form.tags,
       status: form.status,
     };
@@ -222,23 +228,12 @@ export default function ToolsPanel({
           </button>
           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
           <span className="font-mono text-base font-medium truncate">
-            agent tool library // {channelId}
+            agent tool library // global
           </span>
           <span className="font-mono text-[14px] text-[#71717a]">{tools.length} tools</span>
-          <label className="flex items-center gap-1.5 font-mono text-[14px] text-[#71717a]">
-            <span>target</span>
-            <select
-              value={channelId}
-              onChange={(event) => onSelectChannel(event.target.value)}
-              className={inputClass}
-            >
-              {channelIds.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
-          </label>
+          <span className="font-mono text-[13px] text-[#71717a]">
+            usable on any target, including future targets
+          </span>
         </div>
         <div className="flex items-center gap-2 font-mono text-[14px] text-[#71717a]">
           <span>
@@ -263,7 +258,7 @@ export default function ToolsPanel({
               const url = URL.createObjectURL(blob);
               const anchor = document.createElement('a');
               anchor.href = url;
-              anchor.download = `tools-${channelId.replace(/^#/, '')}.json`;
+              anchor.download = 'tools-global.json';
               document.body.appendChild(anchor);
               anchor.click();
               anchor.remove();
@@ -297,7 +292,7 @@ export default function ToolsPanel({
             className={inputClass}
           />
           {filtered.length === 0 ? (
-            <div className="p-2 text-[14px] text-[#71717a]">no tools for this target yet</div>
+            <div className="p-2 text-[14px] text-[#71717a]">no global tools yet</div>
           ) : (
             filtered.map((tool) => (
               <button
@@ -445,6 +440,29 @@ export default function ToolsPanel({
                 </label>
               </div>
               <label className="block space-y-1">
+                <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                  targets (optional, comma separated; empty = any target and future targets)
+                </span>
+                <input
+                  value={form.targets}
+                  onChange={(event) => setForm({ ...form, targets: event.target.value })}
+                  placeholder="#target-a, #target-b - leave empty for every target"
+                  className={inputClass}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                  pipe / composition
+                </span>
+                <textarea
+                  rows={4}
+                  value={form.pipeline}
+                  onChange={(event) => setForm({ ...form, pipeline: event.target.value })}
+                  placeholder="how this tool pipes into other tools, e.g. tool-a | tool-b --json | tool-c"
+                  className={areaClass}
+                />
+              </label>
+              <label className="block space-y-1">
                 <span className="text-[13px] uppercase tracking-wider text-[#71717a]">tags</span>
                 <input
                   value={form.tags}
@@ -572,6 +590,31 @@ export default function ToolsPanel({
                     <h3 className="text-[13px] uppercase tracking-wider text-[#71717a]">outputs</h3>
                     <p className="whitespace-pre-wrap">{selected.outputs || '-'}</p>
                   </div>
+                </section>
+              )}
+              {(selected.targets?.length ?? 0) > 0 && (
+                <section>
+                  <h3 className="text-[13px] uppercase tracking-wider text-[#71717a]">targets</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {selected.targets?.map((target) => (
+                      <span
+                        key={target}
+                        className="px-1.5 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[13px] text-[#71717a]"
+                      >
+                        {target}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {selected.pipeline && (
+                <section>
+                  <h3 className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                    pipe / composition
+                  </h3>
+                  <pre className="p-2.5 border border-[#e5e5e5] dark:border-[#1a1a1e] whitespace-pre-wrap">
+                    {selected.pipeline}
+                  </pre>
                 </section>
               )}
               {selected.tags.length > 0 && (

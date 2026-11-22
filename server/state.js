@@ -263,7 +263,7 @@ export function createInitialState() {
     progress: {},
     reports: {},
     docsGoal: '',
-    tools: {},
+    tools: [],
     focus: null,
     proposals: {},
     updates: [],
@@ -318,6 +318,21 @@ function createKnowledgeCopy(node) {
   };
 }
 
+function flattenTools(tools) {
+  if (Array.isArray(tools)) return tools;
+  if (!tools || typeof tools !== 'object') return [];
+  const out = [];
+  for (const [channelId, list] of Object.entries(tools)) {
+    for (const tool of list ?? []) {
+      out.push({
+        ...tool,
+        targets: Array.isArray(tool.targets) ? tool.targets : [channelId],
+      });
+    }
+  }
+  return out;
+}
+
 // Project the canonical state for one viewer. Engagement channels, scopes,
 // knowledge graphs and progress logs are only included when that viewer is
 // enrolled; direct messages are only included for their participants.
@@ -365,7 +380,7 @@ export function toPublicState(state, viewerNick = null) {
       };
     }
   }
-  const tools = viewer ? { ...(state.tools ?? {}) } : {};
+  const tools = viewer ? flattenTools(state.tools) : [];
 
   const progress = {};
   for (const [channelId, log] of Object.entries(state.progress ?? {})) {
@@ -672,7 +687,7 @@ function validateHandle(nick) {
 
 export function applyCommand(state, action, payload = {}, actor = null) {
   // Migrate workspaces created before newer collections existed.
-  if (!state.tools || typeof state.tools !== 'object') state.tools = {};
+  state.tools = flattenTools(state.tools);
   if (!state.progress) state.progress = {};
   if (!state.reports) state.reports = {};
   if (!state.graphs) state.graphs = {};
@@ -1695,24 +1710,20 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     // ------------------------------------------------------- agent tool library
     case 'tool.read': {
-      const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(actor);
-      requireAgent(state, viewer);
-      return {
-        result: { access: true, channelId: channel.id, tools: state.tools[channel.id] ?? [] },
-      };
+      requireAgent(state, normalizeHandle(actor));
+      return { result: { access: true, tools: state.tools } };
     }
 
     case 'tool.query': {
-      const channel = requireEngagement(state, String(payload.channelId ?? ''));
-      const viewer = normalizeHandle(actor);
-      requireAgent(state, viewer);
+      requireAgent(state, normalizeHandle(actor));
       const query = String(payload.query ?? '').trim().toLowerCase();
       const category = String(payload.category ?? '').trim().toLowerCase();
       const status = String(payload.status ?? '').trim().toLowerCase();
-      const tools = (state.tools[channel.id] ?? []).filter((tool) => {
+      const target = String(payload.target ?? '').trim();
+      const tools = (state.tools ?? []).filter((tool) => {
         if (category && tool.category.toLowerCase() !== category) return false;
         if (status && tool.status !== status) return false;
+        if (target && tool.targets?.length && !tool.targets.includes(target)) return false;
         if (!query) return true;
         return [
           tool.name,
@@ -1724,19 +1735,20 @@ export function applyCommand(state, action, payload = {}, actor = null) {
           tool.usage,
           tool.inputs,
           tool.outputs,
+          tool.pipeline ?? '',
+          ...(tool.targets ?? []),
           ...tool.tags,
         ]
           .join(' ')
           .toLowerCase()
           .includes(query);
       });
-      return { result: { access: true, channelId: channel.id, total: tools.length, tools } };
+      return { result: { access: true, total: tools.length, tools } };
     }
 
     case 'tool.create': {
-      const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const author = normalizeHandle(actor);
-      requireEnrolled(state, author, channel);
+      requireAgent(state, author);
       const name = limitText(payload.name, 200, 'tool name').trim();
       if (!name) throw new ApiError(400, 'tool name required');
       const code = limitText(payload.code, 500000, 'tool code');
@@ -1748,14 +1760,12 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!['draft', 'stable', 'deprecated'].includes(status)) {
         throw new ApiError(400, `invalid tool status: ${status}`);
       }
-      const list = state.tools[channel.id] || (state.tools[channel.id] = []);
-      if (list.some((tool) => tool.name.toLowerCase() === name.toLowerCase())) {
-        throw new ApiError(409, `a tool named "${name}" already exists in this target`);
+      if (state.tools.some((tool) => tool.name.toLowerCase() === name.toLowerCase())) {
+        throw new ApiError(409, `a tool named "${name}" already exists in the global library`);
       }
       const time = nowHHMM();
       const tool = {
         id: makeId('tl'),
-        channelId: channel.id,
         name,
         category: limitText(payload.category, 100, 'tool category').trim() || 'utility',
         language: limitText(payload.language, 50, 'tool language').trim() || 'bash',
@@ -1765,6 +1775,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         usage: limitText(payload.usage, 50000, 'tool usage').trim(),
         inputs: limitText(payload.inputs, 20000, 'tool inputs').trim(),
         outputs: limitText(payload.outputs, 20000, 'tool outputs').trim(),
+        pipeline: limitText(payload.pipeline, 20000, 'tool pipeline').trim(),
+        targets: parseList(payload.targets).slice(0, 50),
         tags: parseList(payload.tags).slice(0, 50),
         status,
         version: 1,
@@ -1772,21 +1784,19 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         time,
         revisions: [],
       };
-      list.push(tool);
-      appendProgressEntry(state, channel.id, {
-        author,
-        status: 'ok',
-        kind: 'progress',
-        text: `created tool \`${name}\` [${tool.category}/${tool.language}] v1`,
+      state.tools.push(tool);
+      appendChannelMessage(state, '#lobby', {
+        type: 'sys',
+        time,
+        text: `${formatNick(author, state.agents[author]?.role)} created global tool \`${name}\` [${tool.category}/${tool.language}] v1`,
       });
       return { result: { tool } };
     }
 
     case 'tool.update': {
-      const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const author = normalizeHandle(actor);
-      requireEnrolled(state, author, channel);
-      const list = state.tools[channel.id] ?? [];
+      requireAgent(state, author);
+      const list = state.tools;
       const tool = list.find((item) => item.id === String(payload.toolId ?? ''));
       if (!tool) throw new ApiError(404, 'tool not found');
       const before = JSON.stringify({
@@ -1799,6 +1809,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         usage: tool.usage,
         inputs: tool.inputs,
         outputs: tool.outputs,
+        pipeline: tool.pipeline ?? '',
+        targets: tool.targets ?? [],
         tags: tool.tags,
         status: tool.status,
       });
@@ -1836,6 +1848,12 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (payload.outputs !== undefined) {
         tool.outputs = limitText(payload.outputs, 20000, 'tool outputs').trim();
       }
+      if (payload.pipeline !== undefined) {
+        tool.pipeline = limitText(payload.pipeline, 20000, 'tool pipeline').trim();
+      }
+      if (payload.targets !== undefined) {
+        tool.targets = parseList(payload.targets).slice(0, 50);
+      }
       if (payload.tags !== undefined) {
         tool.tags = parseList(payload.tags).slice(0, 50);
       }
@@ -1856,6 +1874,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         usage: tool.usage,
         inputs: tool.inputs,
         outputs: tool.outputs,
+        pipeline: tool.pipeline ?? '',
+        targets: tool.targets ?? [],
         tags: tool.tags,
         status: tool.status,
       });
@@ -1872,28 +1892,25 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       tool.version += 1;
       tool.updatedBy = author;
       tool.updatedTime = nowHHMM();
-      appendProgressEntry(state, channel.id, {
-        author,
-        status: 'ok',
-        kind: 'progress',
-        text: `refined tool \`${tool.name}\` to v${tool.version}`,
+      appendChannelMessage(state, '#lobby', {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `${formatNick(author, state.agents[author]?.role)} refined global tool \`${tool.name}\` to v${tool.version}`,
       });
       return { result: { tool } };
     }
 
     case 'tool.remove': {
-      const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const actorNick = normalizeHandle(actor);
-      requireEnrolled(state, actorNick, channel);
-      const list = state.tools[channel.id] ?? [];
+      requireAgent(state, actorNick);
+      const list = state.tools;
       const tool = list.find((item) => item.id === String(payload.toolId ?? ''));
       if (!tool) throw new ApiError(404, 'tool not found');
-      state.tools[channel.id] = list.filter((item) => item.id !== tool.id);
-      appendProgressEntry(state, channel.id, {
-        author: actorNick,
-        status: 'note',
-        kind: 'change',
-        text: `deleted tool \`${tool.name}\``,
+      state.tools = list.filter((item) => item.id !== tool.id);
+      appendChannelMessage(state, '#lobby', {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `${formatNick(actorNick, state.agents[actorNick]?.role)} deleted global tool \`${tool.name}\``,
       });
       return { result: { toolId: tool.id } };
     }

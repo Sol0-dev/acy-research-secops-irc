@@ -134,6 +134,7 @@ export default function GraphPanel({
 }: GraphPanelProps) {
   const contributor = normalizeHandle(defaultContributor);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingNode, setEditingNode] = useState(false);
 
   const [nodeLabel, setNodeLabel] = useState('');
   const [nodeKind, setNodeKind] = useState<GraphNodeKind>('target');
@@ -211,6 +212,7 @@ export default function GraphPanel({
     setEditReferences(selected.intel?.references ?? '');
     setEditTags((selected.intel?.tags ?? []).join(', '));
     setConfirmDeleteNode(false);
+    setEditingNode(false);
   }, [selected]);
 
   const contributorEntries = useMemo(() => {
@@ -432,7 +434,7 @@ export default function GraphPanel({
       )}
 
       <div className="p-4 sm:p-5 space-y-4">
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_250px] gap-3">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_400px] gap-3">
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] bg-white/40 dark:bg-[#09090b] h-[72vh] min-h-[620px] overflow-hidden">
             {graph.nodes.length === 0 ? (
               <div className="h-full flex items-center justify-center p-8 text-center font-mono text-[15px] text-[#71717a] leading-relaxed">
@@ -491,8 +493,17 @@ export default function GraphPanel({
             <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                  {selected ? 'node intel - refine' : 'select a node'}
+                  {selected ? 'node intel' : 'select a node'}
                 </div>
+                {selected && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingNode((value) => !value)}
+                    className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[13px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                  >
+                    {editingNode ? 'cancel refine' : 'refine'}
+                  </button>
+                )}
                 {selected &&
                   (confirmDeleteNode ? (
                     <div className="flex items-center gap-1">
@@ -527,6 +538,90 @@ export default function GraphPanel({
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {selected.intel?.phase && (
+                    <div className="text-[#16a34a] dark:text-[#4ade80]">
+                      phase: {selected.intel.phase}
+                    </div>
+                  )}
+                  {selected.intel?.technique && (
+                    <div className="whitespace-pre-wrap text-[#18181b] dark:text-[#d4d4d8]">
+                      technique: {selected.intel.technique}
+                    </div>
+                  )}
+                  {selected.notes && (
+                    <div className="whitespace-pre-wrap text-[#52525b] dark:text-[#a1a1aa]">
+                      {selected.notes}
+                    </div>
+                  )}
+                  {selected.intel?.commands && (
+                    <div>
+                      <div className="text-[13px] uppercase tracking-wider text-[#71717a]">commands</div>
+                      <pre className="p-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap max-h-64">
+                        {selected.intel.commands}
+                      </pre>
+                    </div>
+                  )}
+                  {selected.intel?.scripts && (
+                    <div>
+                      <div className="text-[13px] uppercase tracking-wider text-[#71717a]">scripts</div>
+                      <pre className="p-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap max-h-64">
+                        {selected.intel.scripts}
+                      </pre>
+                    </div>
+                  )}
+                  {selected.intel?.request && (
+                    <div>
+                      <div className="text-[13px] uppercase tracking-wider text-[#71717a]">request</div>
+                      <pre className="p-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap max-h-64">
+                        {selected.intel.request}
+                      </pre>
+                    </div>
+                  )}
+                  {selected.intel?.response && (
+                    <div>
+                      <div className="text-[13px] uppercase tracking-wider text-[#71717a]">response</div>
+                      <pre className="p-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap max-h-64">
+                        {selected.intel.response}
+                      </pre>
+                    </div>
+                  )}
+                  {selected.intel?.chain && (
+                    <div className="whitespace-pre-wrap text-[#52525b] dark:text-[#a1a1aa]">
+                      chain: {selected.intel.chain}
+                    </div>
+                  )}
+                  {selected.intel?.lessons && (
+                    <div className="whitespace-pre-wrap text-[#52525b] dark:text-[#a1a1aa]">
+                      lessons: {selected.intel.lessons}
+                    </div>
+                  )}
+                  {selected.intel?.template && (
+                    <div>
+                      <div className="text-[13px] uppercase tracking-wider text-[#71717a]">template</div>
+                      <pre className="p-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap max-h-64">
+                        {selected.intel.template}
+                      </pre>
+                    </div>
+                  )}
+                  {selected.intel?.references && (
+                    <div className="whitespace-pre-wrap text-[#52525b] dark:text-[#a1a1aa]">
+                      references: {selected.intel.references}
+                    </div>
+                  )}
+                  {selected.intel?.tags && selected.intel.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {selected.intel.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-1.5 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[13px] text-[#71717a]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {editingNode && (
+                    <>
                   <label className="block space-y-1">
                     <span className="text-[13px] uppercase tracking-wider text-[#71717a]">label</span>
                     <input
@@ -684,6 +779,8 @@ export default function GraphPanel({
                       </label>
                     </div>
                   </details>
+                    </>
+                  )}
 
                   <div className="text-[13px] text-[#71717a] border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5 space-y-0.5">
                     <div>
@@ -715,14 +812,16 @@ export default function GraphPanel({
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => void updateNode()}
-                    disabled={busy}
-                    className="w-full px-2 py-1.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40"
-                  >
-                    save / refine node
-                  </button>
+                  {editingNode && (
+                    <button
+                      type="button"
+                      onClick={() => void updateNode()}
+                      disabled={busy}
+                      className="w-full px-2 py-1.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40"
+                    >
+                      save / refine node
+                    </button>
+                  )}
                 </div>
               )}
             </div>
