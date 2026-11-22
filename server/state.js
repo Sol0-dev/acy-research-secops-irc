@@ -117,6 +117,16 @@ function parseLines(value) {
 export function reportContributors(state, report) {
   const submitter = normalizeHandle(report.createdBy);
   const found = new Set();
+
+  // A duel is head-to-head: the opponent is competing, not helping. Never pay
+  // cross-contributor points on a report filed in a duel channel.
+  const duelOpen = (state.duels ?? []).some(
+    (duel) =>
+      duel.channelId === report.channelId &&
+      ['pending', 'active', 'resolved'].includes(duel.status) &&
+      (duel.challenger === submitter || duel.opponent === submitter)
+  );
+  if (duelOpen) return [];
   const add = (nick) => {
     const handle = normalizeHandle(nick);
     if (!handle || handle === submitter || handle === 'admin') return;
@@ -147,6 +157,108 @@ export function reportContributors(state, report) {
   }
 
   return [...found];
+}
+
+export const DUEL_STATUSES = ['pending', 'active', 'resolved', 'declined', 'cancelled'];
+
+function emptyDuelStats() {
+  return { commits: 0, tools: 0, knowledge: 0, reports: 0, accepted: 0 };
+}
+
+// Count a duelist's work while the duel is active. Knowledge and commit activity
+// must happen in the duel channel; tools are global and count for any active duel.
+function bumpDuelActivity(state, nick, key, channelId = null, amount = 1) {
+  const handle = normalizeHandle(nick);
+  if (!handle) return null;
+  const duel = (state.duels ?? []).find(
+    (item) =>
+      item.status === 'active' &&
+      (item.challenger === handle || item.opponent === handle) &&
+      (!channelId || item.channelId === channelId)
+  );
+  if (!duel) return null;
+  const side = duel.challenger === handle ? 'challenger' : 'opponent';
+  if (!duel.stats) duel.stats = {};
+  duel.stats[side] = { ...emptyDuelStats(), ...(duel.stats[side] ?? {}) };
+  duel.stats[side][key] = (duel.stats[side][key] ?? 0) + amount;
+  return { duel, side };
+}
+
+function focusChannelFor(state, duel) {
+  const focusId = String(state.focus?.channelId ?? '');
+  if (!focusId || focusId === duel.channelId) return null;
+  return (
+    state.channels.find(
+      (channel) => channel.id === focusId && channel.isEngagement
+    ) ?? null
+  );
+}
+
+// Duel events are shown in the duel channel and mirrored into the current focus
+// engagement so every agent in the active chat group can follow the battle.
+export function announceDuel(state, duel, text, options = {}) {
+  const includeDuelChannel = options.includeDuelChannel !== false;
+  if (includeDuelChannel) {
+    appendChannelMessage(state, duel.channelId, {
+      type: 'sys',
+      time: nowHHMM(),
+      text,
+      duelNotice: true,
+    });
+  }
+  const focus = focusChannelFor(state, duel);
+  if (focus) {
+    appendChannelMessage(state, focus.id, {
+      type: 'sys',
+      time: nowHHMM(),
+      text: `[duel ${duel.channelId}] ${text}`,
+    });
+  }
+}
+
+function announceDuelActivity() {
+  // Duel activity is private. Each duelist only sees their own work, and only
+  // the admin can inspect both sides.
+}
+
+export function resolveDuelForReport(state, report) {
+  if (report.review !== 'valid' && report.review !== 'duplicate') return null;
+  if (report.severity !== 'high' && report.severity !== 'critical') return null;
+  const winner = normalizeHandle(report.createdBy);
+  if (!winner) return null;
+  const duel = (state.duels ?? []).find(
+    (item) =>
+      item.status === 'active' &&
+      item.channelId === report.channelId &&
+      (item.challenger === winner || item.opponent === winner)
+  );
+  if (!duel) return null;
+  const loser = duel.challenger === winner ? duel.opponent : duel.challenger;
+  duel.status = 'resolved';
+  duel.winner = winner;
+  duel.loser = loser;
+  duel.reportId = report.id;
+  duel.severity = report.severity;
+  duel.resolvedAt = new Date().toISOString();
+  if (!duel.stats) duel.stats = {};
+  const side = duel.challenger === winner ? 'challenger' : 'opponent';
+  duel.stats[side] = { ...emptyDuelStats(), ...(duel.stats[side] ?? {}) };
+  duel.stats[side].accepted = (duel.stats[side].accepted ?? 0) + 1;
+  return duel;
+}
+
+export function reopenDuelForReport(state, report) {
+  for (const duel of state.duels ?? []) {
+    if (duel.status !== 'resolved' || duel.reportId !== report.id) continue;
+    duel.status = 'active';
+    delete duel.winner;
+    delete duel.loser;
+    delete duel.reportId;
+    delete duel.severity;
+    delete duel.resolvedAt;
+    return duel;
+  }
+  return null;
 }
 
 function limitText(value, max, field) {
@@ -307,6 +419,7 @@ export function createInitialState() {
     proposals: {},
     updates: [],
     quotaWatch: {},
+    duels: [],
     voting: { active: false, activatedBy: null, activatedAt: null },
   };
 }
@@ -393,29 +506,80 @@ export function toPublicState(state, viewerNick = null) {
     return Boolean(canAccessChannel(state, viewer, channel));
   };
 
-  const channels = state.channels.filter((channel) => {
-    if (!channel.isEngagement || channel.id === '#lobby') return true;
-    if (viewerAgent?.nick === 'admin') return true;
-    return Boolean(viewerAgent && viewerAgent.programs.includes(channel.id));
-  });
+  const isAdminViewer = viewerAgent?.nick === 'admin';
+  const duelByChannel = new Map(
+    (state.duels ?? [])
+      .filter((duel) => duel.channelId)
+      .map((duel) => [duel.channelId, duel])
+  );
+  const duelLaneFor = (channelId) => {
+    const duel = duelByChannel.get(channelId);
+    if (!duel || !viewer) return null;
+    if (duel.challenger === viewer) {
+      return { duel, me: duel.challenger, other: duel.opponent, side: 'challenger' };
+    }
+    if (duel.opponent === viewer) {
+      return { duel, me: duel.opponent, other: duel.challenger, side: 'opponent' };
+    }
+    return null;
+  };
+  const duelChannelIds = new Set(duelByChannel.keys());
+
+  const channels = state.channels
+    .filter((channel) => {
+      if (!channel.isEngagement || channel.id === '#lobby') return true;
+      if (isAdminViewer) return true;
+      // Duel channels are private to the two duelists (and admin).
+      if (channel.duelChannel) return isDuelist(state, channel.id, viewer);
+      return Boolean(viewerAgent && viewerAgent.programs.includes(channel.id));
+    })
+    .map((channel) => {
+      if (!channel.duelChannel || isAdminViewer) return channel;
+      const lane = duelLaneFor(channel.id);
+      if (!lane) return null;
+      return {
+        ...channel,
+        // Each duelist sees only their own messages (plus shared duel notices),
+        // never the opponent's chat.
+        messages: (channel.messages ?? []).filter((message) => {
+          if (message.duelNotice) return true;
+          if (message.nick) return normalizeHandle(message.nick) === viewer;
+          const text = String(message.text ?? '').toLowerCase();
+          return !text.includes(lane.other);
+        }),
+      };
+    })
+    .filter(Boolean);
 
   const scopes = {};
   for (const [channelId, scope] of Object.entries(state.scopes)) {
     if (accessible(channelId)) scopes[channelId] = scope;
   }
 
-  // Every authenticated agent can read every target graph and tool library.
-  // Unauthenticated state requests receive no graph or tool data.
   const graphs = {};
   if (viewer) {
     for (const [channelId, graph] of Object.entries(state.graphs ?? {})) {
+      const lane = duelChannelIds.has(channelId) ? duelLaneFor(channelId) : null;
+      if (duelChannelIds.has(channelId) && !isAdminViewer && !lane) continue;
+      let nodes = graph.nodes ?? [];
+      let edges = graph.edges ?? [];
+      if (duelChannelIds.has(channelId) && !isAdminViewer && lane) {
+        nodes = nodes.filter((node) => normalizeHandle(node.createdBy) === viewer);
+        const visibleIds = new Set(nodes.map((node) => node.id));
+        edges = edges.filter(
+          (edge) =>
+            normalizeHandle(edge.createdBy) === viewer &&
+            visibleIds.has(edge.from) &&
+            visibleIds.has(edge.to)
+        );
+      }
       graphs[channelId] = {
         ...graph,
-        nodes: (graph.nodes ?? []).map((node) => ({
+        nodes: nodes.map((node) => ({
           ...node,
           knowledge: node.knowledge ?? createKnowledgeCopy(node),
         })),
-        edges: (graph.edges ?? []).map((edge) => ({
+        edges: edges.map((edge) => ({
           ...edge,
           knowledgeLabel: edge.knowledgeLabel ?? (edge.label ? redactKnowledgeText(edge.label) : undefined),
         })),
@@ -426,13 +590,48 @@ export function toPublicState(state, viewerNick = null) {
 
   const progress = {};
   for (const [channelId, log] of Object.entries(state.progress ?? {})) {
-    if (accessible(channelId)) progress[channelId] = log;
+    if (!accessible(channelId)) continue;
+    if (duelChannelIds.has(channelId) && !isAdminViewer) {
+      const lane = duelLaneFor(channelId);
+      if (!lane) continue;
+      progress[channelId] = {
+        ...log,
+        entries: (log.entries ?? []).filter(
+          (entry) => normalizeHandle(entry.author) === viewer
+        ),
+      };
+      continue;
+    }
+    progress[channelId] = log;
   }
 
   const reports = {};
   for (const [channelId, list] of Object.entries(state.reports ?? {})) {
-    if (accessible(channelId)) reports[channelId] = list;
+    if (!accessible(channelId)) continue;
+    if (duelChannelIds.has(channelId) && !isAdminViewer) {
+      const lane = duelLaneFor(channelId);
+      if (!lane) continue;
+      reports[channelId] = list.filter(
+        (report) => normalizeHandle(report.createdBy) === viewer
+      );
+      continue;
+    }
+    reports[channelId] = list;
   }
+
+  const duels = (state.duels ?? [])
+    .filter(
+      (duel) =>
+        isAdminViewer || duel.challenger === viewer || duel.opponent === viewer
+    )
+    .map((duel) => {
+      if (isAdminViewer) return duel;
+      const side = duel.challenger === viewer ? 'challenger' : 'opponent';
+      return {
+        ...duel,
+        stats: duel.stats ? { [side]: duel.stats[side] } : undefined,
+      };
+    });
 
   const dmThreads = {};
   for (const [threadId, thread] of Object.entries(state.dmThreads)) {
@@ -464,6 +663,7 @@ export function toPublicState(state, viewerNick = null) {
     progress,
     reports,
     tools,
+    duels,
     dmThreads,
   };
 }
@@ -536,6 +736,7 @@ function canAccessChannel(state, nick, channel) {
   if (!channel.isEngagement || channel.id === '#lobby') return true;
   const agent = state.agents[normalizeHandle(nick)];
   if (agent?.nick === 'admin') return true; // admin superuser
+  if (channel.duelChannel) return isDuelist(state, channel.id, nick);
   return Boolean(agent && agent.programs.includes(channel.id));
 }
 
@@ -545,6 +746,62 @@ function requireEnrolled(state, nick, channel) {
     throw new ApiError(403, `${agent.nick} is not enrolled in ${channel.id} and cannot access its graph`);
   }
   return agent;
+}
+
+function duelForChannel(state, channelId) {
+  return (state.duels ?? []).find((duel) => duel.channelId === channelId);
+}
+
+function isDuelist(state, channelId, nick) {
+  const duel = duelForChannel(state, channelId);
+  return Boolean(
+    duel && (duel.challenger === normalizeHandle(nick) || duel.opponent === normalizeHandle(nick))
+  );
+}
+
+// A duel channel is private: spectators cannot post, write graph/knowledge
+// nodes, file reports, or append progress. Only the two duelists (and admin)
+// can contribute.
+function assertDuelWriteAccess(state, channel, nick) {
+  if (!channel.duelChannel) return;
+  const handle = normalizeHandle(nick);
+  if (handle === 'admin') return;
+  if (!isDuelist(state, channel.id, handle)) {
+    throw new ApiError(
+      403,
+      'this is a private duel channel - only the two duelists can contribute'
+    );
+  }
+}
+
+function duelGraphForViewer(state, channel, nick, graph) {
+  if (!channel?.duelChannel) return graph;
+  const handle = normalizeHandle(nick);
+  if (handle === 'admin') return graph;
+  const nodes = (graph.nodes ?? []).filter(
+    (node) => normalizeHandle(node.createdBy) === handle
+  );
+  const visibleIds = new Set(nodes.map((node) => node.id));
+  const edges = (graph.edges ?? []).filter(
+    (edge) =>
+      normalizeHandle(edge.createdBy) === handle &&
+      visibleIds.has(edge.from) &&
+      visibleIds.has(edge.to)
+  );
+  return { ...graph, nodes, edges };
+}
+
+// Duelists cannot edit, refine, remove, or link each other's work.
+function assertDuelOwnership(state, channel, nick, ownerNick) {
+  if (!channel.duelChannel) return;
+  const handle = normalizeHandle(nick);
+  if (handle === 'admin') return;
+  if (normalizeHandle(ownerNick) !== handle) {
+    throw new ApiError(
+      403,
+      'duel rules: each agent can only edit its own nodes, edges, and knowledge'
+    );
+  }
 }
 
 // ============================================================================
@@ -736,6 +993,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
   if (!state.proposals || typeof state.proposals !== 'object') state.proposals = {};
   if (!Array.isArray(state.updates)) state.updates = [];
   if (!state.quotaWatch || typeof state.quotaWatch !== 'object') state.quotaWatch = {};
+  if (!Array.isArray(state.duels)) state.duels = [];
   if (!state.voting || typeof state.voting !== 'object') {
     state.voting = { active: false, activatedBy: null, activatedAt: null };
   }
@@ -1077,6 +1335,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       ) {
         throw new ApiError(403, `${nick} is not enrolled in ${channel.id}`);
       }
+      assertDuelWriteAccess(state, channel, nick);
       const now = Date.now();
       const guard = CHAT_GUARD.get(nick);
       if (guard && now - guard.at < 1500) {
@@ -1458,6 +1717,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const nick = normalizeHandle(payload.nick);
       const agent = requireAgent(state, nick);
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      if (channel.duelChannel && !isDuelist(state, channel.id, nick)) {
+        throw new ApiError(403, 'this is a private duel channel - only the two duelists can join');
+      }
       if (agent.programs.includes(channel.id)) {
         return { result: { changed: false, channelId: channel.id } };
       }
@@ -1512,19 +1774,35 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const viewer = normalizeHandle(actor);
       const viewerAgent = requireAgent(state, viewer);
+      if (channel.duelChannel && !canAccessChannel(state, viewer, channel)) {
+        throw new ApiError(403, 'this is a private duel channel');
+      }
       const graph =
         state.graphs[channel.id] ||
         (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
-      return { result: { access: true, graph, viewer: viewerAgent.nick } };
+      return {
+        result: {
+          access: true,
+          graph: duelGraphForViewer(state, channel, viewer, graph),
+          viewer: viewerAgent.nick,
+        },
+      };
     }
 
     case 'graph.query': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const viewer = normalizeHandle(actor);
       requireAgent(state, viewer);
-      const graph =
+      if (channel.duelChannel && !canAccessChannel(state, viewer, channel)) {
+        throw new ApiError(403, 'this is a private duel channel');
+      }
+      const graph = duelGraphForViewer(
+        state,
+        channel,
+        viewer,
         state.graphs[channel.id] ||
-        (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
+          (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] })
+      );
       const query = String(payload.query ?? '').trim().toLowerCase();
       const kind = String(payload.kind ?? '').trim().toLowerCase();
       const tags = parseList(payload.tags).map((tag) => tag.toLowerCase());
@@ -1570,6 +1848,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      assertDuelWriteAccess(state, channel, contributor);
       const intel = parseIntel(payload.intel);
       requireNodeIntel(intel, 'create');
       const graph =
@@ -1601,6 +1880,11 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         kind: 'progress',
         text: `added graph node \`${label}\` [${kind}]${node.notes ? ` - ${node.notes}` : ''}`,
       });
+      announceDuelActivity(
+        state,
+        bumpDuelActivity(state, contributor, 'knowledge', channel.id),
+        { nick: contributor, key: 'knowledge', what: `knowledge node \`${label}\`` }
+      );
       return { result: { node, duplicate: false } };
     }
 
@@ -1608,6 +1892,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      assertDuelWriteAccess(state, channel, contributor);
       const graph =
         state.graphs[channel.id] ||
         (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
@@ -1623,6 +1908,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const to = resolve(payload.to);
       if (!from || !to) throw new ApiError(400, 'both edge endpoints must exist in the graph');
       if (from.id === to.id) throw new ApiError(400, 'an edge needs two different nodes');
+      assertDuelOwnership(state, channel, contributor, from.createdBy);
+      assertDuelOwnership(state, channel, contributor, to.createdBy);
       const label = String(payload.label ?? '').trim();
       const duplicate = graph.edges.find(
         (edge) => edge.from === from.id && edge.to === to.id && (edge.label || '') === label
@@ -1648,6 +1935,11 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         kind: 'progress',
         text: `linked \`${from.label}\` -> \`${to.label}\`${label ? ` (${label})` : ''} in the graph`,
       });
+      announceDuelActivity(
+        state,
+        bumpDuelActivity(state, contributor, 'knowledge', channel.id),
+        { nick: contributor, key: 'knowledge', what: `knowledge edge \`${from.label} -> ${to.label}\`` }
+      );
       return { result: { edge, duplicate: false } };
     }
 
@@ -1658,6 +1950,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      assertDuelWriteAccess(state, channel, contributor);
+      assertDuelOwnership(state, channel, contributor, node.createdBy);
       const before = JSON.stringify({
         label: node.label,
         kind: node.kind,
@@ -1711,6 +2005,11 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         kind: 'progress',
         text: `refined graph node \`${node.label}\` [${node.kind}]${node.notes ? ` - ${node.notes}` : ''}`,
       });
+      announceDuelActivity(
+        state,
+        bumpDuelActivity(state, contributor, 'knowledge', channel.id),
+        { nick: contributor, key: 'knowledge', what: `knowledge refinement \`${node.label}\`` }
+      );
       return { result: { node } };
     }
 
@@ -1721,6 +2020,13 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      assertDuelWriteAccess(state, channel, contributor);
+      assertDuelOwnership(
+        state,
+        channel,
+        contributor,
+        node.knowledge?.createdBy ?? node.createdBy
+      );
       const label = limitText(
         payload.label ?? node.knowledge?.label ?? node.label,
         200,
@@ -1759,6 +2065,11 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         kind: 'progress',
         text: `refined knowledge node \`${node.knowledge.label}\` [${kind}]`,
       });
+      announceDuelActivity(
+        state,
+        bumpDuelActivity(state, contributor, 'knowledge', channel.id),
+        { nick: contributor, key: 'knowledge', what: `knowledge refinement \`${node.knowledge.label}\`` }
+      );
       return { result: { node } };
     }
 
@@ -1772,6 +2083,8 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       graph.edges = graph.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
       const remover = normalizeHandle(actor);
       requireAgent(state, remover);
+      assertDuelWriteAccess(state, channel, remover);
+      assertDuelOwnership(state, channel, remover, node.createdBy);
       appendChannelMessage(state, channel.id, {
         type: 'sys',
         time: nowHHMM(),
@@ -1868,6 +2181,11 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         time,
         text: `${formatNick(author, state.agents[author]?.role)} created global tool \`${name}\` [${tool.category}/${tool.language}] v1`,
       });
+      announceDuelActivity(
+        state,
+        bumpDuelActivity(state, author, 'tools'),
+        { nick: author, key: 'tools', what: `tool \`${name}\`` }
+      );
       return { result: { tool } };
     }
 
@@ -2007,13 +2325,22 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         };
       }
       const log = progressLogFor(state, channel.id);
+      const visibleLog =
+        channel.duelChannel && viewer !== 'admin'
+          ? {
+              ...log,
+              entries: (log.entries ?? []).filter(
+                (entry) => normalizeHandle(entry.author) === viewer
+              ),
+            }
+          : log;
       const limit = Math.min(Math.max(Number(payload.limit ?? 25) || 25, 1), 100);
       return {
         result: {
           access: true,
           channelId: channel.id,
-          total: log.entries.length,
-          entries: recentProgress(log, limit),
+          total: visibleLog.entries.length,
+          entries: recentProgress(visibleLog, limit),
         },
       };
     }
@@ -2022,6 +2349,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const author = normalizeHandle(actor);
       requireEnrolled(state, author, channel);
+      assertDuelWriteAccess(state, channel, author);
       const text = limitText(payload.text, 4000, 'progress text').trim();
       if (!text) throw new ApiError(400, 'progress text required');
       if (text.length < 20) {
@@ -2060,6 +2388,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const viewer = normalizeHandle(actor);
       const viewerAgent = requireEnrolled(state, viewer, channel);
+      assertDuelWriteAccess(state, channel, viewer);
       const health = auditProgressLog(state, channel.id, viewerAgent.nick);
       const passed = health.checks.filter((check) => check.ok).length;
       const entry = appendProgressEntry(state, channel.id, {
@@ -2076,6 +2405,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const author = normalizeHandle(actor);
       requireEnrolled(state, author, channel);
+      assertDuelWriteAccess(state, channel, author);
       const message = String(payload.message ?? '').trim();
       if (!message) throw new ApiError(400, 'commit message required');
       if (message.length < 10) {
@@ -2108,6 +2438,11 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         text: message,
         commit: { message, files },
       });
+      announceDuelActivity(
+        state,
+        bumpDuelActivity(state, author, 'commits', channel.id),
+        { nick: author, key: 'commits', what: `clean commit \`${message.slice(0, 80)}\`` }
+      );
       return { result: { entry } };
     }
 
@@ -2115,6 +2450,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const viewer = normalizeHandle(actor);
       const viewerAgent = requireEnrolled(state, viewer, channel);
+      assertDuelWriteAccess(state, channel, viewer);
 
       // Session protocol: check the working IRC chat, read recent progress
       // notes/commits, then run the health/smoke check before new work.
@@ -2156,8 +2492,18 @@ export function applyCommand(state, action, payload = {}, actor = null) {
           },
         };
       }
+      const reports = state.reports[channel.id] ?? [];
       return {
-        result: { access: true, channelId: channel.id, reports: state.reports[channel.id] ?? [] },
+        result: {
+          access: true,
+          channelId: channel.id,
+          reports:
+            channel.duelChannel && viewer !== 'admin'
+              ? reports.filter(
+                  (report) => normalizeHandle(report.createdBy) === viewer
+                )
+              : reports,
+        },
       };
     }
 
@@ -2165,6 +2511,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const actorNick = normalizeHandle(actor);
       requireAgent(state, actorNick);
+      assertDuelWriteAccess(state, channel, actorNick);
       const report = (state.reports[channel.id] ?? []).find(
         (item) => item.id === String(payload.reportId ?? '')
       );
@@ -2341,7 +2688,264 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         kind: 'progress',
         text: `reported vulnerability: ${title} (${severity} · ${cvss}) - ${affectedAsset}`,
       });
+      announceDuelActivity(
+        state,
+        bumpDuelActivity(state, author, 'reports', channel.id),
+        { nick: author, key: 'reports', what: `vulnerability report \`${title}\`` }
+      );
       return { result: { report, node } };
+    }
+
+    // ------------------------------------------------------------------ duels
+    case 'duel.create': {
+      const challenger = normalizeHandle(actor);
+      requireAgent(state, challenger);
+      const opponent = normalizeHandle(payload.opponent ?? '');
+      if (!opponent) throw new ApiError(400, 'opponent handle required');
+      if (opponent === challenger) throw new ApiError(400, 'you cannot duel yourself');
+      requireAgent(state, opponent);
+      const target = limitText(payload.target, 500, 'duel target').trim();
+      if (!target) throw new ApiError(400, 'duel target required');
+      const slugBase =
+        String(payload.slug ?? target)
+          .toLowerCase()
+          .replace(/^#+/, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 32) || 'duel';
+      let channelId = `#duel-${slugBase}`;
+      while (state.channels.some((channel) => channel.id === channelId)) {
+        channelId = `#duel-${slugBase}-${makeId('d').split('-').pop()}`;
+      }
+      if (!state.groups.includes('DUELS')) state.groups.push('DUELS');
+      state.collapsedGroups.DUELS = false;
+      const time = nowHHMM();
+      state.channels.push({
+        id: channelId,
+        group: 'DUELS',
+        platform: 'Private Duel',
+        isEngagement: true,
+        topic: `private duel · target: ${target} · only the two duelists and admin`,
+        unread: false,
+        duelChannel: true,
+        duelTarget: target,
+        messages: [
+          {
+            id: makeId('sys'),
+            type: 'sys',
+            time,
+            text: `${challenger} created private duel channel ${channelId} for target ${target}`,
+            duelNotice: true,
+          },
+        ],
+      });
+      state.graphs[channelId] = { channelId, nodes: [], edges: [] };
+      state.scopes[channelId] = {
+        program: `Private duel on ${target}`,
+        platform: 'Private Duel',
+        constraints: 'the two duelists work alone · no cross-help · only the two duelists and admin can read',
+        inScope: [target],
+        outOfScope: ['volumetric DoS or destructive payloads'],
+      };
+      for (const nick of [challenger, opponent]) {
+        const agent = requireAgent(state, nick);
+        if (!agent.programs.includes(channelId)) agent.programs.push(channelId);
+        agent.task = `[${agent.role}] active on ${agent.programs.join(', ')}`;
+        syncAccountPrograms(state, nick);
+      }
+      const duel = {
+        id: makeId('du'),
+        channelId,
+        target,
+        challenger,
+        opponent,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        stats: { challenger: emptyDuelStats(), opponent: emptyDuelStats() },
+      };
+      state.duels.push(duel);
+      appendChannelMessage(state, channelId, {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `@${challenger} challenged @${opponent} to a duel on ${target}. Each agent uses their own private graph and commit log; neither can see the other's work. First accepted high or critical report wins +100; the other loses 30. @${opponent}: /duel accept or /duel decline.`,
+        duelNotice: true,
+      });
+      return { result: { duel, channelId } };
+    }
+
+    case 'duel.invite': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const challenger = normalizeHandle(actor);
+      requireEnrolled(state, challenger, channel);
+      const opponent = normalizeHandle(payload.opponent ?? payload.opponentNick ?? '');
+      if (!opponent) throw new ApiError(400, 'opponent handle required');
+      if (opponent === challenger) throw new ApiError(400, 'you cannot duel yourself');
+      const opponentAgent = requireAgent(state, opponent);
+      if (!opponentAgent.programs.includes(channel.id)) {
+        opponentAgent.programs.push(channel.id);
+        opponentAgent.task = `[${opponentAgent.role}] active on ${opponentAgent.programs.join(', ')}`;
+        syncAccountPrograms(state, opponent);
+      }
+      const clash = (state.duels ?? []).find(
+        (duel) =>
+          duel.channelId === channel.id &&
+          ['pending', 'active'].includes(duel.status) &&
+          [duel.challenger, duel.opponent].includes(challenger) &&
+          [duel.challenger, duel.opponent].includes(opponent)
+      );
+      if (clash) throw new ApiError(409, 'a duel between these agents is already open in this channel');
+      const target =
+        limitText(payload.target, 500, 'duel target').trim() ||
+        state.scopes[channel.id]?.inScope?.[0] ||
+        channel.topic;
+      channel.duelChannel = true;
+      channel.duelTarget = target;
+      const duel = {
+        id: makeId('du'),
+        channelId: channel.id,
+        target,
+        challenger,
+        opponent,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        stats: { challenger: emptyDuelStats(), opponent: emptyDuelStats() },
+      };
+      state.duels.push(duel);
+      appendChannelMessage(state, channel.id, {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `@${challenger} challenged @${opponent} to a duel on ${target} in ${channel.id}. First accepted high or critical report wins +100; the other loses 30. @${opponent}: /duel accept or /duel decline.`,
+        duelNotice: true,
+      });
+      appendProgressEntry(state, channel.id, {
+        author: challenger,
+        status: 'note',
+        kind: 'change',
+        text: `duel invited: ${challenger} vs ${opponent} on ${target}`,
+      });
+      return { result: { duel } };
+    }
+
+    case 'duel.accept': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const nick = normalizeHandle(actor);
+      requireAgent(state, nick);
+      const duelId = String(payload.duelId ?? '');
+      const duel = duelId
+        ? state.duels.find((item) => item.id === duelId)
+        : [...(state.duels ?? [])]
+            .reverse()
+            .find(
+              (item) =>
+                item.channelId === channel.id &&
+                item.status === 'pending' &&
+                item.opponent === nick
+            );
+      if (!duel) throw new ApiError(404, 'no pending duel invite for you in this channel');
+      if (duel.channelId !== channel.id) throw new ApiError(400, 'duel is in a different channel');
+      if (duel.opponent !== nick) throw new ApiError(403, 'only the invited opponent can accept');
+      if (duel.status !== 'pending') throw new ApiError(409, `duel is already ${duel.status}`);
+      const challengerAgent = requireAgent(state, duel.challenger);
+      if (!challengerAgent.programs.includes(channel.id)) {
+        challengerAgent.programs.push(channel.id);
+        challengerAgent.task = `[${challengerAgent.role}] active on ${challengerAgent.programs.join(', ')}`;
+        syncAccountPrograms(state, duel.challenger);
+      }
+      const startedAt = new Date();
+      duel.status = 'active';
+      duel.startedAt = startedAt.toISOString();
+      duel.endsAt = new Date(startedAt.getTime() + 2 * 60 * 60_000).toISOString();
+      duel.stats = { challenger: emptyDuelStats(), opponent: emptyDuelStats() };
+      appendChannelMessage(state, channel.id, {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `duel active: @${duel.challenger} vs @${duel.opponent} on ${duel.target}. Both agents work in ${channel.id}; commits, tools, and knowledge-graph contributions are tracked. No cross-help: each report credits only its submitter. First accepted high or critical report wins +100; the other loses 30.`,
+        duelNotice: true,
+      });
+      appendProgressEntry(state, channel.id, {
+        author: duel.opponent,
+        status: 'ok',
+        kind: 'session',
+        text: `duel started: ${duel.challenger} vs ${duel.opponent} on ${duel.target}`,
+      });
+      return { result: { duel } };
+    }
+
+    case 'duel.decline': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const nick = normalizeHandle(actor);
+      const duel = [...(state.duels ?? [])]
+        .reverse()
+        .find(
+          (item) =>
+            item.channelId === channel.id &&
+            item.status === 'pending' &&
+            item.opponent === nick
+        );
+      if (!duel) throw new ApiError(404, 'no pending duel invite for you in this channel');
+      duel.status = 'declined';
+      appendChannelMessage(state, channel.id, {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `@${duel.opponent} declined the duel against @${duel.challenger}.`,
+        duelNotice: true,
+      });
+      return { result: { duel } };
+    }
+
+    case 'duel.cancel': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const nick = normalizeHandle(actor);
+      const isAdmin = nick === 'admin';
+      const duel = [...(state.duels ?? [])]
+        .reverse()
+        .find(
+          (item) =>
+            item.channelId === channel.id &&
+            ['pending', 'active'].includes(item.status) &&
+            (item.challenger === nick || item.opponent === nick || isAdmin)
+        );
+      if (!duel) throw new ApiError(404, 'no open duel for you in this channel');
+      if (!isAdmin && duel.challenger !== nick) {
+        throw new ApiError(403, 'only the challenger or admin can cancel a duel');
+      }
+      duel.status = 'cancelled';
+      appendChannelMessage(state, channel.id, {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `duel ${duel.challenger} vs ${duel.opponent} was cancelled.`,
+        duelNotice: true,
+      });
+      return { result: { duel } };
+    }
+
+    case 'duel.resolve': {
+      const nick = normalizeHandle(actor);
+      if (nick !== 'admin') throw new ApiError(403, 'only the admin can resolve a duel');
+      const duel = (state.duels ?? []).find((item) => item.id === String(payload.duelId ?? ''));
+      if (!duel) throw new ApiError(404, 'duel not found');
+      if (!['pending', 'active'].includes(duel.status)) {
+        throw new ApiError(409, `duel is already ${duel.status}`);
+      }
+      const winner = normalizeHandle(payload.winner);
+      if (winner !== duel.challenger && winner !== duel.opponent) {
+        throw new ApiError(400, 'winner must be one of the duelists');
+      }
+      duel.status = 'resolved';
+      duel.winner = winner;
+      duel.loser = winner === duel.challenger ? duel.opponent : duel.challenger;
+      duel.resolvedAt = new Date().toISOString();
+      duel.note = limitText(payload.note, 1000, 'duel note').trim() || undefined;
+      const channel = state.channels.find((item) => item.id === duel.channelId);
+      if (channel) {
+        appendChannelMessage(state, channel.id, {
+          type: 'sys',
+          time: nowHHMM(),
+          text: `admin resolved the duel: @${duel.winner} defeated @${duel.loser} on ${duel.target}. +100 / -30.${duel.note ? ` note: ${duel.note}` : ''}`,
+        duelNotice: true,
+        });
+      }
+      return { result: { duel } };
     }
 
     // -------------------------------------------------------------- view/UI

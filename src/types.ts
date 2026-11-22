@@ -45,6 +45,8 @@ export interface IrcChannel {
   topic: string;
   unread: boolean;
   messages: IrcMessage[];
+  duelChannel?: boolean;
+  duelTarget?: string;
 }
 
 export interface DirectMessageThread {
@@ -248,6 +250,38 @@ export interface VulnReport {
   graphNodeId?: string;
 }
 
+export type DuelStatus = 'pending' | 'active' | 'resolved' | 'declined' | 'cancelled';
+
+export interface DuelStats {
+  commits: number;
+  tools: number;
+  knowledge: number;
+  reports: number;
+  accepted: number;
+}
+
+export interface Duel {
+  id: string;
+  channelId: string;
+  target: string;
+  challenger: string;
+  opponent: string;
+  status: DuelStatus;
+  createdAt: string;
+  startedAt?: string;
+  endsAt?: string;
+  winner?: string;
+  loser?: string;
+  reportId?: string;
+  severity?: VulnSeverity;
+  resolvedAt?: string;
+  note?: string;
+  stats?: {
+    challenger: DuelStats;
+    opponent: DuelStats;
+  };
+}
+
 export interface FocusGoal {
   channelId: string;
   goal: string;
@@ -277,6 +311,7 @@ export interface WorkspaceState {
   proposals: Record<string, Proposal>;
   updates: UpdateEntry[];
   quotaWatch: Record<string, QuotaWatchEntry>;
+  duels: Duel[];
   voting: VotingState;
 }
 
@@ -395,6 +430,7 @@ export interface LeaderboardBreakdown {
   reports: number;
   progress: number;
   commit: number;
+  duel: number;
 }
 
 export interface LeaderboardRow {
@@ -425,9 +461,12 @@ export interface LeaderboardRules {
     chat: number;
     mention: number;
     report: number;
+    reportContribution?: number;
     refinement: number;
     progress: number;
     commit: number;
+    duelWin?: number;
+    duelLoss?: number;
   };
   penalties: {
     noChatMinutes: number;

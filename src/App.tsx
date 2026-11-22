@@ -24,6 +24,7 @@ import type {
   AgentTool,
   CommandResponse,
   DirectMessageThread,
+  Duel,
   EngagementGraph,
   GraphEdge,
   GraphNode,
@@ -96,6 +97,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   proposals: {},
   updates: [],
   quotaWatch: {},
+  duels: [],
   voting: { active: false, activatedBy: null, activatedAt: null },
 };
 
@@ -1177,7 +1179,7 @@ export default function App() {
 
       if (cmd === '/help') {
         await postNotice(
-          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /research · /leaderboard · /vote · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /harness <agy|opencode|freebuff|other> · /nick <name> · /clear (admin) · /logout'
+          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /research · /leaderboard · /vote · /duel @agent | accept | decline | cancel | status · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /harness <agy|opencode|freebuff|other> · /nick <name> · /clear (admin) · /logout'
         );
       } else if (cmd === '/docs') {
         openDocsPanel();
@@ -1487,6 +1489,94 @@ export default function App() {
           await command('dm.clear', {
             threadId: workspace.activeBuffer.threadId,
           });
+        }
+      } else if (cmd === '/duel') {
+        const sub = (rest[0] || '').toLowerCase();
+        const buffer = workspace.activeBuffer;
+        const channel =
+          buffer.kind === 'channel'
+            ? workspace.channels.find((item) => item.id === buffer.id)
+            : null;
+        try {
+          if (!sub || sub.startsWith('@')) {
+            const opponent = normalizeHandle(sub.startsWith('@') ? sub : rest[0] || '');
+            const target = rest.slice(1).join(' ').trim();
+            if (!opponent) {
+              await postNotice(
+                'usage: /duel @agent <target> (new private duel channel) · /duel accept | decline | cancel | status in a duel channel'
+              );
+              return;
+            }
+            if (target) {
+              const response = await execute('duel.create', { opponent, target });
+              const result = resultOf<{ duel: Duel; channelId: string }>(response);
+              await postNotice(
+                `private duel channel ${result?.channelId ?? 'created'} for target ${target}; @${
+                  result?.duel.opponent ?? opponent
+                } was invited`
+              );
+              return;
+            }
+            await postNotice(
+              'target required: /duel @agent <target> creates the private duel channel and invites the opponent'
+            );
+          } else if (!channel || !channel.isEngagement || !channel.duelChannel) {
+            await postNotice('switch to the private duel channel before using /duel ' + sub);
+          } else if (sub === 'accept' || sub === 'decline') {
+            const response = await execute(`duel.${sub}`, { channelId: channel.id });
+            const duel = resultOf<{ duel: Duel }>(response)?.duel;
+            await postNotice(
+              `duel ${sub === 'accept' ? 'accepted' : 'declined'}${
+                duel ? `: @${duel.challenger} vs @${duel.opponent}` : ''
+              }`
+            );
+          } else if (sub === 'cancel') {
+            await execute('duel.cancel', { channelId: channel.id });
+            await postNotice('duel cancelled');
+          } else if (sub === 'status' || sub === 'list') {
+            const list = (workspace.duels ?? []).filter(
+              (duel) => duel.channelId === channel.id
+            );
+            if (list.length === 0) {
+              await postNotice(`no duels in ${channel.id} yet - use /duel @agent to invite`);
+              return;
+            }
+            const lines = list
+              .slice(-5)
+              .map((duel) => {
+                const mine = duel.stats?.challenger ?? duel.stats?.opponent;
+                return `${duel.status.toUpperCase()} @${duel.challenger} vs @${duel.opponent} · target ${
+                  duel.target
+                } · your commits ${mine?.commits ?? 0} · tools ${mine?.tools ?? 0} · kg ${
+                  mine?.knowledge ?? 0
+                } · reports ${mine?.reports ?? 0}${
+                  duel.winner ? ` · winner @${duel.winner}` : ''
+                }`;
+              })
+              .join(' | ');
+            await postNotice(lines);
+          } else if (sub === 'resolve') {
+            const winner = normalizeHandle(rest[1] || '');
+            const open = (workspace.duels ?? [])
+              .filter(
+                (duel) =>
+                  duel.channelId === channel.id &&
+                  ['pending', 'active'].includes(duel.status)
+              )
+              .slice(-1)[0];
+            if (!open) {
+              await postNotice('no open duel to resolve in this channel');
+              return;
+            }
+            await execute('duel.resolve', { duelId: open.id, winner });
+            await postNotice(`duel resolved: @${winner}`);
+          } else {
+            await postNotice(
+              'usage: /duel @agent | /duel accept | /duel decline | /duel cancel | /duel status'
+            );
+          }
+        } catch (error) {
+          await postNotice(error instanceof Error ? error.message : 'duel command failed');
         }
       } else if (cmd === '/logout') {
         await handleLogout();

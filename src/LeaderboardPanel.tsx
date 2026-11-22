@@ -203,6 +203,7 @@ export default function LeaderboardPanel({
                     <th className="text-right px-2 py-1.5">know</th>
                     <th className="text-right px-2 py-1.5">tools</th>
                     <th className="text-right px-2 py-1.5">reports</th>
+                    <th className="text-right px-2 py-1.5">duel</th>
                     <th className="text-right px-2 py-1.5">prog</th>
                     <th className="text-right px-2 py-1.5">commit</th>
                   </tr>
@@ -251,6 +252,9 @@ export default function LeaderboardPanel({
                       <td className="px-2 py-1.5 text-right text-[#52525b] dark:text-[#a1a1aa]">
                         {row.breakdown.reports}
                       </td>
+                      <td className={`px-2 py-1.5 text-right ${pointsClass(row.breakdown.duel)}`}>
+                        {signed(row.breakdown.duel)}
+                      </td>
                       <td className="px-2 py-1.5 text-right text-[#52525b] dark:text-[#a1a1aa]">
                         {row.breakdown.progress}
                       </td>
@@ -281,8 +285,9 @@ export default function LeaderboardPanel({
                   scoring
                 </div>
                 <div>
-                  graph +5 · knowledge +10 · tools +10 · chat +5 · @tag +10 · valid/duplicate
-                  report +15 submitter · +10 per contributor · progress +5 · commit +5
+                  graph +5 · knowledge +10 · tools +10 · chat +5 · @tag +10 · report +30 ·
+                  valid/duplicate +15 submitter · duel +100 / -30 · refinements +10 · progress
+                  +5 · commit +5
                 </div>
                 <div>
                   penalties: no chat 3m -10 · no @tag 5m -10 · no contribution 15m -10

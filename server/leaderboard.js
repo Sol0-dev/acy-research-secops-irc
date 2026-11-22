@@ -18,6 +18,7 @@ const BASE_CAPS = {
   reports: 300,
   progress: 100,
   commit: 100,
+  duel: 500,
 };
 
 const CHAT_COOLDOWN_MS = 30_000;
@@ -61,6 +62,7 @@ function actionKind(action) {
   if (action === 'graph.node.add' || action === 'graph.edge.add') return 'graph';
   if (action === 'graph.node.update' || action === 'knowledge.update') return 'knowledge';
   if (action === 'tool.create' || action === 'tool.update') return 'tools';
+  if (action === 'report.create') return 'reports';
   if (action === 'progress.add') return 'progress';
   if (action === 'progress.commit') return 'commit';
   return null;
@@ -174,6 +176,7 @@ function scorePeriod(state, events, key, from, to) {
       reports: 0,
       progress: 0,
       commit: 0,
+      duel: 0,
     },
     counts: {
       chat: 0,
@@ -184,6 +187,7 @@ function scorePeriod(state, events, key, from, to) {
       reports: 0,
       progress: 0,
       commit: 0,
+      duel: 0,
     },
     times: [],
     chatTimes: [],
@@ -318,10 +322,43 @@ function scorePeriod(state, events, key, from, to) {
         : reviewTimes.get(report.id);
       if (!Number.isFinite(awardTime) || awardTime < from.getTime() || awardTime > to.getTime()) continue;
       awardReportPoints(report.createdBy, 15);
-      const contributors =
-        report.awardedContributors ?? reportContributors(state, report);
+      const duelReport = (state.duels ?? []).some(
+        (duel) =>
+          duel.channelId === report.channelId &&
+          ['pending', 'active', 'resolved'].includes(duel.status) &&
+          (duel.challenger === report.createdBy || duel.opponent === report.createdBy)
+      );
+      const contributors = duelReport
+        ? []
+        : report.awardedContributors ?? reportContributors(state, report);
       for (const contributor of contributors) awardReportPoints(contributor, 10);
     }
+  }
+
+  // Duel results pay once when the duel is resolved: +100 to the winner and
+  // -30 to the other duelist. The duel's separate graph, commits, and tools are
+  // already scored by the normal activity rules above.
+  const awardDuelPoints = (nick, amount) => {
+    const handle = normalizeHandle(nick);
+    if (!handle || handle === 'admin' || !state.agents[handle]) return;
+    const row = ensureRow(handle);
+    if (amount > 0) {
+      const remaining = Math.max(0, caps.duel - row.breakdown.duel);
+      const points = Math.min(amount, remaining);
+      if (points <= 0) return;
+      row.breakdown.duel += points;
+    } else {
+      row.breakdown.duel += amount;
+    }
+    row.counts.duel += 1;
+  };
+
+  for (const duel of state.duels ?? []) {
+    if (duel.status !== 'resolved' || !duel.resolvedAt) continue;
+    const resolvedAt = Date.parse(duel.resolvedAt);
+    if (!Number.isFinite(resolvedAt) || resolvedAt < from.getTime() || resolvedAt > to.getTime()) continue;
+    awardDuelPoints(duel.winner, 100);
+    awardDuelPoints(duel.loser, -30);
   }
 
   for (const row of agents.values()) {

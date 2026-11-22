@@ -15,8 +15,11 @@ import { buildReportDocx, safeFilename } from './docx.js';
 import { buildLeaderboard } from './leaderboard.js';
 import {
   applyCommand,
+  announceDuel,
   normalizeHandle,
+  reopenDuelForReport,
   reportContributors,
+  resolveDuelForReport,
   toPublicState,
   ApiError,
 } from './state.js';
@@ -347,6 +350,15 @@ app.post('/api/admin/report/review', async (req, res) => {
       report.awardedContributors = awardedContributors;
     }
 
+    // A duel ends as soon as one duelist lands an accepted high or critical
+    // report. Re-reviewing that report away from valid/duplicate reopens it.
+    let duelOutcome = null;
+    if (decision === 'valid' || decision === 'duplicate') {
+      duelOutcome = resolveDuelForReport(state, report);
+    } else {
+      duelOutcome = reopenDuelForReport(state, report);
+    }
+
     let cleanedNodes = 0;
     let cleanedEdges = 0;
     if (decision === 'invalid') {
@@ -384,10 +396,15 @@ app.post('/api/admin/report/review', async (req, res) => {
       decision === 'valid' || decision === 'duplicate'
         ? ` - submitter +15 pts${awardedContributors.length > 0 ? `, contributors +10 pts each (${awardedContributors.map((nick) => '@' + nick).join(' ')})` : ''}`
         : '';
+    const duelText = duelOutcome
+      ? duelOutcome.status === 'resolved'
+        ? ` DUEL: @${duelOutcome.winner} defeated @${duelOutcome.loser} on ${duelOutcome.target} (+100 / -30).`
+        : ` DUEL REOPENED: ${duelOutcome.challenger} vs ${duelOutcome.opponent} on ${duelOutcome.target}.`
+      : '';
     const channelText =
       decision === 'invalid'
-        ? `${mentions}${mentions ? ' ' : ''}INVALID report: "${report.title}". Do not follow this rabbit hole again. Removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from all graphs and the knowledge graph. Agents: use Clean contamination in the report if you still see matching nodes.`
-        : `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}${rewardText}`;
+        ? `${mentions}${mentions ? ' ' : ''}INVALID report: "${report.title}". Do not follow this rabbit hole again. Removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from all graphs and the knowledge graph. Agents: use Clean contamination in the report if you still see matching nodes.${duelText}`
+        : `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}${rewardText}${duelText}`;
 
     const log = state.progress[channelId] || (state.progress[channelId] = { channelId, entries: [] });
     log.entries.push({
@@ -412,8 +429,20 @@ app.post('/api/admin/report/review', async (req, res) => {
           type: 'sys',
           time,
           text: channelText,
+          duelNotice: Boolean(duelOutcome),
         },
       ];
+    }
+
+    if (duelOutcome) {
+      announceDuel(
+        state,
+        duelOutcome,
+        duelOutcome.status === 'resolved'
+          ? `@${duelOutcome.winner} defeated @${duelOutcome.loser} on ${duelOutcome.target} with a ${duelOutcome.severity} report. +100 / -30.`
+          : `duel reopened: ${duelOutcome.challenger} vs ${duelOutcome.opponent} on ${duelOutcome.target}.`,
+        { includeDuelChannel: false }
+      );
     }
 
     const version = await persistState(state, 'admin.report.review', 'admin', {
