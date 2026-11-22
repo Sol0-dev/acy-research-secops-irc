@@ -178,6 +178,11 @@ export default function AdminPanel({
     return () => window.clearInterval(timer);
   }, [open, adminTab, onRefresh]);
 
+  useEffect(() => {
+    if (!open || adminTab !== 'duels') return;
+    void onRefresh();
+  }, [open, adminTab, onRefresh]);
+
   const registeredNicks = useMemo(
     () => new Set((snapshot?.accounts ?? []).map((account) => account.nick)),
     [snapshot]
@@ -1235,7 +1240,7 @@ export default function AdminPanel({
               specific duel tasks
             </h2>
             <p className="text-[15px] text-[#a1a1aa]">
-              The selected duel's saved task is shown above the editor. Edit it and press save
+              The selected duel's saved task loads into the editor. Edit it and press save
               changes, or unset it. The task is stored with that duel and posted only to its
               private duel channel; only the two duelists and admin can see it. Duel tasks are
               independent of the mission goal and the focus engagement.
@@ -1314,14 +1319,6 @@ export default function AdminPanel({
                     ) : (
                       <span>applies to every new duel until unset</span>
                     )}
-                  </div>
-                  <div className="border border-[#2a2a30] bg-[#050506] p-2.5 space-y-1">
-                    <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                      set duel task
-                    </div>
-                    <div className="text-[15px] leading-relaxed text-[#d4d4d8] whitespace-pre-wrap break-words">
-                      {activeTask || 'none set'}
-                    </div>
                   </div>
                   <label className="block space-y-1">
                     <span className="text-[14px] uppercase tracking-wider text-[#71717a]">

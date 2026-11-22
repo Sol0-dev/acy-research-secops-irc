@@ -289,6 +289,7 @@ app.get('/api/admin', async (req, res) => {
       progress,
       graphs,
       duels: state.duels ?? [],
+      duelTask: state.duelTask ?? null,
       audit,
       security: {
         apiHost: HOST,
