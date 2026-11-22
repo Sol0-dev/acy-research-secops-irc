@@ -1009,8 +1009,19 @@ export default function AdminPanel({
             )}
           </section>
 
-          <section className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${adminTab === 'accounts' ? '' : 'hidden'}`}>
-            <div className="space-y-2">
+          <section className={`space-y-3 ${adminTab === 'accounts' ? '' : 'hidden'}`}>
+            {accountNotice && (
+              <div className="border border-[#4ade80]/50 bg-[#4ade80]/10 px-3 py-2 text-[16px] text-[#4ade80]">
+                {accountNotice}
+              </div>
+            )}
+            {accountError && (
+              <div className="border border-[#f87171]/50 bg-[#f87171]/10 px-3 py-2 text-[16px] text-[#f87171]">
+                {accountError}
+              </div>
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="space-y-2 border border-[#2a2a30] bg-[#09090b] p-3">
               <h2 className="text-base uppercase tracking-wider text-[#71717a]">
                 registered accounts ({snapshot.accounts.length})
               </h2>
@@ -1036,32 +1047,13 @@ export default function AdminPanel({
                           <td className={td}>{account.programs.join(', ') || '-'}</td>
                           <td className={td}>{account.email || '-'}</td>
                           <td className={td}>
-                            {confirmAccountDelete === account.nick ? (
-                              <div className="flex flex-wrap gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => void deleteAccount(account.nick)}
-                                  className="px-1.5 py-0.5 border border-[#f87171] text-[15px] text-[#f87171]"
-                                >
-                                  yes, remove
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmAccountDelete(null)}
-                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
-                                >
-                                  no
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setConfirmAccountDelete(account.nick)}
-                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
-                              >
-                                remove account
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => setConfirmAccountDelete(account.nick)}
+                              className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
+                            >
+                              remove account
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1071,10 +1063,7 @@ export default function AdminPanel({
               )}
             </div>
 
-            {accountNotice && <div className="text-base text-[#4ade80]">{accountNotice}</div>}
-            {accountError && <div className="text-base text-[#f87171]">{accountError}</div>}
-
-            <div className="space-y-2">
+            <div className="space-y-2 border border-[#2a2a30] bg-[#09090b] p-3">
               <h2 className="text-base uppercase tracking-wider text-[#71717a]">
                 live agents ({snapshot.agents.length})
               </h2>
@@ -1131,28 +1120,11 @@ export default function AdminPanel({
                                 '-'
                               ) : registeredNicks.has(agent.nick) ? (
                                 <span className="text-[15px] text-[#71717a]">registered</span>
-                              ) : confirmAccountDelete === agent.nick ? (
-                                <div className="flex flex-wrap gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => void deleteAccount(agent.nick)}
-                                    className="px-1.5 py-0.5 border border-[#f87171] text-[15px] text-[#f87171]"
-                                  >
-                                    yes, remove
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmAccountDelete(null)}
-                                    className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
-                                  >
-                                    no
-                                  </button>
-                                </div>
                               ) : (
                                 <button
                                   type="button"
                                   onClick={() => setConfirmAccountDelete(agent.nick)}
-                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
+                                  className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
                                 >
                                   remove unregistered
                                 </button>
@@ -1165,6 +1137,7 @@ export default function AdminPanel({
                   </table>
                 </div>
               )}
+            </div>
             </div>
           </section>
 
@@ -1282,6 +1255,42 @@ export default function AdminPanel({
           </div>
           </div>
         </>
+      )}
+
+      {confirmAccountDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-md border border-[#2a2a30] bg-[#09090b] p-4 space-y-3">
+            <div className="text-lg text-[#f4f4f5]">
+              {registeredNicks.has(confirmAccountDelete)
+                ? `Delete registered account @${confirmAccountDelete}?`
+                : `Delete unregistered agent @${confirmAccountDelete}?`}
+            </div>
+            <p className="text-[15px] text-[#a1a1aa] leading-relaxed">
+              {registeredNicks.has(confirmAccountDelete)
+                ? 'This removes the account and its agent session. The graphs, knowledge, tools, progress, reports, and chat history stay in the workspace.'
+                : 'This removes the unregistered agent from the roster and invalidates its session. Workspace content stays.'}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const nick = confirmAccountDelete;
+                  if (nick) void deleteAccount(nick);
+                }}
+                className="px-3 py-1.5 border border-[#f87171] text-[15px] text-[#f87171]"
+              >
+                yes, remove
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmAccountDelete(null)}
+                className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
+              >
+                no, cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirmGraphDelete && (
