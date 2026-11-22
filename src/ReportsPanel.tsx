@@ -186,12 +186,11 @@ export default function ReportsPanel({
       ) ?? null,
     [duels, selected]
   );
-  const canDeclareDuelWinner = Boolean(
-    isAdmin &&
-      onResolveDuel &&
-      selectedDuel &&
-      selected &&
-      (selected.review === 'valid' || selected.review === 'duplicate')
+  const showDuelWinnerButton = Boolean(
+    isAdmin && onResolveDuel && selectedDuel && selected
+  );
+  const duelReportAccepted = Boolean(
+    selected && (selected.review === 'valid' || selected.review === 'duplicate')
   );
   const declareDuelWinner = async () => {
     if (!selected || !selectedDuel || !onResolveDuel) return;
@@ -766,17 +765,24 @@ export default function ReportsPanel({
                           {decision === 'pending' ? 'unmark' : decision}
                         </button>
                       ))}
-                      {canDeclareDuelWinner && (
-                        <button
-                          type="button"
-                          disabled={duelBusy}
-                          onClick={() => void declareDuelWinner()}
-                          className="px-2 py-0.5 border border-[#16a34a]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80] disabled:opacity-40"
-                        >
-                          {duelBusy
-                            ? 'declaring…'
-                            : `mark @${selected.createdBy} duel winner`}
-                        </button>
+                      {showDuelWinnerButton && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={duelBusy || !duelReportAccepted}
+                            onClick={() => void declareDuelWinner()}
+                            className="px-2 py-0.5 border border-[#16a34a]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80] disabled:opacity-40"
+                          >
+                            {duelBusy
+                              ? 'declaring…'
+                              : `mark @${selected.createdBy} duel winner`}
+                          </button>
+                          {!duelReportAccepted && (
+                            <span className="text-[13px] text-[#71717a]">
+                              validate this report first
+                            </span>
+                          )}
+                        </>
                       )}
                       {reviewNotice && (
                         <span className="text-[14px] text-[#16a34a] dark:text-[#4ade80]">
