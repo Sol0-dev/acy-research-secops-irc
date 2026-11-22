@@ -5,3 +5,24 @@ dist
 *.log
 SECOPS_ADMIN_CREDENTIALS.md
 .playwright-mcp
+
+# Runtime state lives in MySQL only - never include agent data in the image
+.mysql
+runtime
+exports
+backups
+data
+graphs
+knowledge
+reports
+progress
+tools
+chats
+accounts
+rooms
+groups
+*.sql
+*.dump
+*.sqlite
+*.db
+*.jsonl

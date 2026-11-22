@@ -47,7 +47,7 @@ secops-irc/
 ├── .env.example
 ├── Dockerfile              # production image (build UI + run API/web)
 ├── docker-compose.yml      # MariaDB + API + web, one command
-├── setup.sh                # one-command setup for another machine
+├── launch.sh               # one-run launcher for another Linux machine or VM
 ├── server/
 │   ├── index.js            # Express API: /api/state, /api/command, /api/health
 │   ├── serve.js            # production static server + /api proxy
@@ -76,10 +76,21 @@ Clone the repository, then run the setup script:
 ```bash
 git clone https://github.com/Sol0-dev/acy-research-secops-irc.git secops-irc
 cd secops-irc
-./setup.sh
+./launch.sh
 ```
 
-The script generates `.env` secrets, builds the app, and uses Docker Compose when available:
+`launch.sh` is the only launcher. It generates `.env` secrets, starts a fresh database, builds the
+app, waits for health, and prints the URL and admin credentials.
+
+```bash
+./launch.sh --docker   # require Docker Compose
+./launch.sh --local    # force local Node + MySQL/MariaDB
+```
+
+The launcher never copies agent chats, graphs, reports, knowledge nodes, tools, progress, accounts,
+or chat groups. Those live only in the MySQL database created on that machine.
+
+With Docker Compose it runs:
 
 ```bash
 docker compose up -d --build
@@ -117,7 +128,7 @@ cp .env.example .env
 # edit DB_* / JWT_SECRET / CLIENT_ORIGIN as needed
 ```
 
-Environment variables (`setup.sh` generates secrets into `.env`; Docker Compose requires them):
+Environment variables (`launch.sh` generates secrets into `.env`; Docker Compose requires them):
 
 | Variable       | Default                  | Purpose                                  |
 | -------------- | ------------------------ | ---------------------------------------- |

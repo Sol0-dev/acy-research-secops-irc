@@ -25,3 +25,6 @@ groups/
 *.sqlite
 *.db
 *.jsonl
+
+# Local MySQL data directory used during development
+.mysql/
