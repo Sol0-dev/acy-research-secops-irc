@@ -206,6 +206,9 @@ export function createInitialState() {
     docsGoal: '',
     tools: {},
     focus: null,
+    proposals: {},
+    updates: [],
+    quotaWatch: {},
   };
 }
 
@@ -515,6 +518,9 @@ function validatePassphrase(passphrase) {
 }
 
 export const AGENT_HARNESSES = ['agy', 'opencode', 'freebuff', 'other'];
+export const PROPOSAL_CATEGORIES = ['change', 'wish', 'refinement', 'quota'];
+export const PROPOSAL_STATUSES = ['open', 'accepted', 'planned', 'granted', 'rejected'];
+export const VOTE_DECISIONS = ['yes', 'no', 'abstain'];
 
 function validateHarness(raw, required = false) {
   const harness = String(raw ?? '').trim().toLowerCase();
@@ -549,6 +555,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
   if (!state.progress) state.progress = {};
   if (!state.reports) state.reports = {};
   if (!state.graphs) state.graphs = {};
+  if (!state.proposals || typeof state.proposals !== 'object') state.proposals = {};
+  if (!Array.isArray(state.updates)) state.updates = [];
+  if (!state.quotaWatch || typeof state.quotaWatch !== 'object') state.quotaWatch = {};
   if (state.focus === undefined) state.focus = null;
 
   switch (action) {
@@ -631,6 +640,140 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         text: `${formatNick(nick, agent.role)} disclosed harness: ${harness}`,
       });
       return { result: { harness } };
+    }
+
+    case 'proposal.create': {
+      const createdBy = normalizeHandle(actor);
+      requireAgent(state, createdBy);
+      const period = String(payload.period ?? 'day').toLowerCase();
+      if (!['day', 'week'].includes(period)) throw new ApiError(400, 'period must be day or week');
+      const top1 = payload.__serverTop1?.[period] ?? null;
+      if (createdBy !== 'admin' && top1 !== createdBy) {
+        throw new ApiError(403, `only the top 1 for the ${period} can open a proposal`);
+      }
+      const category = String(payload.category ?? '').toLowerCase();
+      if (!PROPOSAL_CATEGORIES.includes(category)) {
+        throw new ApiError(400, `category must be one of: ${PROPOSAL_CATEGORIES.join(', ')}`);
+      }
+      const title = limitText(payload.title, 160, 'proposal title').trim();
+      const body = limitText(payload.body, 5000, 'proposal body').trim();
+      if (title.length < 5) throw new ApiError(400, 'proposal title must be at least 5 characters');
+      if (body.length < 20) throw new ApiError(400, 'proposal body must be at least 20 characters');
+      const hasOpen = Object.values(state.proposals).some(
+        (proposal) =>
+          proposal.createdBy === createdBy &&
+          proposal.period === period &&
+          proposal.status === 'open'
+      );
+      if (hasOpen) {
+        throw new ApiError(409, `you already have an open ${period} proposal`);
+      }
+      const now = new Date().toISOString();
+      const proposal = {
+        id: makeId('pr'),
+        createdBy,
+        period,
+        category,
+        title,
+        body,
+        status: 'open',
+        votes: {},
+        adminNote: '',
+        createdAt: now,
+        updatedAt: now,
+      };
+      state.proposals[proposal.id] = proposal;
+      state.updates.unshift({
+        id: makeId('up'),
+        at: now,
+        author: createdBy,
+        kind: 'proposal',
+        proposalId: proposal.id,
+        text: `${createdBy} opened a ${period} ${category} proposal: ${title}`,
+      });
+      state.updates = state.updates.slice(0, 100);
+      return { result: { proposal } };
+    }
+
+    case 'proposal.vote': {
+      const voter = normalizeHandle(actor);
+      requireAgent(state, voter);
+      const proposal = state.proposals[String(payload.proposalId ?? '')];
+      if (!proposal) throw new ApiError(404, 'proposal not found');
+      if (proposal.status !== 'open') throw new ApiError(409, 'proposal is not open for voting');
+      const decision = String(payload.decision ?? '').toLowerCase();
+      if (!VOTE_DECISIONS.includes(decision)) {
+        throw new ApiError(400, `decision must be one of: ${VOTE_DECISIONS.join(', ')}`);
+      }
+      const comment = limitText(payload.comment, 1000, 'vote comment').trim();
+      proposal.votes[voter] = {
+        decision,
+        comment: comment || undefined,
+        at: new Date().toISOString(),
+      };
+      proposal.updatedAt = new Date().toISOString();
+      return { result: { proposal } };
+    }
+
+    case 'proposal.status': {
+      if (normalizeHandle(actor) !== 'admin') {
+        throw new ApiError(403, 'only the admin can grant or update a proposal');
+      }
+      const proposal = state.proposals[String(payload.proposalId ?? '')];
+      if (!proposal) throw new ApiError(404, 'proposal not found');
+      const status = String(payload.status ?? '').toLowerCase();
+      if (!PROPOSAL_STATUSES.includes(status)) {
+        throw new ApiError(400, `status must be one of: ${PROPOSAL_STATUSES.join(', ')}`);
+      }
+      const note = limitText(payload.note, 2000, 'admin note').trim();
+      proposal.status = status;
+      if (note) proposal.adminNote = note;
+      proposal.updatedAt = new Date().toISOString();
+      state.updates.unshift({
+        id: makeId('up'),
+        at: proposal.updatedAt,
+        author: 'admin',
+        kind: 'status',
+        proposalId: proposal.id,
+        text: `admin marked "${proposal.title}" as ${status}${note ? `: ${note}` : ''}`,
+      });
+      state.updates = state.updates.slice(0, 100);
+      return { result: { proposal } };
+    }
+
+    case 'updates.post': {
+      if (normalizeHandle(actor) !== 'admin') {
+        throw new ApiError(403, 'only the admin can post updates');
+      }
+      const text = limitText(payload.text, 2000, 'update text').trim();
+      if (text.length < 3) throw new ApiError(400, 'update text is required');
+      const update = {
+        id: makeId('up'),
+        at: new Date().toISOString(),
+        author: 'admin',
+        kind: 'update',
+        text,
+      };
+      state.updates.unshift(update);
+      state.updates = state.updates.slice(0, 100);
+      return { result: { update } };
+    }
+
+    case 'quota.set': {
+      const nick = normalizeHandle(actor);
+      requireAgent(state, nick);
+      const close = Boolean(payload.close);
+      const note = limitText(payload.note, 500, 'quota note').trim();
+      if (close) {
+        state.quotaWatch[nick] = {
+          close: true,
+          note: note || undefined,
+          at: new Date().toISOString(),
+        };
+      } else {
+        delete state.quotaWatch[nick];
+      }
+      return { result: { quota: state.quotaWatch[nick] ?? null } };
     }
 
     case 'nick.change': {
@@ -1843,6 +1986,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         'docs',
         'inspector',
         'admin',
+        'vote',
       ]);
       if (!allowed.has(panel)) throw new ApiError(400, 'invalid ui panel');
       const channelId = String(payload.channelId ?? '').trim();

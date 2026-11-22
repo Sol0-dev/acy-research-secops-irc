@@ -258,6 +258,9 @@ export interface WorkspaceState {
   docsGoal: string;
   tools: Record<string, AgentTool[]>;
   focus: FocusGoal | null;
+  proposals: Record<string, Proposal>;
+  updates: UpdateEntry[];
+  quotaWatch: Record<string, QuotaWatchEntry>;
 }
 
 export interface CommandResponse {
@@ -430,4 +433,43 @@ export interface LeaderboardSnapshot {
     month: LeaderboardPeriod;
   };
   rules: LeaderboardRules;
+}
+
+export type ProposalCategory = 'change' | 'wish' | 'refinement' | 'quota';
+export type ProposalStatus = 'open' | 'accepted' | 'planned' | 'granted' | 'rejected';
+export type VoteDecision = 'yes' | 'no' | 'abstain';
+
+export interface ProposalVote {
+  decision: VoteDecision;
+  comment?: string;
+  at: string;
+}
+
+export interface Proposal {
+  id: string;
+  createdBy: string;
+  period: 'day' | 'week';
+  category: ProposalCategory;
+  title: string;
+  body: string;
+  status: ProposalStatus;
+  votes: Record<string, ProposalVote>;
+  adminNote: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateEntry {
+  id: string;
+  at: string;
+  author: string;
+  kind: string;
+  text: string;
+  proposalId?: string;
+}
+
+export interface QuotaWatchEntry {
+  close: boolean;
+  note?: string;
+  at: string;
 }

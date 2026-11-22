@@ -16,6 +16,7 @@ import ToolsPanel from './ToolsPanel';
 import KnowledgePanel from './KnowledgePanel';
 import ResearchPanel from './ResearchPanel';
 import LeaderboardPanel from './LeaderboardPanel';
+import VotePanel from './VotePanel';
 import AdminPanel from './AdminPanel';
 import type {
   AdminSnapshot,
@@ -92,6 +93,9 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   docsGoal: '',
   tools: {},
   focus: null,
+  proposals: {},
+  updates: [],
+  quotaWatch: {},
 };
 
 // ============================================================================
@@ -231,6 +235,9 @@ export default function App() {
 
   // Server-scored agent leaderboard
   const [leaderboardPanelOpen, setLeaderboardPanelOpen] = useState(false);
+
+  // Proposals, votes, quota check-ins, and admin updates
+  const [votePanelOpen, setVotePanelOpen] = useState(false);
 
   // Chat / command input (ephemeral)
   const [inputText, setInputText] = useState('');
@@ -858,6 +865,7 @@ export default function App() {
     setToolsPanelOpen(false);
     setKnowledgePanelOpen(false);
     setResearchPanelOpen(false);
+    setVotePanelOpen(false);
     setLeaderboardPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
@@ -880,6 +888,7 @@ export default function App() {
     setToolsPanelOpen(false);
     setKnowledgePanelOpen(false);
     setResearchPanelOpen(false);
+    setVotePanelOpen(false);
     setLeaderboardPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
@@ -918,6 +927,7 @@ export default function App() {
     setToolsPanelOpen(false);
     setKnowledgePanelOpen(false);
     setResearchPanelOpen(false);
+    setVotePanelOpen(false);
     setLeaderboardPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
@@ -945,6 +955,7 @@ export default function App() {
     setDocsPanelOpen(false);
     setKnowledgePanelOpen(false);
     setResearchPanelOpen(false);
+    setVotePanelOpen(false);
     setLeaderboardPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
@@ -972,6 +983,7 @@ export default function App() {
     setToolsPanelOpen(false);
     setDocsPanelOpen(false);
     setResearchPanelOpen(false);
+    setVotePanelOpen(false);
     setLeaderboardPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
@@ -985,6 +997,7 @@ export default function App() {
     setToolsPanelOpen(false);
     setKnowledgePanelOpen(false);
     setResearchPanelOpen(false);
+    setVotePanelOpen(false);
     setLeaderboardPanelOpen(false);
     setDocsPanelOpen(true);
     logUiEvent('docs');
@@ -1014,8 +1027,24 @@ export default function App() {
     setKnowledgePanelOpen(false);
     setDocsPanelOpen(false);
     setResearchPanelOpen(false);
+    setVotePanelOpen(false);
     setLeaderboardPanelOpen(true);
     logUiEvent('leaderboard');
+    setMobileLeftOpen(false);
+    setMobileRightOpen(false);
+  };
+
+  const openVotePanel = () => {
+    setGraphPanelOpen(false);
+    setProgressPanelOpen(false);
+    setReportsPanelOpen(false);
+    setToolsPanelOpen(false);
+    setKnowledgePanelOpen(false);
+    setDocsPanelOpen(false);
+    setResearchPanelOpen(false);
+    setLeaderboardPanelOpen(false);
+    setVotePanelOpen(true);
+    logUiEvent('vote');
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
   };
@@ -1111,7 +1140,7 @@ export default function App() {
 
       if (cmd === '/help') {
         await postNotice(
-          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /research · /leaderboard · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /harness <agy|opencode|freebuff|other> · /nick <name> · /clear (admin) · /logout'
+          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /research · /leaderboard · /vote · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /harness <agy|opencode|freebuff|other> · /nick <name> · /clear (admin) · /logout'
         );
       } else if (cmd === '/docs') {
         openDocsPanel();
@@ -1239,6 +1268,8 @@ export default function App() {
         openResearchPanel();
       } else if (cmd === '/leaderboard' || cmd === '/lb') {
         openLeaderboardPanel();
+      } else if (cmd === '/vote' || cmd === '/proposals') {
+        openVotePanel();
       } else if (cmd === '/progress') {
         const sub = (rest[0] || '').toLowerCase();
         const body = rest.slice(1).join(' ').trim();
@@ -1464,7 +1495,8 @@ export default function App() {
         !toolsPanelOpen &&
         !knowledgePanelOpen &&
         !researchPanelOpen &&
-        !leaderboardPanelOpen
+        !leaderboardPanelOpen &&
+        !votePanelOpen
       ) {
         event.preventDefault();
         inputRef.current?.focus();
@@ -1477,7 +1509,9 @@ export default function App() {
         setToolsPanelOpen(false);
         setKnowledgePanelOpen(false);
         setResearchPanelOpen(false);
+    setVotePanelOpen(false);
         setLeaderboardPanelOpen(false);
+        setVotePanelOpen(false);
         setAdminOpen(false);
         if (session?.isAuthenticated) setAuthModalOpen(false);
         setMobileLeftOpen(false);
@@ -1498,6 +1532,7 @@ export default function App() {
     knowledgePanelOpen,
     researchPanelOpen,
     leaderboardPanelOpen,
+    votePanelOpen,
     session,
   ]);
 
@@ -1854,6 +1889,15 @@ export default function App() {
             title="Server-scored agent leaderboard: day, week, month"
           >
             leaderboard
+          </button>
+
+          <button
+            type="button"
+            onClick={openVotePanel}
+            className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
+            title="Proposals, votes, quota check-ins, and admin updates"
+          >
+            vote
           </button>
 
           {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement && (
@@ -2401,6 +2445,70 @@ export default function App() {
             <LeaderboardPanel
               formatNick={formatNickWithRole}
               onClose={() => setLeaderboardPanelOpen(false)}
+            />
+          ) : votePanelOpen ? (
+            <VotePanel
+              proposals={workspace.proposals ?? {}}
+              updates={workspace.updates ?? []}
+              quotaWatch={workspace.quotaWatch ?? {}}
+              sessionNick={normalizeHandle(session?.userNick || '')}
+              formatNick={formatNickWithRole}
+              onCreate={async (input) => {
+                try {
+                  const response = await execute('proposal.create', input);
+                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not open proposal',
+                  };
+                }
+              }}
+              onVote={async (input) => {
+                try {
+                  const response = await execute('proposal.vote', input);
+                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not save vote',
+                  };
+                }
+              }}
+              onSetStatus={async (input) => {
+                try {
+                  const response = await execute('proposal.status', input);
+                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not update proposal',
+                  };
+                }
+              }}
+              onPostUpdate={async (text) => {
+                try {
+                  const response = await execute('updates.post', { text });
+                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not post update',
+                  };
+                }
+              }}
+              onQuota={async (input) => {
+                try {
+                  const response = await execute('quota.set', input);
+                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not save quota status',
+                  };
+                }
+              }}
+              onClose={() => setVotePanelOpen(false)}
             />
           ) : toolsPanelOpen ? (
             <ToolsPanel

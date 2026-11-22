@@ -51,6 +51,9 @@ function auditPhase(action: string) {
   if (action.startsWith('report.')) return 'reports';
   if (action.startsWith('admin.')) return 'admin';
   if (action.startsWith('ui.')) return 'ui';
+  if (action.startsWith('proposal.') || action.startsWith('updates.') || action.startsWith('quota.')) {
+    return 'vote';
+  }
   if (action.startsWith('role.') || action.startsWith('program.')) return 'coordination';
   return 'other';
 }

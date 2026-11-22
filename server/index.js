@@ -740,6 +740,14 @@ async function handleCommand(req) {
   const isPublicAuth = action.startsWith('auth.');
   if (!isPublicAuth && !actor) throw new ApiError(401, 'authentication required');
 
+  if (action === 'proposal.create') {
+    const leaderboard = await buildLeaderboard(state);
+    payload.__serverTop1 = {
+      day: leaderboard.periods.day.rows[0]?.nick ?? null,
+      week: leaderboard.periods.week.rows[0]?.nick ?? null,
+    };
+  }
+
   const outcome = applyCommand(state, action, payload, actor);
   const issuedNick = outcome.tokenNick ?? null;
   const auditActor = issuedNick ?? actor;
