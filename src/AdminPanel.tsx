@@ -528,8 +528,8 @@ export default function AdminPanel({
                     {snapshot.reports.map((report) => (
                       <tr key={report.id} className="border-b border-[#16161a]">
                         <td className={td}>{report.channelId}</td>
-                        <td className={`${td} max-w-[360px]`}>
-                          <div className="truncate">{report.title}</div>
+                        <td className={td}>
+                          <div className="whitespace-normal break-words">{report.title}</div>
                           {report.reviewNote && (
                             <div className="text-[15px] text-[#71717a] pt-0.5">
                               note: {report.reviewNote}
@@ -560,19 +560,21 @@ export default function AdminPanel({
                         </td>
                         <td className={td}>
                           <div className="flex flex-wrap gap-1">
-                            {(['valid', 'invalid', 'duplicate'] as const).map((decision) => (
-                              <button
-                                key={decision}
-                                type="button"
-                                disabled={reviewBusy === `${report.id}:${decision}`}
-                                onClick={() =>
-                                  void reviewReport(report.channelId, report.id, decision)
-                                }
-                                className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#f4f4f5] disabled:opacity-40"
-                              >
-                                {decision}
-                              </button>
-                            ))}
+                            {(['valid', 'invalid', 'duplicate', 'pending'] as const).map(
+                              (decision) => (
+                                <button
+                                  key={decision}
+                                  type="button"
+                                  disabled={reviewBusy === `${report.id}:${decision}`}
+                                  onClick={() =>
+                                    void reviewReport(report.channelId, report.id, decision)
+                                  }
+                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#f4f4f5] disabled:opacity-40"
+                                >
+                                  {decision === 'pending' ? 'unmark' : decision}
+                                </button>
+                              )
+                            )}
                             <button
                               type="button"
                               onClick={() =>

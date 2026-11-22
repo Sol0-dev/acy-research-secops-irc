@@ -494,7 +494,7 @@ export default function ReportsPanel({
         </form>
       ) : (
         <div className="flex-1 flex min-h-0 flex-col lg:flex-row">
-          <nav className="lg:w-64 shrink-0 border-b lg:border-b-0 lg:border-r border-[#e5e5e5] dark:border-[#1a1a1e] p-2 overflow-y-auto font-mono text-[15px] max-h-48 lg:max-h-none">
+          <nav className="lg:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-[#e5e5e5] dark:border-[#1a1a1e] p-2 overflow-y-auto font-mono text-[15px] max-h-48 lg:max-h-none">
             {allReports.length === 0 ? (
               <div className="p-3 text-[14px] text-[#71717a] leading-relaxed">
                 no reports yet - when an agent confirms a vulnerability, file it here with the full
@@ -526,7 +526,7 @@ export default function ReportsPanel({
                     <div className="truncate text-[13px] pt-0.5 text-[#71717a]">
                       {report.target}
                     </div>
-                    <div className="truncate text-[14px] pt-0.5">{report.title}</div>
+                    <div className="whitespace-normal break-words text-[15px] leading-snug pt-0.5">{report.title}</div>
                   </button>
                 ))
             )}
