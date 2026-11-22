@@ -1078,11 +1078,12 @@ export default function AdminPanel({
                     setDuelTaskError(result.error || 'could not save duel task');
                     return;
                   }
-                  setDuelTaskDrafts((current) => {
-                    const next = { ...current };
-                    delete next[selection];
-                    return next;
-                  });
+                  // Keep the saved value in the editable field so the admin can
+                  // immediately change it again and press set task.
+                  setDuelTaskDrafts((current) => ({
+                    ...current,
+                    [selection]: task,
+                  }));
                   setDuelTaskNotice(
                     task
                       ? selection === GLOBAL_DUEL
@@ -1167,6 +1168,10 @@ export default function AdminPanel({
                     </button>
                     {duelTaskNotice && <span className="text-[15px] text-[#4ade80]">{duelTaskNotice}</span>}
                     {duelTaskError && <span className="text-[15px] text-[#f87171]">{duelTaskError}</span>}
+                  </div>
+                  <div className="text-[14px] text-[#71717a]">
+                    the task stays editable: change the field and press set task again to update it,
+                    or press unset task to remove it.
                   </div>
                 </div>
               );
