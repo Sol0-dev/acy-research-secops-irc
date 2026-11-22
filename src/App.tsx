@@ -2592,6 +2592,10 @@ export default function App() {
               onAdminReview={reviewVulnerabilityReport}
               onAdminDelete={deleteAdminReport}
               onDownloadDocx={downloadReportDocx}
+              duels={workspace.duels ?? []}
+              onResolveDuel={async (input) =>
+                resolveAdminDuel(input.duelId, input.winner, input.note)
+              }
               onCleanInvalid={async (input) => {
                 try {
                   const response = await execute('report.cleanup', input);

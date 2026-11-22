@@ -7,7 +7,7 @@
  * ---------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from 'react';
-import type { AgentProfile, ReportStatus, VulnReport, VulnSeverity } from './types';
+import type { AgentProfile, Duel, ReportStatus, VulnReport, VulnSeverity } from './types';
 
 const SEVERITIES: VulnSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
@@ -79,6 +79,12 @@ interface ReportsPanelProps {
     reportId: string;
   }) => Promise<{ ok: boolean; error?: string }>;
   onDownloadDocx?: (reportId: string, filename: string) => Promise<{ ok: boolean; error?: string }>;
+  duels?: Duel[];
+  onResolveDuel?: (input: {
+    duelId: string;
+    winner: string;
+    note?: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
   onCleanInvalid?: (input: {
     channelId: string;
     reportId: string;
@@ -125,6 +131,8 @@ export default function ReportsPanel({
   nickColor,
   isAdmin,
   onAdminReview,
+  duels,
+  onResolveDuel,
   onAdminDelete,
   onDownloadDocx,
   onCleanInvalid,
@@ -151,6 +159,9 @@ export default function ReportsPanel({
   const [error, setError] = useState('');
   const [reviewBusy, setReviewBusy] = useState('');
   const [reviewNotice, setReviewNotice] = useState('');
+  const [duelBusy, setDuelBusy] = useState(false);
+  const [duelNotice, setDuelNotice] = useState('');
+  const [duelError, setDuelError] = useState('');
   const [cleanBusy, setCleanBusy] = useState(false);
   const [cleanNotice, setCleanNotice] = useState('');
   const [adminBusy, setAdminBusy] = useState('');
@@ -163,6 +174,42 @@ export default function ReportsPanel({
     () => allReports.find((report) => report.id === selectedId) ?? allReports[0] ?? null,
     [allReports, selectedId]
   );
+
+  const selectedDuel = useMemo(
+    () =>
+      (duels ?? []).find(
+        (duel) =>
+          selected &&
+          duel.channelId === selected.channelId &&
+          ['pending', 'active'].includes(duel.status) &&
+          (duel.challenger === selected.createdBy || duel.opponent === selected.createdBy)
+      ) ?? null,
+    [duels, selected]
+  );
+  const canDeclareDuelWinner = Boolean(
+    isAdmin &&
+      onResolveDuel &&
+      selectedDuel &&
+      selected &&
+      (selected.review === 'valid' || selected.review === 'duplicate')
+  );
+  const declareDuelWinner = async () => {
+    if (!selected || !selectedDuel || !onResolveDuel) return;
+    setDuelBusy(true);
+    setDuelNotice('');
+    setDuelError('');
+    const result = await onResolveDuel({
+      duelId: selectedDuel.id,
+      winner: selected.createdBy,
+      note: `winning report: ${selected.title}`,
+    });
+    setDuelBusy(false);
+    if (!result.ok) {
+      setDuelError(result.error || 'could not declare duel winner');
+      return;
+    }
+    setDuelNotice(`@${selected.createdBy} declared duel winner`);
+  };
 
   useEffect(() => {
     if (allReports.length === 0) {
@@ -719,9 +766,31 @@ export default function ReportsPanel({
                           {decision === 'pending' ? 'unmark' : decision}
                         </button>
                       ))}
+                      {canDeclareDuelWinner && (
+                        <button
+                          type="button"
+                          disabled={duelBusy}
+                          onClick={() => void declareDuelWinner()}
+                          className="px-2 py-0.5 border border-[#16a34a]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80] disabled:opacity-40"
+                        >
+                          {duelBusy
+                            ? 'declaring…'
+                            : `mark @${selected.createdBy} duel winner`}
+                        </button>
+                      )}
                       {reviewNotice && (
                         <span className="text-[14px] text-[#16a34a] dark:text-[#4ade80]">
                           {reviewNotice}
+                        </span>
+                      )}
+                      {duelNotice && (
+                        <span className="text-[14px] text-[#16a34a] dark:text-[#4ade80]">
+                          {duelNotice}
+                        </span>
+                      )}
+                      {duelError && (
+                        <span className="text-[14px] text-[#dc2626] dark:text-[#f87171]">
+                          {duelError}
                         </span>
                       )}
                     </div>

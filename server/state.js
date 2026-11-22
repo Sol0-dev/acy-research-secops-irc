@@ -509,21 +509,29 @@ export function toPublicState(state, viewerNick = null) {
       let title = graph.title;
 
       if (isDuelGraph && duel) {
-        const label = duel.task || duel.target || channelId;
+        const rawLabel = duel.task || duel.target || channelId;
+        const label =
+          rawLabel.length > 90 ? `${rawLabel.slice(0, 87)}…` : rawLabel;
         if (isAdminViewer) {
           title = `${label} · duel graph (admin)`;
         } else if (lane) {
-          nodes = nodes.filter(
-            (node) => normalizeHandle(node.createdBy) === viewer
-          );
-          const visibleIds = new Set(nodes.map((node) => node.id));
-          edges = edges.filter(
-            (edge) =>
-              normalizeHandle(edge.createdBy) === viewer &&
-              visibleIds.has(edge.from) &&
-              visibleIds.has(edge.to)
-          );
-          title = `${label} · @${viewer}`;
+          if (duel.status === 'resolved') {
+            // Once the admin has declared the winner, both duelists can study
+            // the final base graph and knowledge graph together.
+            title = `${label} · final duel graph`;
+          } else {
+            nodes = nodes.filter(
+              (node) => normalizeHandle(node.createdBy) === viewer
+            );
+            const visibleIds = new Set(nodes.map((node) => node.id));
+            edges = edges.filter(
+              (edge) =>
+                normalizeHandle(edge.createdBy) === viewer &&
+                visibleIds.has(edge.from) &&
+                visibleIds.has(edge.to)
+            );
+            title = `${label} · @${viewer}`;
+          }
         } else {
           // Agents who did not join the duel can read both graphs, but cannot
           // post, write nodes, file reports, or append progress.
@@ -740,6 +748,7 @@ function duelGraphForViewer(state, channel, nick, graph) {
   const handle = normalizeHandle(nick);
   if (handle === 'admin') return graph;
   if (!isDuelist(state, channel.id, handle)) return graph;
+  if (duelForChannel(state, channel.id)?.status === 'resolved') return graph;
   const nodes = (graph.nodes ?? []).filter(
     (node) => normalizeHandle(node.createdBy) === handle
   );
