@@ -67,6 +67,12 @@ interface ReportsPanelProps {
   defaultContributor: string;
   formatNick: (nick: string, role?: string) => string;
   nickColor: (nick: string) => string;
+  isAdmin?: boolean;
+  onAdminReview?: (input: {
+    channelId: string;
+    reportId: string;
+    decision: 'valid' | 'invalid' | 'duplicate' | 'pending';
+  }) => Promise<ReportActionResult>;
   onClose: () => void;
   onCreate: (input: ReportDraft) => Promise<ReportActionResult>;
 }
@@ -107,6 +113,8 @@ export default function ReportsPanel({
   defaultContributor,
   formatNick,
   nickColor,
+  isAdmin,
+  onAdminReview,
   onClose,
   onCreate,
 }: ReportsPanelProps) {
@@ -128,6 +136,8 @@ export default function ReportsPanel({
   const [draft, setDraft] = useState<ReportDraft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [reviewBusy, setReviewBusy] = useState('');
+  const [reviewNotice, setReviewNotice] = useState('');
 
   const selected = useMemo(
     () => allReports.find((report) => report.id === selectedId) ?? allReports[0] ?? null,
@@ -203,6 +213,21 @@ export default function ReportsPanel({
   const label = (text: string) => (
     <span className="text-[13px] uppercase tracking-wider text-[#71717a]">{text}</span>
   );
+
+  const reviewReport = async (decision: 'valid' | 'invalid' | 'duplicate' | 'pending') => {
+    if (!selected || !onAdminReview) return;
+    setReviewBusy(decision);
+    setReviewNotice('');
+    const result = await onAdminReview({
+      channelId: selected.channelId,
+      reportId: selected.id,
+      decision,
+    });
+    setReviewBusy('');
+    setReviewNotice(
+      result.ok ? `report ${decision === 'pending' ? 'unmarked' : decision}` : result.error || 'review failed'
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#fafafa] dark:bg-[#0c0c0e] overflow-hidden">
@@ -302,6 +327,11 @@ export default function ReportsPanel({
           <div className="text-[15px] text-[#52525b] dark:text-[#a1a1aa]">
             change the <span className="text-[#18181b] dark:text-[#f4f4f5]">file target</span> in
             the header to report against a different engagement.
+          </div>
+          <div className="border-l-2 border-[#f59e0b] pl-2.5 text-[14px] text-[#b45309] dark:text-[#fbbf24] leading-relaxed">
+            Use the exact request and response captured during testing. No placeholders, empty
+            brackets, redaction, truncation, User-Agent notes, or 1.1 numbering. Steps must be 1., 2.,
+            3.
           </div>
 
           <label className="block space-y-1">
@@ -561,6 +591,29 @@ export default function ReportsPanel({
                   <h1 className="text-lg sm:text-xl font-medium text-[#18181b] dark:text-[#f4f4f5] not-italic">
                     {selected.title}
                   </h1>
+                  {isAdmin && onAdminReview && (
+                    <div className="flex flex-wrap items-center gap-1.5 border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2">
+                      <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                        admin review
+                      </span>
+                      {(['valid', 'invalid', 'duplicate', 'pending'] as const).map((decision) => (
+                        <button
+                          key={decision}
+                          type="button"
+                          disabled={reviewBusy === decision}
+                          onClick={() => void reviewReport(decision)}
+                          className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#52525b] dark:text-[#a1a1aa] disabled:opacity-40"
+                        >
+                          {decision === 'pending' ? 'unmark' : decision}
+                        </button>
+                      ))}
+                      {reviewNotice && (
+                        <span className="text-[14px] text-[#16a34a] dark:text-[#4ade80]">
+                          {reviewNotice}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </header>
 
                 <section className="space-y-1">

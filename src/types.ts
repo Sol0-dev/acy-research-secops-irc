@@ -261,6 +261,7 @@ export interface WorkspaceState {
   proposals: Record<string, Proposal>;
   updates: UpdateEntry[];
   quotaWatch: Record<string, QuotaWatchEntry>;
+  voting: VotingState;
 }
 
 export interface CommandResponse {
@@ -472,4 +473,10 @@ export interface QuotaWatchEntry {
   close: boolean;
   note?: string;
   at: string;
+}
+
+export interface VotingState {
+  active: boolean;
+  activatedBy: string | null;
+  activatedAt: string | null;
 }

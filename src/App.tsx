@@ -96,6 +96,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   proposals: {},
   updates: [],
   quotaWatch: {},
+  voting: { active: false, activatedBy: null, activatedAt: null },
 };
 
 // ============================================================================
@@ -2376,6 +2377,8 @@ export default function App() {
               defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
               nickColor={(nick) => getNickColor(nick, isDark)}
+              isAdmin={isAdminSession}
+              onAdminReview={reviewVulnerabilityReport}
               onClose={() => setReportsPanelOpen(false)}
               onCreate={async (input: ReportDraft) => {
                 try {
@@ -2451,6 +2454,7 @@ export default function App() {
               proposals={workspace.proposals ?? {}}
               updates={workspace.updates ?? []}
               quotaWatch={workspace.quotaWatch ?? {}}
+              voting={workspace.voting ?? { active: false, activatedBy: null, activatedAt: null }}
               sessionNick={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
               onCreate={async (input) => {
@@ -2505,6 +2509,17 @@ export default function App() {
                   return {
                     ok: false,
                     error: error instanceof Error ? error.message : 'could not save quota status',
+                  };
+                }
+              }}
+              onSetVoting={async (active) => {
+                try {
+                  const response = await execute('voting.set', { active });
+                  return response ? { ok: true } : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not change voting',
                   };
                 }
               }}

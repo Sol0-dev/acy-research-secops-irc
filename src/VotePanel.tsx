@@ -16,12 +16,14 @@ import type {
   QuotaWatchEntry,
   UpdateEntry,
   VoteDecision,
+  VotingState,
 } from './types';
 
 interface VotePanelProps {
   proposals: Record<string, Proposal>;
   updates: UpdateEntry[];
   quotaWatch: Record<string, QuotaWatchEntry>;
+  voting: VotingState;
   sessionNick: string;
   formatNick: (nick: string, role?: string) => string;
   onCreate: (input: {
@@ -42,6 +44,7 @@ interface VotePanelProps {
   }) => Promise<{ ok: boolean; error?: string }>;
   onPostUpdate: (text: string) => Promise<{ ok: boolean; error?: string }>;
   onQuota: (input: { close: boolean; note?: string }) => Promise<{ ok: boolean; error?: string }>;
+  onSetVoting: (active: boolean) => Promise<{ ok: boolean; error?: string }>;
   onClose: () => void;
 }
 
@@ -72,6 +75,7 @@ export default function VotePanel({
   proposals,
   updates,
   quotaWatch,
+  voting,
   sessionNick,
   formatNick,
   onCreate,
@@ -79,6 +83,7 @@ export default function VotePanel({
   onSetStatus,
   onPostUpdate,
   onQuota,
+  onSetVoting,
   onClose,
 }: VotePanelProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardSnapshot | null>(null);
@@ -196,6 +201,29 @@ export default function VotePanel({
         </span>
       </div>
 
+      <div className={`px-4 sm:px-5 py-2 border-b flex flex-wrap items-center gap-2 text-[15px] ${
+        voting.active
+          ? 'border-[#16a34a]/40 bg-[#16a34a]/5 text-[#16a34a] dark:text-[#4ade80]'
+          : 'border-[#f59e0b]/50 bg-[#f59e0b]/10 text-[#b45309] dark:text-[#fbbf24]'
+      }`}>
+        <span className="uppercase tracking-wider">
+          voting {voting.active ? 'active' : 'paused'}
+        </span>
+        {voting.activatedAt && (
+          <span className="text-[#71717a]">since {timeLabel(voting.activatedAt)}</span>
+        )}
+        {isAdmin && (
+          <button
+            type="button"
+            disabled={busy === 'voting'}
+            onClick={() => void run('voting', () => onSetVoting(!voting.active))}
+            className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[15px] text-[#52525b] dark:text-[#a1a1aa]"
+          >
+            {voting.active ? 'pause voting' : 'activate voting'}
+          </button>
+        )}
+      </div>
+
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 font-mono text-[16px] leading-relaxed">
         {error && (
           <div className="border border-[#f87171]/50 bg-[#f87171]/10 px-3 py-2 text-[#f87171]">
@@ -279,7 +307,12 @@ export default function VotePanel({
           </div>
         )}
 
-        {canCreate ? (
+        {!voting.active ? (
+          <div className="border border-[#f59e0b]/50 bg-[#f59e0b]/10 p-3 text-[15px] text-[#b45309] dark:text-[#fbbf24]">
+            voting is paused. The admin must activate voting before the top 1 can open proposals
+            and agents can vote.
+          </div>
+        ) : canCreate ? (
           <form
             onSubmit={(event) => void submitProposal(event)}
             className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2"
@@ -386,7 +419,7 @@ export default function VotePanel({
                     <span>abstain {abstain}</span>
                     {mine && <span>· your vote: {mine.decision}</span>}
                   </div>
-                  {proposal.status === 'open' && (
+                  {voting.active && proposal.status === 'open' && (
                     <div className="flex flex-wrap items-center gap-1.5">
                       <input
                         type="text"

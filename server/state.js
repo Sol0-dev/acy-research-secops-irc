@@ -172,6 +172,45 @@ function targetKey(raw) {
   return value.replace(/\/+$/, '').replace(/\.$/, '');
 }
 
+function assertCleanReportText(value, field, options = {}) {
+  const text = String(value ?? '');
+  if (/\$\{[^}]*\}/.test(text)) {
+    throw new ApiError(400, `${field} must use the actual value, not a \${...} placeholder`);
+  }
+  if (/\[\s*\]/.test(text)) {
+    throw new ApiError(400, `${field} must not contain an empty [] placeholder`);
+  }
+  if (/\[\s*(redacted|truncated|placeholder|insert)[^\]]*\]/i.test(text)) {
+    throw new ApiError(400, `${field} must not contain a redaction or truncation marker`);
+  }
+  if (/<\s*(redacted|truncated|placeholder|insert)[^>]*>/i.test(text)) {
+    throw new ApiError(400, `${field} must not contain a redaction or truncation marker`);
+  }
+  if (/\b(redacted|truncated)\b/i.test(text)) {
+    throw new ApiError(400, `${field} must not contain a redaction or truncation marker`);
+  }
+  if (options.requestLike) {
+    for (const line of text.split(/\r?\n/)) {
+      if (/^\s*user-agent\s*:/i.test(line) && /[()]/.test(line)) {
+        throw new ApiError(
+          400,
+          'User-Agent must be the exact value sent during testing; remove parenthetical notes'
+        );
+      }
+    }
+    if (text.includes('…') || /\.{3,}/.test(text)) {
+      throw new ApiError(400, `${field} must not be truncated with an ellipsis`);
+    }
+  }
+  if (options.steps) {
+    for (const line of text.split(/\r?\n/)) {
+      if (/^\s*\d+\.\d+/.test(line)) {
+        throw new ApiError(400, `${field} must use 1., 2., 3. numbering, not 1.1`);
+      }
+    }
+  }
+}
+
 // ============================================================================
 // Seed (used only when the central database has no workspace row yet)
 // ============================================================================
@@ -209,6 +248,7 @@ export function createInitialState() {
     proposals: {},
     updates: [],
     quotaWatch: {},
+    voting: { active: false, activatedBy: null, activatedAt: null },
   };
 }
 
@@ -558,6 +598,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
   if (!state.proposals || typeof state.proposals !== 'object') state.proposals = {};
   if (!Array.isArray(state.updates)) state.updates = [];
   if (!state.quotaWatch || typeof state.quotaWatch !== 'object') state.quotaWatch = {};
+  if (!state.voting || typeof state.voting !== 'object') {
+    state.voting = { active: false, activatedBy: null, activatedAt: null };
+  }
   if (state.focus === undefined) state.focus = null;
 
   switch (action) {
@@ -643,6 +686,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     }
 
     case 'proposal.create': {
+      if (!state.voting?.active) {
+        throw new ApiError(403, 'voting is not active - wait for the admin to activate it');
+      }
       const createdBy = normalizeHandle(actor);
       requireAgent(state, createdBy);
       const period = String(payload.period ?? 'day').toLowerCase();
@@ -696,6 +742,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     }
 
     case 'proposal.vote': {
+      if (!state.voting?.active) {
+        throw new ApiError(403, 'voting is paused by the admin');
+      }
       const voter = normalizeHandle(actor);
       requireAgent(state, voter);
       const proposal = state.proposals[String(payload.proposalId ?? '')];
@@ -774,6 +823,38 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         delete state.quotaWatch[nick];
       }
       return { result: { quota: state.quotaWatch[nick] ?? null } };
+    }
+
+    case 'voting.set': {
+      if (normalizeHandle(actor) !== 'admin') {
+        throw new ApiError(403, 'only the admin can activate or pause voting');
+      }
+      const active = Boolean(payload.active);
+      state.voting = {
+        active,
+        activatedBy: 'admin',
+        activatedAt: new Date().toISOString(),
+      };
+      const mentions = Object.values(state.agents)
+        .filter((agent) => agent.nick !== 'admin')
+        .map((agent) => `@${agent.nick}`)
+        .join(' ');
+      appendChannelMessage(state, '#lobby', {
+        type: 'sys',
+        time: nowHHMM(),
+        text: active
+          ? `${mentions}${mentions ? ' ' : ''}voting is open. Top 1 day/week: open a proposal. Every agent: vote yes/no/abstain, then continue working.`
+          : 'admin paused voting. Continue working and wait for the next activation.',
+      });
+      state.updates.unshift({
+        id: makeId('up'),
+        at: state.voting.activatedAt,
+        author: 'admin',
+        kind: 'voting',
+        text: active ? 'admin activated voting' : 'admin paused voting',
+      });
+      state.updates = state.updates.slice(0, 100);
+      return { result: { voting: state.voting } };
     }
 
     case 'nick.change': {
@@ -1891,6 +1972,18 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!attackerValue) throw new ApiError(400, 'attacker value section required');
       if (!impact) throw new ApiError(400, 'impact section required');
       if (remediation.length === 0) throw new ApiError(400, 'at least one remediation step required');
+      assertCleanReportText(title, 'report title');
+      assertCleanReportText(summary, 'report summary');
+      assertCleanReportText(affectedAsset, 'affected asset');
+      assertCleanReportText(String(payload.steps ?? ''), 'steps to reproduce', { steps: true });
+      assertCleanReportText(request, 'request', { requestLike: true });
+      assertCleanReportText(response, 'response', { requestLike: true });
+      assertCleanReportText(attackerValue, 'attacker value');
+      assertCleanReportText(String(payload.testedRuledOut ?? ''), 'tested and ruled out', {
+        steps: true,
+      });
+      assertCleanReportText(impact, 'impact');
+      assertCleanReportText(String(payload.remediation ?? ''), 'remediation', { steps: true });
 
       const reports = state.reports[channel.id] || (state.reports[channel.id] = []);
       if (reports.some((report) => report.title.toLowerCase() === title.toLowerCase())) {
