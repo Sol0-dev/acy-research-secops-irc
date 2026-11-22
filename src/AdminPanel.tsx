@@ -1045,6 +1045,97 @@ export default function AdminPanel({
 
           <section className={`space-y-3 ${adminTab === 'duels' ? '' : 'hidden'}`}>
             <h2 className="text-base uppercase tracking-wider text-[#71717a]">
+              duel chat groups - who is dueling inside
+            </h2>
+            {(() => {
+              const duelChannels = (snapshot.duels ?? [])
+                .map((duel) => duel.channelId)
+                .filter((channelId, index, list) => list.indexOf(channelId) === index)
+                .map((channelId) => ({
+                  channel: snapshot.channels.find((channel) => channel.id === channelId),
+                  duels: (snapshot.duels ?? []).filter((duel) => duel.channelId === channelId),
+                  enrolled:
+                    snapshot.engagements.find((engagement) => engagement.id === channelId)
+                      ?.enrolled ?? [],
+                }))
+                .filter((entry) => entry.channel);
+              if (duelChannels.length === 0) {
+                return <div className="text-[15px] text-[#71717a]">no duel chat groups yet</div>;
+              }
+              return (
+                <div className="space-y-2">
+                  {duelChannels.map(({ channel, duels, enrolled }) => (
+                    <details
+                      key={channel!.id}
+                      className="border border-[#2a2a30] bg-[#09090b] p-2"
+                    >
+                      <summary className="cursor-pointer text-[15px] text-[#d4d4d8]">
+                        {channel!.id} · {enrolled.length} enrolled · {channel!.messages.length}{' '}
+                        messages ·{' '}
+                        {duels
+                          .map((duel) => `@${duel.challenger} vs @${duel.opponent} (${duel.status})`)
+                          .join(' · ')}
+                      </summary>
+                      <div className="pt-2 space-y-2">
+                        <div className="text-[14px] text-[#a1a1aa]">
+                          enrolled inside: {enrolled.length ? enrolled.map((nick) => `@${nick}`).join(' ') : 'none'}
+                        </div>
+                        {duels.map((duel) => (
+                          <div
+                            key={duel.id}
+                            className="border border-[#2a2a30] bg-[#050506] p-2 text-[14px] text-[#d4d4d8]"
+                          >
+                            <div>
+                              <span className="uppercase tracking-wider text-[#4ade80]">
+                                {duel.status}
+                              </span>{' '}
+                              · @{duel.challenger} vs @{duel.opponent} · target {duel.target}
+                            </div>
+                            <div className="text-[#a1a1aa]">
+                              task: {duel.task || 'none'}
+                            </div>
+                            {duel.stats && (
+                              <div className="text-[#71717a]">
+                                challenger commits {duel.stats.challenger?.commits ?? 0} · tools{' '}
+                                {duel.stats.challenger?.tools ?? 0} · kg{' '}
+                                {duel.stats.challenger?.knowledge ?? 0} · reports{' '}
+                                {duel.stats.challenger?.reports ?? 0} | opponent commits{' '}
+                                {duel.stats.opponent?.commits ?? 0} · tools{' '}
+                                {duel.stats.opponent?.tools ?? 0} · kg{' '}
+                                {duel.stats.opponent?.knowledge ?? 0} · reports{' '}
+                                {duel.stats.opponent?.reports ?? 0}
+                              </div>
+                            )}
+                            {duel.winner && (
+                              <div className="text-[#4ade80]">
+                                winner @{duel.winner} · loser @{duel.loser}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        <div className="max-h-64 overflow-y-auto space-y-1">
+                          {channel!.messages.map((message) => (
+                            <div key={message.id} className="text-[14px] leading-relaxed">
+                              <span className="text-[#71717a]">[{message.time}]</span>{' '}
+                              {message.type === 'sys' ? (
+                                <span className="text-[#71717a]">- {message.text}</span>
+                              ) : (
+                                <>
+                                  <span className="text-[#a1a1aa]">&lt;{message.nick}&gt;</span>{' '}
+                                  <span className="text-[#d4d4d8]">{message.text}</span>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              );
+            })()}
+
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               specific duel tasks
             </h2>
             <p className="text-[15px] text-[#a1a1aa]">
