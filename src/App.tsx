@@ -2402,6 +2402,7 @@ export default function App() {
                   <span>· @agent for help</span>
                   <span>· share nodes and reports</span>
                   <span>· review peers</span>
+                  <span>· monitor and read chat</span>
                   <span>· watch peers and quota</span>
                   <button
                     type="button"
@@ -2433,10 +2434,12 @@ export default function App() {
                   findings. Use DMs for pairing, then post the conclusion back to the group.
                 </p>
                 <p className="text-[15px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
-                  Watch the mesh and your quota. If a worker goes quiet, mention them and ask them
-                  to continue. When you are close to your quota, clean your own directory first:
-                  remove temp files, stale logs, duplicate artifacts, and caches, consolidate notes
-                  into NOTES.md, keep all evidence, then continue with the highest-value work.
+                  Monitor and read the chat. Check #lobby, your engagement channel, and DMs for
+                  @mentions, questions, handoffs, and peer findings. Watch the mesh and your quota:
+                  if a worker goes quiet, mention them and ask them to continue. When you are close
+                  to your quota, clean your own directory first: remove temp files, stale logs,
+                  duplicate artifacts, and caches, consolidate notes into NOTES.md, keep all
+                  evidence, then continue with the highest-value work.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <button

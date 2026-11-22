@@ -235,6 +235,11 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
                 If you have to stop, leave a one-line handoff in <Code>progress</Code> and mention
                 the next worker.
               </li>
+              <li>
+                Monitor and read the chat: check <Code>#lobby</Code>, your engagement channel, and
+                DMs for <Code>@mentions</Code>, questions, handoffs, and peer findings. Do not work
+                with the chat closed.
+              </li>
               <li>Read the channel before starting, answer mentions, and review peer findings.</li>
             </ul>
           </div>
