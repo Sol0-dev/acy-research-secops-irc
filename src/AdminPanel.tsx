@@ -11,7 +11,7 @@ import { api } from './lib/api';
 import GraphView from './GraphView';
 import type { AdminSnapshot } from './types';
 
-type AdminTab = 'goal' | 'reports' | 'graphs' | 'knowledge' | 'accounts' | 'audit' | 'irc';
+type AdminTab = 'goal' | 'graphs' | 'knowledge' | 'accounts' | 'audit' | 'irc';
 
 interface AdminPanelProps {
   open: boolean;
@@ -22,16 +22,10 @@ interface AdminPanelProps {
   onRequestLogin: () => void;
   onSaveGoal: (goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
-  onReviewReport: (input: {
-    channelId: string;
-    reportId: string;
-    decision: string;
-  }) => Promise<{ ok: boolean; error?: string }>;
   onOpenAgentPortal: () => void;
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteAccount: (nick: string) => Promise<{ ok: boolean; error?: string }>;
-  onDeleteReport: (input: { channelId: string; reportId: string }) => Promise<{ ok: boolean; error?: string }>;
   onRefresh: () => Promise<void>;
   onClose: () => void;
 }
@@ -77,12 +71,10 @@ export default function AdminPanel({
   onRequestLogin,
   onSaveGoal,
   onSetFocus,
-  onReviewReport,
   onOpenAgentPortal,
   onDeleteGraph,
   onDeleteChannel,
   onDeleteAccount,
-  onDeleteReport,
   onRefresh,
   onClose,
 }: AdminPanelProps) {
@@ -94,20 +86,10 @@ export default function AdminPanel({
   const [goalNotice, setGoalNotice] = useState('');
   const [goalError, setGoalError] = useState('');
   const [goalBusy, setGoalBusy] = useState(false);
-  const [reviewBusy, setReviewBusy] = useState('');
-  const [reviewNotice, setReviewNotice] = useState('');
-  const [reviewError, setReviewError] = useState('');
   const [pendingDelete, setPendingDelete] = useState('');
   const [confirmAccountDelete, setConfirmAccountDelete] = useState<string | null>(null);
   const [accountNotice, setAccountNotice] = useState('');
   const [accountError, setAccountError] = useState('');
-  const [confirmReportDelete, setConfirmReportDelete] = useState<{
-    channelId: string;
-    reportId: string;
-    title: string;
-  } | null>(null);
-  const [reportDeleteNotice, setReportDeleteNotice] = useState('');
-  const [reportDeleteError, setReportDeleteError] = useState('');
   const [confirmGraphDelete, setConfirmGraphDelete] = useState<string | null>(null);
   const [deleteNotice, setDeleteNotice] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -215,16 +197,6 @@ export default function AdminPanel({
 
   if (!open) return null;
 
-  const reviewReport = async (channelId: string, reportId: string, decision: string) => {
-    setReviewBusy(`${reportId}:${decision}`);
-    setReviewNotice('');
-    setReviewError('');
-    const result = await onReviewReport({ channelId, reportId, decision });
-    setReviewBusy('');
-    if (!result.ok) setReviewError(result.error || 'could not review report');
-    else setReviewNotice(`report marked ${decision}`);
-  };
-
   const confirmDelete = async (kind: 'graph' | 'channel', channelId: string) => {
     setDeleteNotice('');
     setDeleteError('');
@@ -252,25 +224,6 @@ export default function AdminPanel({
     }
     setConfirmAccountDelete(null);
     setAccountNotice(`removed: ${nick}`);
-  };
-
-  const deleteReport = async (input: {
-    channelId: string;
-    reportId: string;
-    title: string;
-  }) => {
-    setReportDeleteNotice('');
-    setReportDeleteError('');
-    const result = await onDeleteReport({
-      channelId: input.channelId,
-      reportId: input.reportId,
-    });
-    if (!result.ok) {
-      setReportDeleteError(result.error || 'could not delete report');
-      return;
-    }
-    setConfirmReportDelete(null);
-    setReportDeleteNotice(`report deleted: ${input.title}`);
   };
 
   const th = 'text-left py-1 pr-3 text-[15px] uppercase tracking-wider text-[#71717a] font-normal';
@@ -397,7 +350,6 @@ export default function AdminPanel({
             {(
               [
                 ['goal', 'Goal'],
-                ['reports', 'Reports'],
                 ['graphs', 'Graphs'],
                 ['knowledge', 'Knowledge'],
                 ['accounts', 'Accounts'],
@@ -531,120 +483,6 @@ export default function AdminPanel({
               {focusNotice && <span className="text-base text-[#4ade80]">{focusNotice}</span>}
               {focusError && <span className="text-base text-[#f87171]">{focusError}</span>}
             </div>
-          </section>
-
-          <section className={`space-y-2 ${adminTab === 'reports' ? '' : 'hidden'}`}>
-            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
-              report review queue ({snapshot.reports.length})
-            </h2>
-            {snapshot.reports.length === 0 ? (
-              <div className="text-base text-[#52525b]">no reports filed.</div>
-            ) : (
-              <div className="overflow-x-auto border border-[#2a2a30]">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#2a2a30]">
-                      <th className={th}>channel</th>
-                      <th className={th}>report</th>
-                      <th className={th}>severity</th>
-                      <th className={th}>reporter</th>
-                      <th className={th}>review</th>
-                      <th className={th}>decision</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {snapshot.reports.map((report) => (
-                      <tr key={report.id} className="border-b border-[#16161a]">
-                        <td className={td}>{report.channelId}</td>
-                        <td className={td}>
-                          <div className="whitespace-normal break-words">{report.title}</div>
-                          {report.reviewNote && (
-                            <div className="text-[15px] text-[#71717a] pt-0.5">
-                              note: {report.reviewNote}
-                            </div>
-                          )}
-                        </td>
-                        <td className={td}>{report.severity}</td>
-                        <td className={td}>{report.createdBy}</td>
-                        <td className={td}>
-                          <span
-                            className={
-                              report.review === 'valid'
-                                ? 'text-[#4ade80]'
-                                : report.review === 'invalid'
-                                  ? 'text-[#f87171]'
-                                  : report.review === 'duplicate'
-                                    ? 'text-[#fbbf24]'
-                                    : report.review === 'triage'
-                                      ? 'text-[#38bdf8]'
-                                      : 'text-[#a1a1aa]'
-                            }
-                          >
-                            {report.review === 'triage' ? 'under triage' : report.review}
-                          </span>
-                          {report.reviewedBy && (
-                            <div className="text-[15px] text-[#71717a]">
-                              by {report.reviewedBy} · {report.reviewedTime}
-                            </div>
-                          )}
-                        </td>
-                        <td className={td}>
-                          <div className="flex flex-wrap gap-1">
-                            {(['triage', 'valid', 'invalid', 'duplicate', 'pending'] as const).map(
-                              (decision) => (
-                                <button
-                                  key={decision}
-                                  type="button"
-                                  disabled={reviewBusy === `${report.id}:${decision}`}
-                                  onClick={() =>
-                                    void reviewReport(report.channelId, report.id, decision)
-                                  }
-                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#f4f4f5] disabled:opacity-40"
-                                >
-                                  {decision === 'pending' ? 'unmark' : decision}
-                                </button>
-                              )
-                            )}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void downloadFile(
-                                  'docx',
-                                  report.id,
-                                  `${report.title.replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 60)}.docx`
-                                )
-                              }
-                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
-                            >
-                              docx
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setConfirmReportDelete({
-                                  channelId: report.channelId,
-                                  reportId: report.id,
-                                  title: report.title,
-                                })
-                              }
-                              className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
-                            >
-                              delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {reviewNotice && <div className="text-base text-[#4ade80]">{reviewNotice}</div>}
-            {reviewError && <div className="text-base text-[#f87171]">{reviewError}</div>}
-            {downloadNotice && <div className="text-base text-[#4ade80]">{downloadNotice}</div>}
-            {downloadError && <div className="text-base text-[#f87171]">{downloadError}</div>}
-            {reportDeleteNotice && <div className="text-base text-[#4ade80]">{reportDeleteNotice}</div>}
-            {reportDeleteError && <div className="text-base text-[#f87171]">{reportDeleteError}</div>}
           </section>
 
           <section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>
@@ -1303,43 +1141,14 @@ export default function AdminPanel({
             )}
           </section>
 
+          {downloadNotice && <div className="text-base text-[#4ade80]">{downloadNotice}</div>}
+          {downloadError && <div className="text-base text-[#f87171]">{downloadError}</div>}
           <div className="text-[15px] text-[#52525b] border-t border-[#2a2a30] pt-2">
             Admin panel - credentials gated. Set the goal, review reports, inspect the IRC,
             open graphs, and export files. Press Esc to close.
           </div>
           </div>
         </>
-      )}
-
-      {confirmReportDelete && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70">
-          <div className="w-full max-w-md border border-[#2a2a30] bg-[#09090b] p-4 space-y-3">
-            <div className="text-lg text-[#f4f4f5]">
-              Delete report "{confirmReportDelete.title}"?
-            </div>
-            <p className="text-[15px] text-[#a1a1aa] leading-relaxed">
-              This removes the report and its linked vulnerability node(s) and edges from all
-              graphs and the knowledge graph. The audit log keeps the action. This cannot be
-              undone.
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void deleteReport(confirmReportDelete)}
-                className="px-3 py-1.5 border border-[#f87171] text-[15px] text-[#f87171]"
-              >
-                yes, delete
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmReportDelete(null)}
-                className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
-              >
-                no, cancel
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {confirmAccountDelete && (

@@ -3643,12 +3643,10 @@ export default function App() {
         }}
         onSaveGoal={saveDocsGoal}
         onSetFocus={setAdminFocus}
-        onReviewReport={reviewVulnerabilityReport}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}
         onDeleteAccount={deleteAdminAccount}
-        onDeleteReport={deleteAdminReport}
         onRefresh={refreshAdminSnapshot}
         onClose={() => setAdminOpen(false)}
       />
