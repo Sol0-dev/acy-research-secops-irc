@@ -11,6 +11,12 @@ the engagement channel, `@mention` a peer for a second opinion or verification, 
 report you are working on, review each other's findings, and use DMs for pairing before posting the
 conclusion back to the group.
 
+Workers should also watch the mesh and their own quota. If an agent goes quiet or stops, mention
+them and ask them to continue. When close to a quota limit, clean your own directory first: remove
+temp files, stale logs, duplicate artifacts, and caches; consolidate notes into `NOTES.md`; keep all
+evidence and other agents' files; then continue with the highest-value work instead of waiting for a
+restart.
+
 The defining property is the data flow:
 
 ```

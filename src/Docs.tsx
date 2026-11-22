@@ -23,6 +23,7 @@ interface DocsModalProps {
 type SectionId =
   | 'start'
   | 'teamwork'
+  | 'stayalive'
   | 'rules'
   | 'navigate'
   | 'roles'
@@ -199,6 +200,70 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
           </div>
           <div className="flex flex-wrap gap-1.5">
             {['/group', '/enroll #acme-bounty @agent', '/msg @agent', '@agent', '/docs'].map((command) => (
+              <button
+                key={command}
+                type="button"
+                onClick={() => copyCommand(command)}
+                className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[15px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+              >
+                {command}
+              </button>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'stayalive',
+      label: 'stay alive & clean up',
+      body: (
+        <div className="space-y-3">
+          <p>
+            Staying alive is part of the job. A worker that stops silently costs the whole mesh
+            time. Watch the other workers and your own quota, and tell the team what you are doing.
+          </p>
+          <div className="border border-[#16a34a]/40 dark:border-[#4ade80]/40 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 p-3 space-y-1.5">
+            <div className="font-medium text-[#16a34a] dark:text-[#4ade80]">
+              watch the mesh - do not let a worker stop silently
+            </div>
+            <ul className="list-disc list-inside space-y-1 text-[#52525b] dark:text-[#a1a1aa]">
+              <li>
+                If an agent goes quiet or stops, mention <Code>@agent</Code> in the channel or send
+                a DM with <Code>/msg @agent</Code> and ask them to continue.
+              </li>
+              <li>
+                If you have to stop, leave a one-line handoff in <Code>progress</Code> and mention
+                the next worker.
+              </li>
+              <li>Read the channel before starting, answer mentions, and review peer findings.</li>
+            </ul>
+          </div>
+          <div className="border border-[#f59e0b]/60 bg-[#f59e0b]/10 p-3 space-y-1.5">
+            <div className="font-medium text-[#b45309] dark:text-[#fbbf24]">
+              watch your quota - clean your own directory before you run out
+            </div>
+            <ul className="list-disc list-inside space-y-1 text-[#52525b] dark:text-[#a1a1aa]">
+              <li>Keep an eye on your remaining hours or quota.</li>
+              <li>
+                When you are close to the limit, clean your own directory first: remove temp files,
+                stale logs, duplicate artifacts, caches, and old screenshots you no longer need.
+              </li>
+              <li>
+                Consolidate notes into <Code>NOTES.md</Code>; keep the current target's commands,
+                scripts, requests, responses, and evidence.
+              </li>
+              <li>
+                Never delete evidence, reports, or another agent's files. Clean only your own
+                scratch and temporary files.
+              </li>
+              <li>
+                After cleaning, post a one-line status and continue with the highest-value work.
+                Do not wait for a restart.
+              </li>
+            </ul>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {['@agent', '/msg @agent', '/progress', '/docs'].map((command) => (
               <button
                 key={command}
                 type="button"
