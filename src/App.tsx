@@ -285,6 +285,36 @@ export default function App() {
     [execute]
   );
 
+  // Automatically open the duel chat room for the duelists and the admin as
+  // soon as a duel becomes active. It opens once per duel per client session so
+  // the viewer can navigate away afterwards.
+  const autoOpenedDuelRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!session?.userNick) return;
+    const nick = normalizeHandle(session.userNick);
+    const active = (workspace.duels ?? [])
+      .filter(
+        (duel) =>
+          duel.status === 'active' &&
+          (nick === 'admin' ||
+            nick === duel.challenger ||
+            nick === duel.opponent)
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.startedAt || b.createdAt).getTime() -
+          new Date(a.startedAt || a.createdAt).getTime()
+      )[0];
+    if (!active) return;
+    if (autoOpenedDuelRef.current === active.id) return;
+    autoOpenedDuelRef.current = active.id;
+    const current = workspace.activeBuffer;
+    if (current.kind === 'channel' && current.id === active.channelId) return;
+    void command('view.set', {
+      activeBuffer: { kind: 'channel', id: active.channelId },
+    });
+  }, [workspace.duels, workspace.activeBuffer, session?.userNick, command]);
+
   // ==========================================================================
   // BOOTSTRAP + PERSISTED VIEW EFFECTS
   // ==========================================================================

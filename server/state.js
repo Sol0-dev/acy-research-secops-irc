@@ -375,6 +375,7 @@ export function createInitialState() {
     groups: ['COORDINATION'],
     collapsedGroups: {},
     activeBuffer: { kind: 'channel', id: '#lobby' },
+    activeBuffers: {},
     accounts: {},
     channels: [
       {
@@ -642,7 +643,8 @@ export function toPublicState(state, viewerNick = null) {
     }
   }
 
-  let activeBuffer = state.activeBuffer;
+  let activeBuffer =
+    (viewer && state.activeBuffers?.[viewer]) || state.activeBuffer;
   if (
     (activeBuffer.kind === 'channel' &&
       !channels.some((channel) => channel.id === activeBuffer.id)) ||
@@ -651,8 +653,9 @@ export function toPublicState(state, viewerNick = null) {
     activeBuffer = { kind: 'channel', id: '#lobby' };
   }
 
+  const { activeBuffers: _activeBuffers, ...publicState } = state;
   return {
-    ...state,
+    ...publicState,
     activeBuffer,
     accounts,
     channels,
@@ -1001,6 +1004,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
     state.voting = { active: false, activatedBy: null, activatedAt: null };
   }
   if (state.focus === undefined) state.focus = null;
+  if (!state.activeBuffers || typeof state.activeBuffers !== 'object') {
+    state.activeBuffers = {};
+  }
 
   switch (action) {
     // ------------------------------------------------------------------ auth
@@ -1308,15 +1314,20 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         state.accounts[next] = { ...state.accounts[actor], nick: next };
         delete state.accounts[actor];
       }
+      if (state.activeBuffers[actor]) {
+        state.activeBuffers[next] = state.activeBuffers[actor];
+        delete state.activeBuffers[actor];
+      }
       const notice = `${actor} is now known as ${next}`;
-      if (state.activeBuffer.kind === 'channel') {
-        appendChannelMessage(state, state.activeBuffer.id, {
+      const buffer = state.activeBuffers[next] ?? state.activeBuffer;
+      if (buffer.kind === 'channel') {
+        appendChannelMessage(state, buffer.id, {
           type: 'sys',
           time: nowHHMM(),
           text: notice,
         });
       } else {
-        appendDmSystem(state, state.activeBuffer.threadId, notice);
+        appendDmSystem(state, buffer.threadId, notice);
       }
       return { result: { nick: next }, tokenNick: next };
     }
@@ -3005,10 +3016,19 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       }
       if (payload.activeBuffer) {
         const next = payload.activeBuffer;
+        let accepted = null;
         if (next.kind === 'channel' && state.channels.some((item) => item.id === next.id)) {
-          state.activeBuffer = { kind: 'channel', id: next.id };
+          accepted = { kind: 'channel', id: next.id };
         } else if (next.kind === 'dm' && state.dmThreads[next.threadId]) {
-          state.activeBuffer = { kind: 'dm', threadId: next.threadId };
+          accepted = { kind: 'dm', threadId: next.threadId };
+        }
+        if (accepted) {
+          const viewer = actor ? normalizeHandle(actor) : null;
+          if (viewer) {
+            state.activeBuffers[viewer] = accepted;
+          } else {
+            state.activeBuffer = accepted;
+          }
         }
       }
       return { result: { ok: true } };

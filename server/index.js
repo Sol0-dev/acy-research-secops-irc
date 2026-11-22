@@ -686,6 +686,7 @@ app.post('/api/admin/account/delete', async (req, res) => {
     if (registered) delete state.accounts[nick];
     if (state.agents[nick]) delete state.agents[nick];
     if (state.quotaWatch) delete state.quotaWatch[nick];
+    if (state.activeBuffers) delete state.activeBuffers[nick];
 
     const time = new Date().toTimeString().slice(0, 5);
     const lobby = state.channels.find((item) => item.id === '#lobby');
