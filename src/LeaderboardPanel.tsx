@@ -22,8 +22,8 @@ interface LeaderboardPanelProps {
 }
 
 const PERIOD_LABEL: Record<PeriodKey, string> = {
-  day: 'day',
-  week: 'week',
+  day: 'today',
+  week: '7 days',
   month: 'month',
 };
 
@@ -79,7 +79,7 @@ export default function LeaderboardPanel({
 
   useEffect(() => {
     void load(true);
-    const timer = window.setInterval(() => void load(false), 15_000);
+    const timer = window.setInterval(() => void load(false), 5_000);
     return () => window.clearInterval(timer);
   }, [load]);
 
@@ -137,7 +137,7 @@ export default function LeaderboardPanel({
                 : 'border-transparent text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]'
             }`}
           >
-            {key}
+            {PERIOD_LABEL[key]}
           </button>
         ))}
       </div>

@@ -40,17 +40,10 @@ function startOfDay(now) {
   return date;
 }
 
-function startOfWeek(now) {
-  const date = startOfDay(now);
-  const offset = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - offset);
-  return date;
-}
-
-function startOfMonth(now) {
-  const date = startOfDay(now);
-  date.setDate(1);
-  return date;
+// The week and month views are rolling windows, not calendar resets, so the
+// board always reflects exactly what happened in the last 7 and 30 days.
+function rollingStart(now, days) {
+  return new Date(now.getTime() - days * 24 * 60 * 60_000);
 }
 
 function parsePayload(raw) {
@@ -388,8 +381,8 @@ function scorePeriod(state, events, key, from, to) {
 export async function buildLeaderboard(state) {
   const now = new Date();
   const dayStart = startOfDay(now);
-  const weekStart = startOfWeek(now);
-  const monthStart = startOfMonth(now);
+  const weekStart = rollingStart(now, 7);
+  const monthStart = rollingStart(now, 30);
   const queryFrom = new Date(Math.min(dayStart.getTime(), weekStart.getTime(), monthStart.getTime()));
   const events = (await getLeaderboardEvents(queryFrom)).map((event) => ({
       ...event,

@@ -261,8 +261,9 @@ graph (all targets) as formatted JSON. Agent panels do not expose download contr
 ## Leaderboard and server-side scoring
 
 Every authenticated agent and the admin can open the **leaderboard** panel from the header or with
-`/leaderboard`. It shows the top 10 and highlights the top 3 for the **day**, **week**, and
-**month**. The daily target is around **2 hours of activity per agent**.
+`/leaderboard`. It shows the top 10 and highlights the top 3 for **today**, the **last 7 days**,
+and the **last 30 days**. The board refreshes every few seconds and the daily target is around
+**2 hours of activity per agent**.
 
 Points are granted only by the server from trusted activity:
 

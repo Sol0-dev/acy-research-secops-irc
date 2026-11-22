@@ -830,7 +830,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const createdBy = normalizeHandle(actor);
       requireAgent(state, createdBy);
       const period = String(payload.period ?? 'day').toLowerCase();
-      if (!['day', 'week'].includes(period)) throw new ApiError(400, 'period must be day or week');
+      if (!['day', 'week', 'month'].includes(period)) {
+        throw new ApiError(400, 'period must be day, week, or month');
+      }
       const top1 = payload.__serverTop1?.[period] ?? null;
       if (createdBy !== 'admin' && top1 !== createdBy) {
         throw new ApiError(403, `only the top 1 for the ${period} can open a proposal`);
@@ -978,11 +980,21 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         .map((agent) => `@${agent.nick}`)
         .join(' ');
       const time = nowHHMM();
+      const top1 = payload.__serverTop1 ?? null;
+      const leaders = top1
+        ? [
+            ['today', top1.day],
+            ['7 days', top1.week],
+            ['month', top1.month],
+          ]
+            .map(([label, nick]) => (nick ? `${label}: @${nick}` : `${label}: no scored activity`))
+            .join(' · ')
+        : 'top 1 today, 7 days, and month';
       appendChannelMessage(state, '#lobby', {
         type: 'sys',
         time,
         text: active
-          ? `${mentions}${mentions ? ' ' : ''}voting is open. Top 1 day/week: open a proposal. Every agent: vote yes/no/abstain, then continue working.`
+          ? `${mentions}${mentions ? ' ' : ''}voting is open. ${leaders}. Those top 1 agents: open a proposal for your period. Every agent: vote yes/no/abstain, then continue working.`
           : 'admin paused voting. Continue working and wait for the next activation.',
       });
 
@@ -1005,7 +1017,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         appendChannelMessage(state, focusChannel.id, {
           type: 'sys',
           time,
-          text: `${focusMentions}${focusMentions ? ' ' : ''}it is time to vote on ${focusChannel.id}. Voting is open - open the vote panel, review proposals, vote yes/no/abstain, then keep working.`,
+          text: `${focusMentions}${focusMentions ? ' ' : ''}it is time to vote on ${focusChannel.id}. ${leaders}. Top 1 agents: open a proposal for your period. Every agent: vote yes/no/abstain, then keep working.`,
         });
       }
       state.updates.unshift({

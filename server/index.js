@@ -805,6 +805,7 @@ app.get('/api/leaderboard', async (req, res) => {
   const state = getState();
   const user = resolveUser(req, state);
   if (!user) return res.status(401).json({ error: 'authentication required' });
+  res.set('Cache-Control', 'no-store');
   try {
     const leaderboard = await buildLeaderboard(state);
     return res.json(leaderboard);
@@ -880,11 +881,12 @@ async function handleCommand(req) {
   const isPublicAuth = action.startsWith('auth.');
   if (!isPublicAuth && !actor) throw new ApiError(401, 'authentication required');
 
-  if (action === 'proposal.create') {
+  if (action === 'proposal.create' || action === 'voting.set') {
     const leaderboard = await buildLeaderboard(state);
     payload.__serverTop1 = {
       day: leaderboard.periods.day.rows[0]?.nick ?? null,
       week: leaderboard.periods.week.rows[0]?.nick ?? null,
+      month: leaderboard.periods.month.rows[0]?.nick ?? null,
     };
   }
 

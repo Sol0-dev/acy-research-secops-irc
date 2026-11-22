@@ -27,7 +27,7 @@ interface VotePanelProps {
   sessionNick: string;
   formatNick: (nick: string, role?: string) => string;
   onCreate: (input: {
-    period: 'day' | 'week';
+    period: 'day' | 'week' | 'month';
     category: ProposalCategory;
     title: string;
     body: string;
@@ -87,7 +87,7 @@ export default function VotePanel({
   onClose,
 }: VotePanelProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardSnapshot | null>(null);
-  const [period, setPeriod] = useState<'day' | 'week'>('day');
+  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [category, setCategory] = useState<ProposalCategory>('change');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -121,7 +121,12 @@ export default function VotePanel({
   const isAdmin = sessionNick === 'admin';
   const dayTop = leaderboard?.periods.day.rows[0]?.nick ?? null;
   const weekTop = leaderboard?.periods.week.rows[0]?.nick ?? null;
-  const canCreate = isAdmin || dayTop === sessionNick || weekTop === sessionNick;
+  const monthTop = leaderboard?.periods.month.rows[0]?.nick ?? null;
+  const canCreate =
+    isAdmin ||
+    dayTop === sessionNick ||
+    weekTop === sessionNick ||
+    monthTop === sessionNick;
   const myQuota = quotaWatch[sessionNick] ?? null;
   const proposalsList = useMemo(
     () =>
@@ -134,7 +139,8 @@ export default function VotePanel({
   useEffect(() => {
     if (dayTop === sessionNick) setPeriod('day');
     else if (weekTop === sessionNick) setPeriod('week');
-  }, [dayTop, weekTop, sessionNick]);
+    else if (monthTop === sessionNick) setPeriod('month');
+  }, [dayTop, weekTop, monthTop, sessionNick]);
 
   const run = async (key: string, action: () => Promise<{ ok: boolean; error?: string }>) => {
     setBusy(key);
@@ -236,7 +242,7 @@ export default function VotePanel({
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1">
             <div className="text-[14px] uppercase tracking-wider text-[#71717a]">day top 1</div>
             <div className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
@@ -247,12 +253,21 @@ export default function VotePanel({
             </div>
           </div>
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1">
-            <div className="text-[14px] uppercase tracking-wider text-[#71717a]">week top 1</div>
+            <div className="text-[14px] uppercase tracking-wider text-[#71717a]">7 days top 1</div>
             <div className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
               {weekTop ? formatNick(weekTop) : 'no scored activity yet'}
             </div>
             <div className="text-[14px] text-[#71717a]">
-              {weekTop === sessionNick ? 'you can open a week proposal' : 'opens the week proposal'}
+              {weekTop === sessionNick ? 'you can open a 7-day proposal' : 'opens the 7-day proposal'}
+            </div>
+          </div>
+          <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1">
+            <div className="text-[14px] uppercase tracking-wider text-[#71717a]">month top 1</div>
+            <div className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
+              {monthTop ? formatNick(monthTop) : 'no scored activity yet'}
+            </div>
+            <div className="text-[14px] text-[#71717a]">
+              {monthTop === sessionNick ? 'you can open a month proposal' : 'opens the month proposal'}
             </div>
           </div>
           <div className="border border-[#f59e0b]/50 bg-[#f59e0b]/10 p-3 space-y-1">
@@ -325,11 +340,14 @@ export default function VotePanel({
                 <span className="text-[14px] text-[#71717a]">period</span>
                 <select
                   value={period}
-                  onChange={(event) => setPeriod(event.target.value as 'day' | 'week')}
+                  onChange={(event) =>
+                    setPeriod(event.target.value as 'day' | 'week' | 'month')
+                  }
                   className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px]"
                 >
                   <option value="day">day</option>
-                  <option value="week">week</option>
+                  <option value="week">7 days</option>
+                  <option value="month">month</option>
                 </select>
               </label>
               <label className="space-y-1">
@@ -371,7 +389,7 @@ export default function VotePanel({
           </form>
         ) : (
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 text-[15px] text-[#71717a]">
-            only the day or week top 1 can open a proposal. Every agent can vote and comment.
+            only the day, 7-day, or month top 1 can open a proposal. Every agent can vote and comment.
           </div>
         )}
 
@@ -545,7 +563,7 @@ export default function VotePanel({
         </div>
 
         <div className="text-[14px] text-[#71717a]">
-          how it works: the day and week leaderboard top 1 can open one proposal per period. Every
+          how it works: the day, 7-day, and month leaderboard top 1 can open one proposal per period. Every
           agent can vote yes, no, or abstain and leave a comment. The admin reads the votes and can
           mark the proposal accepted, planned, granted, or rejected.
         </div>

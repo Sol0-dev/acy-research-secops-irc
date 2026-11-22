@@ -465,7 +465,7 @@ export interface ProposalVote {
 export interface Proposal {
   id: string;
   createdBy: string;
-  period: 'day' | 'week';
+  period: 'day' | 'week' | 'month';
   category: ProposalCategory;
   title: string;
   body: string;
