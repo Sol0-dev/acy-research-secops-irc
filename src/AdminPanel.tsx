@@ -243,7 +243,7 @@ export default function AdminPanel({
   };
 
   const th = 'text-left py-1 pr-3 text-[15px] uppercase tracking-wider text-[#71717a] font-normal';
-  const td = 'py-1 pr-3 align-top text-base text-[#d4d4d8]';
+  const td = 'py-1.5 pr-3 align-top text-base text-[#d4d4d8]';
 
   const adminGraph =
     snapshot?.graphs.find((graph) => graph.channelId === adminGraphChannelId) ??
@@ -1168,76 +1168,78 @@ export default function AdminPanel({
             </div>
           </section>
 
-          <section className={`space-y-2 ${adminTab === 'audit' ? '' : 'hidden'}`}>
+          <section className={`space-y-3 ${adminTab === 'audit' ? '' : 'hidden'}`}>
             <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               audit / agent activity (latest {snapshot.audit.length})
             </h2>
-            <div className="flex flex-wrap items-center gap-2 text-[15px]">
-              <input
-                type="text"
-                value={auditActorFilter}
-                onChange={(event) => setAuditActorFilter(event.target.value)}
-                placeholder="filter actor"
-                className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-[15px] text-[#f4f4f5]"
-              />
-              <input
-                type="text"
-                value={auditActionFilter}
-                onChange={(event) => setAuditActionFilter(event.target.value)}
-                placeholder="filter action"
-                className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-[15px] text-[#f4f4f5]"
-              />
-              <input
-                type="text"
-                value={auditSearch}
-                onChange={(event) => setAuditSearch(event.target.value)}
-                placeholder="search payload"
-                className="bg-[#050506] border border-[#2a2a30] px-2 py-1 text-[15px] text-[#f4f4f5]"
-              />
-              <span className="text-[#71717a]">
-                {filteredAudit.length} / {snapshot.audit.length} entries
-              </span>
-              <button
-                type="button"
-                onClick={() => void onRefresh()}
-                className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
-              >
-                refresh
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-1 text-[14px]">
-              <span className="text-[#71717a] uppercase tracking-wider">phases</span>
-              <button
-                type="button"
-                onClick={() => setAuditPhaseFilter('all')}
-                className={`px-1.5 py-0.5 border ${
-                  auditPhaseFilter === 'all'
-                    ? 'border-[#4ade80] text-[#4ade80]'
-                    : 'border-[#2a2a30] text-[#a1a1aa]'
-                }`}
-              >
-                all
-              </button>
-              {auditPhases.map(([phase, count]) => (
+            <div className="border border-[#2a2a30] bg-[#09090b] p-3 space-y-2.5">
+              <div className="flex flex-wrap items-center gap-2 text-[15px]">
+                <input
+                  type="text"
+                  value={auditActorFilter}
+                  onChange={(event) => setAuditActorFilter(event.target.value)}
+                  placeholder="filter actor"
+                  className="flex-1 min-w-[170px] bg-[#050506] border border-[#2a2a30] px-2.5 py-1.5 text-[15px] text-[#f4f4f5]"
+                />
+                <input
+                  type="text"
+                  value={auditActionFilter}
+                  onChange={(event) => setAuditActionFilter(event.target.value)}
+                  placeholder="filter action"
+                  className="flex-1 min-w-[170px] bg-[#050506] border border-[#2a2a30] px-2.5 py-1.5 text-[15px] text-[#f4f4f5]"
+                />
+                <input
+                  type="text"
+                  value={auditSearch}
+                  onChange={(event) => setAuditSearch(event.target.value)}
+                  placeholder="search payload"
+                  className="flex-1 min-w-[190px] bg-[#050506] border border-[#2a2a30] px-2.5 py-1.5 text-[15px] text-[#f4f4f5]"
+                />
+                <span className="text-[#71717a] whitespace-nowrap">
+                  {filteredAudit.length} / {snapshot.audit.length} entries
+                </span>
                 <button
-                  key={phase}
                   type="button"
-                  onClick={() => setAuditPhaseFilter(phase)}
-                  className={`px-1.5 py-0.5 border ${
-                    auditPhaseFilter === phase
+                  onClick={() => void onRefresh()}
+                  className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80]"
+                >
+                  refresh
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 text-[14px]">
+                <span className="text-[#71717a] uppercase tracking-wider mr-1">phases</span>
+                <button
+                  type="button"
+                  onClick={() => setAuditPhaseFilter('all')}
+                  className={`px-2 py-1 border ${
+                    auditPhaseFilter === 'all'
                       ? 'border-[#4ade80] text-[#4ade80]'
                       : 'border-[#2a2a30] text-[#a1a1aa]'
                   }`}
                 >
-                  {phase} · {count}
+                  all
                 </button>
-              ))}
+                {auditPhases.map(([phase, count]) => (
+                  <button
+                    key={phase}
+                    type="button"
+                    onClick={() => setAuditPhaseFilter(phase)}
+                    className={`px-2 py-1 border ${
+                      auditPhaseFilter === phase
+                        ? 'border-[#4ade80] text-[#4ade80]'
+                        : 'border-[#2a2a30] text-[#a1a1aa]'
+                    }`}
+                  >
+                    {phase} · {count}
+                  </button>
+                ))}
+              </div>
             </div>
             {snapshot.audit.length === 0 ? (
               <div className="text-base text-[#52525b]">no audit entries.</div>
             ) : (
-              <div className="overflow-x-auto border border-[#2a2a30] max-h-96 overflow-y-auto">
-                <table className="w-full border-collapse">
+              <div className="overflow-x-auto border border-[#2a2a30] max-h-[65vh] overflow-y-auto">
+                <table className="w-full min-w-[980px] border-collapse">
                   <thead className="sticky top-0 bg-[#09090b]">
                     <tr className="border-b border-[#2a2a30]">
                       <th className={th}>v</th>
