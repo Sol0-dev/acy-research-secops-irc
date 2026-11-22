@@ -1139,10 +1139,10 @@ export default function AdminPanel({
               specific duel tasks
             </h2>
             <p className="text-[15px] text-[#a1a1aa]">
-              Pick the specific duel, type its task, then set or unset it. The task is stored with
-              that duel and posted only to its private duel channel; only the two duelists and
-              admin can see it. Duel tasks are independent of the mission goal and the focus
-              engagement.
+              The selected duel's saved task is shown above the editor. Edit it and press save
+              changes, or unset it. The task is stored with that duel and posted only to its
+              private duel channel; only the two duelists and admin can see it. Duel tasks are
+              independent of the mission goal and the focus engagement.
             </p>
             {(() => {
               const duelList = snapshot.duels ?? [];
@@ -1214,18 +1214,22 @@ export default function AdminPanel({
                           {activeDuel.status}
                         </span>
                         <span>target {activeDuel.target}</span>
-                        <span>current task: {activeDuel.task || 'none'}</span>
                       </>
                     ) : (
-                      <span>
-                        applies to every new duel until unset · current:{' '}
-                        {snapshot.duelTask?.text || 'none'}
-                      </span>
+                      <span>applies to every new duel until unset</span>
                     )}
+                  </div>
+                  <div className="border border-[#2a2a30] bg-[#050506] p-2.5 space-y-1">
+                    <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                      set duel task
+                    </div>
+                    <div className="text-[15px] leading-relaxed text-[#d4d4d8] whitespace-pre-wrap break-words">
+                      {activeTask || 'none set'}
+                    </div>
                   </div>
                   <label className="block space-y-1">
                     <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                      duel task field
+                      edit duel task
                     </span>
                     <textarea
                       rows={16}
@@ -1247,7 +1251,7 @@ export default function AdminPanel({
                       onClick={() => saveTask(activeDraft)}
                       className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
                     >
-                      {duelTaskBusy === selection ? 'saving…' : 'set task'}
+                      {duelTaskBusy === selection ? 'saving…' : 'save changes'}
                     </button>
                     <button
                       type="button"
@@ -1261,28 +1265,8 @@ export default function AdminPanel({
                     {duelTaskError && <span className="text-[15px] text-[#f87171]">{duelTaskError}</span>}
                   </div>
                   <div className="text-[14px] text-[#71717a]">
-                    the task stays editable: change the field and press set task again to update it,
-                    or press unset task to remove it.
-                  </div>
-                  <div className="border-t border-[#2a2a30] pt-2 space-y-1">
-                    <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                      saved duel tasks
-                    </div>
-                    <div className="text-[14px] text-[#a1a1aa]">
-                      global / next duel: {snapshot.duelTask?.text || 'none'}
-                    </div>
-                    {duelList.length === 0 ? (
-                      <div className="text-[14px] text-[#71717a]">
-                        no duel-specific tasks yet
-                      </div>
-                    ) : (
-                      duelList.map((duel) => (
-                        <div key={duel.id} className="text-[14px] text-[#71717a]">
-                          {duel.channelId} · @{duel.challenger} vs @{duel.opponent} · task:{' '}
-                          {duel.task || 'none'}
-                        </div>
-                      ))
-                    )}
+                    change the editor above and press save changes to update the task, or unset
+                    it to remove it. Duelists are notified in their duel channel.
                   </div>
                 </div>
               );
