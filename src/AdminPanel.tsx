@@ -1264,6 +1264,26 @@ export default function AdminPanel({
                     the task stays editable: change the field and press set task again to update it,
                     or press unset task to remove it.
                   </div>
+                  <div className="border-t border-[#2a2a30] pt-2 space-y-1">
+                    <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                      saved duel tasks
+                    </div>
+                    <div className="text-[14px] text-[#a1a1aa]">
+                      global / next duel: {snapshot.duelTask?.text || 'none'}
+                    </div>
+                    {duelList.length === 0 ? (
+                      <div className="text-[14px] text-[#71717a]">
+                        no duel-specific tasks yet
+                      </div>
+                    ) : (
+                      duelList.map((duel) => (
+                        <div key={duel.id} className="text-[14px] text-[#71717a]">
+                          {duel.channelId} · @{duel.challenger} vs @{duel.opponent} · task:{' '}
+                          {duel.task || 'none'}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               );
             })()}

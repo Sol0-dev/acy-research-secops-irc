@@ -796,17 +796,24 @@ app.post('/api/admin/duel/task', async (req, res) => {
       state.duelTask = task ? { text: task, setBy: 'admin', setAt: now } : null;
       const lobby = state.channels.find((item) => item.id === '#lobby');
       if (lobby) {
+        const mentions = Object.values(state.agents)
+          .filter((agent) => agent.nick !== 'admin')
+          .map((agent) => `@${agent.nick}`)
+          .join(' ');
         lobby.messages = [
           ...lobby.messages.slice(-199),
           {
             id: `ch-${crypto.randomBytes(6).toString('hex')}`,
             type: 'sys',
             time,
-            text: task
-              ? `admin set the next duel task: ${task}`
-              : 'admin cleared the next duel task.',
+            text: `${mentions}${mentions ? ' ' : ''}${
+              task
+                ? `admin set the next duel task: ${task}`
+                : 'admin cleared the next duel task.'
+            }`,
           },
         ];
+        lobby.unread = true;
       }
       const version = await persistState(state, 'admin.duel.task', 'admin', {
         duelId: null,
@@ -828,12 +835,15 @@ app.post('/api/admin/duel/task', async (req, res) => {
           id: `ch-${crypto.randomBytes(6).toString('hex')}`,
           type: 'sys',
           time,
-          text: task
-            ? `admin set the specific duel task: ${task}`
-            : 'admin cleared the specific duel task.',
+          text: `@${duel.challenger} @${duel.opponent} ${
+            task
+              ? `admin set the duel task: ${task}`
+              : 'admin cleared the duel task.'
+          }`,
           duelNotice: true,
         },
       ];
+      channel.unread = true;
     }
     const version = await persistState(state, 'admin.duel.task', 'admin', {
       duelId,
