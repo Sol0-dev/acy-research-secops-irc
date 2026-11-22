@@ -569,6 +569,9 @@ export default function App() {
     reportId: string;
     decision: string;
   }) => {
+    if (normalizeHandle(session?.userNick || '') !== 'admin') {
+      return { ok: false, error: 'admin only' };
+    }
     if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
       await api.adminReviewReport(adminToken, input);
