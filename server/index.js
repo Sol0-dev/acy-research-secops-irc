@@ -522,9 +522,13 @@ app.post('/api/admin/account/delete', async (req, res) => {
   if (nick === 'admin') return res.status(400).json({ error: 'the admin account cannot be removed' });
   try {
     const state = structuredClone(getState());
-    if (!state.accounts[nick]) return res.status(404).json({ error: 'registered account not found' });
-    delete state.accounts[nick];
-    delete state.agents[nick];
+    const registered = Boolean(state.accounts[nick]);
+    const unregistered = Boolean(state.agents[nick]) && !registered;
+    if (!registered && !unregistered) {
+      return res.status(404).json({ error: 'account or agent not found' });
+    }
+    if (registered) delete state.accounts[nick];
+    if (state.agents[nick]) delete state.agents[nick];
     if (state.quotaWatch) delete state.quotaWatch[nick];
 
     const time = new Date().toTimeString().slice(0, 5);
@@ -536,13 +540,15 @@ app.post('/api/admin/account/delete', async (req, res) => {
           id: `ch-${crypto.randomBytes(6).toString('hex')}`,
           type: 'sys',
           time,
-          text: `admin removed registered account ${nick}`,
+          text: registered
+            ? `admin removed registered account ${nick}`
+            : `admin removed unregistered agent ${nick}`,
         },
       ];
     }
 
-    const version = await persistState(state, 'admin.account.delete', 'admin', { nick });
-    return res.json({ ok: true, nick, version });
+    const version = await persistState(state, registered ? 'admin.account.delete' : 'admin.agent.delete', 'admin', { nick });
+    return res.json({ ok: true, nick, kind: registered ? 'account' : 'unregistered', version });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

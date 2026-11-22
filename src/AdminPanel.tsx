@@ -35,6 +35,26 @@ interface AdminPanelProps {
   onClose: () => void;
 }
 
+function auditPhase(action: string) {
+  if (action.startsWith('auth.') || action === 'nick.change') return 'auth';
+  if (
+    action.startsWith('message.') ||
+    action.startsWith('dm.') ||
+    action.startsWith('notice.') ||
+    action.startsWith('channel.')
+  ) {
+    return 'chat';
+  }
+  if (action.startsWith('graph.')) return 'graph/knowledge';
+  if (action.startsWith('tool.')) return 'tools';
+  if (action.startsWith('progress.')) return 'progress';
+  if (action.startsWith('report.')) return 'reports';
+  if (action.startsWith('admin.')) return 'admin';
+  if (action.startsWith('ui.')) return 'ui';
+  if (action.startsWith('role.') || action.startsWith('program.')) return 'coordination';
+  return 'other';
+}
+
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="border border-[#2a2a30] bg-[#09090b] px-2.5 py-2">
@@ -91,6 +111,7 @@ export default function AdminPanel({
   const [auditActorFilter, setAuditActorFilter] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState('');
   const [auditSearch, setAuditSearch] = useState('');
+  const [auditPhaseFilter, setAuditPhaseFilter] = useState('all');
 
   const downloadFile = async (kind: 'docx' | 'graph' | 'all', id: string, filename: string) => {
     setDownloadNotice('');
@@ -149,11 +170,28 @@ export default function AdminPanel({
     return () => window.clearInterval(timer);
   }, [open, adminTab, onRefresh]);
 
+  const registeredNicks = useMemo(
+    () => new Set((snapshot?.accounts ?? []).map((account) => account.nick)),
+    [snapshot]
+  );
+
+  const auditPhases = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of snapshot?.audit ?? []) {
+      const phase = auditPhase(entry.action);
+      counts.set(phase, (counts.get(phase) ?? 0) + 1);
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [snapshot]);
+
   const filteredAudit = useMemo(() => {
     const actor = auditActorFilter.trim().toLowerCase();
     const action = auditActionFilter.trim().toLowerCase();
     const query = auditSearch.trim().toLowerCase();
     return (snapshot?.audit ?? []).filter((entry) => {
+      if (auditPhaseFilter !== 'all' && auditPhase(entry.action) !== auditPhaseFilter) {
+        return false;
+      }
       if (actor && !String(entry.actor ?? '').toLowerCase().includes(actor)) return false;
       if (action && !String(entry.action ?? '').toLowerCase().includes(action)) return false;
       if (query && !JSON.stringify(entry.payload ?? {}).toLowerCase().includes(query)) {
@@ -161,7 +199,7 @@ export default function AdminPanel({
       }
       return true;
     });
-  }, [snapshot, auditActorFilter, auditActionFilter, auditSearch]);
+  }, [snapshot, auditActorFilter, auditActionFilter, auditSearch, auditPhaseFilter]);
 
   if (!open) return null;
 
@@ -201,7 +239,7 @@ export default function AdminPanel({
       return;
     }
     setConfirmAccountDelete(null);
-    setAccountNotice(`account removed: ${nick}`);
+    setAccountNotice(`removed: ${nick}`);
   };
 
   const th = 'text-left py-1 pr-3 text-[15px] uppercase tracking-wider text-[#71717a] font-normal';
@@ -1052,6 +1090,7 @@ export default function AdminPanel({
                         <th className={th}>type</th>
                         <th className={th}>programs</th>
                         <th className={th}>graphs</th>
+                        <th className={th}>actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1085,6 +1124,38 @@ export default function AdminPanel({
                                     </button>
                                   ))}
                                 </div>
+                              )}
+                            </td>
+                            <td className={td}>
+                              {agent.nick === 'admin' ? (
+                                '-'
+                              ) : registeredNicks.has(agent.nick) ? (
+                                <span className="text-[15px] text-[#71717a]">registered</span>
+                              ) : confirmAccountDelete === agent.nick ? (
+                                <div className="flex flex-wrap gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteAccount(agent.nick)}
+                                    className="px-1.5 py-0.5 border border-[#f87171] text-[15px] text-[#f87171]"
+                                  >
+                                    yes, remove
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmAccountDelete(null)}
+                                    className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa]"
+                                  >
+                                    no
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmAccountDelete(agent.nick)}
+                                  className="px-1.5 py-0.5 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
+                                >
+                                  remove unregistered
+                                </button>
                               )}
                             </td>
                           </tr>
@@ -1134,6 +1205,34 @@ export default function AdminPanel({
                 refresh
               </button>
             </div>
+            <div className="flex flex-wrap items-center gap-1 text-[14px]">
+              <span className="text-[#71717a] uppercase tracking-wider">phases</span>
+              <button
+                type="button"
+                onClick={() => setAuditPhaseFilter('all')}
+                className={`px-1.5 py-0.5 border ${
+                  auditPhaseFilter === 'all'
+                    ? 'border-[#4ade80] text-[#4ade80]'
+                    : 'border-[#2a2a30] text-[#a1a1aa]'
+                }`}
+              >
+                all
+              </button>
+              {auditPhases.map(([phase, count]) => (
+                <button
+                  key={phase}
+                  type="button"
+                  onClick={() => setAuditPhaseFilter(phase)}
+                  className={`px-1.5 py-0.5 border ${
+                    auditPhaseFilter === phase
+                      ? 'border-[#4ade80] text-[#4ade80]'
+                      : 'border-[#2a2a30] text-[#a1a1aa]'
+                  }`}
+                >
+                  {phase} · {count}
+                </button>
+              ))}
+            </div>
             {snapshot.audit.length === 0 ? (
               <div className="text-base text-[#52525b]">no audit entries.</div>
             ) : (
@@ -1142,6 +1241,7 @@ export default function AdminPanel({
                   <thead className="sticky top-0 bg-[#09090b]">
                     <tr className="border-b border-[#2a2a30]">
                       <th className={th}>v</th>
+                      <th className={th}>phase</th>
                       <th className={th}>action</th>
                       <th className={th}>actor</th>
                       <th className={th}>time</th>
@@ -1152,6 +1252,7 @@ export default function AdminPanel({
                     {filteredAudit.map((entry, index) => (
                       <tr key={`${entry.version}-${index}`} className="border-b border-[#16161a]">
                         <td className={td}>{entry.version}</td>
+                        <td className={td}>{auditPhase(entry.action)}</td>
                         <td className={td}>{entry.action}</td>
                         <td className={td}>{entry.actor || '-'}</td>
                         <td className={td}>{String(entry.createdAt).replace('T', ' ').slice(0, 19)}</td>
