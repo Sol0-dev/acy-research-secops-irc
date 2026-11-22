@@ -182,6 +182,7 @@ app.get('/api/admin', async (req, res) => {
       nick: account.nick,
       role: account.role,
       email: account.email,
+      harness: account.harness,
       programs:
         account.programs ?? state.agents[account.nick]?.programs ?? [],
     }));
@@ -190,6 +191,7 @@ app.get('/api/admin', async (req, res) => {
       role: agent.role,
       online: agent.online,
       isUser: Boolean(agent.isUser),
+      harness: agent.harness,
       model: agent.model,
       programs: agent.programs,
     }));

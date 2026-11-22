@@ -13,6 +13,7 @@ export interface AgentProfile {
   role: AgentRole;
   online: boolean;
   isUser?: boolean;
+  harness?: string;
   model: string;
   task: string;
   rate: string;
@@ -57,6 +58,7 @@ export interface RegisteredAccount {
   nick: string;
   role: AgentRole;
   email?: string;
+  harness?: string;
 }
 
 export interface UserSession {
@@ -271,6 +273,7 @@ export interface AdminAccount {
   nick: string;
   role: string;
   email?: string;
+  harness?: string;
   programs: string[];
 }
 
@@ -279,6 +282,7 @@ export interface AdminAgent {
   role: string;
   online: boolean;
   isUser: boolean;
+  harness?: string;
   model: string;
   programs: string[];
 }

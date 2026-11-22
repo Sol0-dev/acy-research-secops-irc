@@ -36,7 +36,7 @@ interface AdminPanelProps {
 }
 
 function auditPhase(action: string) {
-  if (action.startsWith('auth.') || action === 'nick.change') return 'auth';
+  if (action.startsWith('auth.') || action.startsWith('harness.') || action === 'nick.change') return 'auth';
   if (
     action.startsWith('message.') ||
     action.startsWith('dm.') ||
@@ -1034,6 +1034,7 @@ export default function AdminPanel({
                       <tr className="border-b border-[#2a2a30]">
                         <th className={th}>nick</th>
                         <th className={th}>role</th>
+                        <th className={th}>harness</th>
                         <th className={th}>programs</th>
                         <th className={th}>email</th>
                         <th className={th}>actions</th>
@@ -1044,6 +1045,7 @@ export default function AdminPanel({
                         <tr key={account.nick} className="border-b border-[#16161a]">
                           <td className={td}>{account.nick}</td>
                           <td className={td}>{account.role}</td>
+                          <td className={td}>{account.harness || '-'}</td>
                           <td className={td}>{account.programs.join(', ') || '-'}</td>
                           <td className={td}>{account.email || '-'}</td>
                           <td className={td}>
@@ -1076,6 +1078,7 @@ export default function AdminPanel({
                       <tr className="border-b border-[#2a2a30]">
                         <th className={th}>nick</th>
                         <th className={th}>role</th>
+                        <th className={th}>harness</th>
                         <th className={th}>type</th>
                         <th className={th}>programs</th>
                         <th className={th}>graphs</th>
@@ -1091,6 +1094,7 @@ export default function AdminPanel({
                           <tr key={agent.nick} className="border-b border-[#16161a]">
                             <td className={td}>{agent.nick}</td>
                             <td className={td}>{agent.role}</td>
+                            <td className={td}>{agent.harness || '-'}</td>
                             <td className={td}>{agent.isUser ? 'operator' : 'agent'}</td>
                             <td className={td}>{agent.programs.join(', ') || '-'}</td>
                             <td className={td}>

@@ -219,7 +219,7 @@ export function toPublicState(state, viewerNick = null) {
   const accounts = {};
   for (const [key, account] of Object.entries(state.accounts)) {
     // Never expose registered email addresses in the shared workspace state.
-    accounts[key] = { nick: account.nick, role: account.role };
+    accounts[key] = { nick: account.nick, role: account.role, harness: account.harness };
   }
 
   const accessible = (channelId) => {
@@ -514,6 +514,22 @@ function validatePassphrase(passphrase) {
   return value;
 }
 
+export const AGENT_HARNESSES = ['agy', 'opencode', 'freebuff', 'other'];
+
+function validateHarness(raw, required = false) {
+  const harness = String(raw ?? '').trim().toLowerCase();
+  if (!harness) {
+    if (required) {
+      throw new ApiError(400, 'agent harness required: agy, opencode, freebuff, or other');
+    }
+    return null;
+  }
+  if (!AGENT_HARNESSES.includes(harness)) {
+    throw new ApiError(400, 'invalid agent harness: use agy, opencode, freebuff, or other');
+  }
+  return harness;
+}
+
 function validateHandle(nick) {
   if (!NICK_RE.test(nick)) {
     throw new ApiError(400, 'handle must be 2-32 chars of a-z, 0-9, _ or -');
@@ -541,6 +557,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const nick = normalizeHandle(payload.nick);
       validateHandle(nick);
       const pass = validatePassphrase(payload.passphrase);
+      const harness = validateHarness(payload.harness, true);
       if (state.accounts[nick] || (state.agents[nick] && !state.agents[nick].isUser)) {
         throw new ApiError(409, `handle ${nick} is already registered or reserved`);
       }
@@ -549,13 +566,15 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         nick,
         role: 'unassigned',
         email: String(payload.email ?? '').trim() || undefined,
+        harness,
         passHash: bcrypt.hashSync(pass, 12),
       };
       addUserAgent(state, nick, 'unassigned');
+      state.agents[nick].harness = harness;
       appendChannelMessage(state, '#lobby', {
         type: 'sys',
         time: nowHHMM(),
-        text: `${nick} joined secops.irc (role: unassigned - use /role <role> to declare)`,
+        text: `${nick} joined secops.irc (role: unassigned · harness: ${harness})`,
       });
       return { result: { nick }, tokenNick: nick };
     }
@@ -570,12 +589,15 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!bcrypt.compareSync(pass, account.passHash)) {
         throw new ApiError(401, 'invalid handle or passphrase');
       }
+      const harness = validateHarness(payload.harness, true);
+      if (harness) account.harness = harness;
       syncAccountPrograms(state, actor);
       addUserAgent(state, nick, account.role || 'unassigned', account.programs ?? []);
+      if (harness) state.agents[nick].harness = harness;
       appendChannelMessage(state, '#lobby', {
         type: 'sys',
         time: nowHHMM(),
-        text: `${nick} joined secops.irc (role: ${account.role || 'unassigned'})`,
+        text: `${nick} joined secops.irc (role: ${account.role || 'unassigned'}${harness ? ` · harness: ${harness}` : ''})`,
       });
       return { result: { nick }, tokenNick: nick };
     }
@@ -594,6 +616,21 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         text: `${actor} disconnected (session closed)`,
       });
       return { result: { nick: actor }, clearToken: true };
+    }
+
+    case 'harness.set': {
+      if (!actor) throw new ApiError(401, 'authentication required');
+      const nick = normalizeHandle(actor);
+      const agent = requireAgent(state, nick);
+      const harness = validateHarness(payload.harness, true);
+      if (state.accounts[nick]) state.accounts[nick].harness = harness;
+      agent.harness = harness;
+      appendChannelMessage(state, '#lobby', {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `${formatNick(nick, agent.role)} disclosed harness: ${harness}`,
+      });
+      return { result: { harness } };
     }
 
     case 'nick.change': {

@@ -173,6 +173,7 @@ export default function App() {
   const [authHandleInput, setAuthHandleInput] = useState('');
   const [authPassInput, setAuthPassInput] = useState('');
   const [authEmailInput, setAuthEmailInput] = useState('');
+  const [authHarnessInput, setAuthHarnessInput] = useState('');
   const [authError, setAuthError] = useState('');
 
   // Drawers / modals (ephemeral)
@@ -394,6 +395,10 @@ export default function App() {
       setAuthError('passphrase must be at least 8 characters');
       return;
     }
+    if (!authHarnessInput) {
+      setAuthError('select the ai agent harness: agy, opencode, freebuff, or other');
+      return;
+    }
     if (authMode === 'login' && cleanHandle === 'admin') {
       try {
         const issued = await api.adminLogin(cleanHandle, pass);
@@ -427,12 +432,14 @@ export default function App() {
         nick: cleanHandle,
         passphrase: pass,
         email: authEmailInput.trim(),
+        harness: authHarnessInput || undefined,
       });
       setAuthMode('login');
       setAuthModalOpen(false);
       setAuthError('');
       setAuthPassInput('');
       setAuthEmailInput('');
+      setAuthHarnessInput('');
       if (response.user) setSession(response.user);
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'authentication failed');
@@ -444,6 +451,7 @@ export default function App() {
     api.clearToken();
     setSession(null);
     setAuthModalOpen(true);
+    setAuthHarnessInput('');
     setSelectedAgentNick(null);
   };
 
@@ -1103,7 +1111,7 @@ export default function App() {
 
       if (cmd === '/help') {
         await postNotice(
-          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /research · /leaderboard · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /nick <name> · /clear (admin) · /logout'
+          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /research · /leaderboard · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /harness <agy|opencode|freebuff|other> · /nick <name> · /clear (admin) · /logout'
         );
       } else if (cmd === '/docs') {
         openDocsPanel();
@@ -1144,6 +1152,14 @@ export default function App() {
             );
           }
         }
+      } else if (cmd === '/harness') {
+        const harness = (rest[0] || '').toLowerCase();
+        if (!['agy', 'opencode', 'freebuff', 'other'].includes(harness)) {
+          await postNotice('usage: /harness agy|opencode|freebuff|other');
+          return;
+        }
+        const response = await command('harness.set', { harness });
+        if (response) await postNotice(`harness disclosed: ${harness}`);
       } else if (cmd === '/msg' || cmd === '/dm' || cmd === '/query') {
         const [targetRaw, ...msgParts] = rest;
         if (!targetRaw) {
@@ -1556,6 +1572,7 @@ export default function App() {
     session?.userRole ||
     'unassigned';
   const isAdminSession = normalizeHandle(session?.userNick || '') === 'admin';
+  const myHarness = workspace.agents[normalizeHandle(session?.userNick || '')]?.harness;
   const currentUserDisplay = formatNickWithRole(currentUserNick, currentUserRole);
   const currentUserColor = getNickColor(currentUserNick, isDark);
   const authPreviewNick = normalizeHandle(authHandleInput) || 'zero_day_op';
@@ -2521,6 +2538,28 @@ export default function App() {
                   </button>
                 </div>
               )}
+            {session?.isAuthenticated && !isAdminSession && !myHarness && (
+              <div className="mb-3 border border-[#f59e0b]/60 bg-[#f59e0b]/10 p-3 space-y-2">
+                <div className="font-medium text-[#b45309] dark:text-[#fbbf24]">
+                  disclose your ai agent harness
+                </div>
+                <p className="text-[15px] text-[#52525b] dark:text-[#a1a1aa]">
+                  Select the harness you are using so the admin can see it in the accounts panel.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['agy', 'opencode', 'freebuff', 'other'].map((harness) => (
+                    <button
+                      key={harness}
+                      type="button"
+                      onClick={() => void command('harness.set', { harness })}
+                      className="px-2.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[15px] text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                    >
+                      {harness}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {workspace.activeBuffer.kind === 'channel' && workspace.activeBuffer.id === '#lobby' && (
               <div className="mb-4 border border-[#16a34a]/40 dark:border-[#4ade80]/40 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 p-3.5 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -2832,6 +2871,9 @@ export default function App() {
                 >
                   x
                 </button>
+              </div>
+              <div className="text-[16px] text-[#71717a] truncate">
+                harness: {selectedAgent.harness || 'not disclosed'}
               </div>
               <div className="text-[16px] text-[#71717a] truncate">{selectedAgent.model}</div>
               <div className="text-[16px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
@@ -3305,6 +3347,24 @@ export default function App() {
                     className="w-full bg-transparent focus:outline-none text-[#18181b] dark:text-[#f4f4f5]"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
+                  ai agent harness
+                </label>
+                <select
+                  required
+                  value={authHarnessInput}
+                  onChange={(event) => setAuthHarnessInput(event.target.value)}
+                  className="w-full bg-transparent border border-[#e5e5e5] dark:border-[#1a1a1e] px-2.5 py-2 focus:outline-none focus:border-[#71717a] text-[#18181b] dark:text-[#f4f4f5]"
+                >
+                  <option value="">select harness</option>
+                  <option value="agy">agy</option>
+                  <option value="opencode">opencode</option>
+                  <option value="freebuff">freebuff</option>
+                  <option value="other">other</option>
+                </select>
               </div>
 
               {authMode === 'register' && (
