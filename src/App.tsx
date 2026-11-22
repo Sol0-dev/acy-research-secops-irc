@@ -98,6 +98,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   updates: [],
   quotaWatch: {},
   duels: [],
+  duelTask: null,
   voting: { active: false, activatedBy: null, activatedAt: null },
 };
 

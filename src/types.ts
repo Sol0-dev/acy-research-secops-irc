@@ -260,6 +260,12 @@ export interface DuelStats {
   accepted: number;
 }
 
+export interface DuelTaskConfig {
+  text: string;
+  setBy: string;
+  setAt: string;
+}
+
 export interface Duel {
   id: string;
   channelId: string;
@@ -315,6 +321,7 @@ export interface WorkspaceState {
   updates: UpdateEntry[];
   quotaWatch: Record<string, QuotaWatchEntry>;
   duels: Duel[];
+  duelTask: DuelTaskConfig | null;
   voting: VotingState;
 }
 
@@ -413,6 +420,7 @@ export interface AdminSnapshot {
   }>;
   graphs: EngagementGraph[];
   duels: Duel[];
+  duelTask: DuelTaskConfig | null;
   audit: AdminAuditEntry[];
   security: {
     apiHost: string;

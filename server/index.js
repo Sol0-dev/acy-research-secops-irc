@@ -790,14 +790,41 @@ app.post('/api/admin/duel/task', async (req, res) => {
   const task = String(req.body?.task ?? '').trim();
   try {
     const state = structuredClone(getState());
+    const now = new Date().toISOString();
+    const time = new Date().toTimeString().slice(0, 5);
+
+    // No duel id means this is the preset task for the next duel. Agents can
+    // invite each other after the admin prepares it.
+    if (!duelId) {
+      state.duelTask = task ? { text: task, setBy: 'admin', setAt: now } : null;
+      const lobby = state.channels.find((item) => item.id === '#lobby');
+      if (lobby) {
+        lobby.messages = [
+          ...lobby.messages.slice(-199),
+          {
+            id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+            type: 'sys',
+            time,
+            text: task
+              ? `admin set the next duel task: ${task}`
+              : 'admin cleared the next duel task.',
+          },
+        ];
+      }
+      const version = await persistState(state, 'admin.duel.task', 'admin', {
+        duelId: null,
+        task,
+      });
+      return res.json({ ok: true, duelTask: state.duelTask, version });
+    }
+
     const duel = (state.duels ?? []).find((item) => item.id === duelId);
     if (!duel) return res.status(404).json({ error: 'duel not found' });
     duel.task = task || undefined;
     duel.taskSetBy = 'admin';
-    duel.taskSetAt = new Date().toISOString();
+    duel.taskSetAt = now;
     const channel = state.channels.find((item) => item.id === duel.channelId);
     if (channel) {
-      const time = new Date().toTimeString().slice(0, 5);
       channel.messages = [
         ...channel.messages.slice(-199),
         {

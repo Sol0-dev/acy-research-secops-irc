@@ -13,6 +13,8 @@ import type { AdminSnapshot } from './types';
 
 type AdminTab = 'goal' | 'graphs' | 'knowledge' | 'accounts' | 'duels' | 'audit' | 'irc';
 
+const GLOBAL_DUEL = '__global__';
+
 interface AdminPanelProps {
   open: boolean;
   token: string;
@@ -1052,17 +1054,24 @@ export default function AdminPanel({
             </p>
             {(() => {
               const duelList = snapshot.duels ?? [];
+              const selection = selectedDuelId || GLOBAL_DUEL;
               const activeDuel =
-                duelList.find((duel) => duel.id === selectedDuelId) ?? duelList[0] ?? null;
-              const activeDraft = activeDuel
-                ? duelTaskDrafts[activeDuel.id] ?? activeDuel.task ?? ''
-                : '';
+                selection === GLOBAL_DUEL
+                  ? null
+                  : duelList.find((duel) => duel.id === selection) ?? null;
+              const activeTask =
+                selection === GLOBAL_DUEL
+                  ? snapshot.duelTask?.text ?? ''
+                  : activeDuel?.task ?? '';
+              const activeDraft = duelTaskDrafts[selection] ?? activeTask;
               const saveTask = (task: string) => {
-                if (!activeDuel) return;
-                setDuelTaskBusy(activeDuel.id);
+                setDuelTaskBusy(selection);
                 setDuelTaskNotice('');
                 setDuelTaskError('');
-                void onSetDuelTask(activeDuel.id, task).then((result) => {
+                void onSetDuelTask(
+                  selection === GLOBAL_DUEL ? '' : selection,
+                  task
+                ).then((result) => {
                   setDuelTaskBusy('');
                   if (!result.ok) {
                     setDuelTaskError(result.error || 'could not save duel task');
@@ -1070,11 +1079,17 @@ export default function AdminPanel({
                   }
                   setDuelTaskDrafts((current) => {
                     const next = { ...current };
-                    delete next[activeDuel.id];
+                    delete next[selection];
                     return next;
                   });
                   setDuelTaskNotice(
-                    task ? `task set for ${activeDuel.channelId}` : `task unset for ${activeDuel.channelId}`
+                    task
+                      ? selection === GLOBAL_DUEL
+                        ? 'next duel task set - new duels will inherit it'
+                        : `task set for ${activeDuel?.channelId ?? selection}`
+                      : selection === GLOBAL_DUEL
+                        ? 'next duel task unset'
+                        : `task unset for ${activeDuel?.channelId ?? selection}`
                   );
                 });
               };
@@ -1082,34 +1097,39 @@ export default function AdminPanel({
                 <div className="space-y-2 border border-[#2a2a30] bg-[#09090b] p-3">
                   <label className="block space-y-1">
                     <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                      specific duel
+                      duel target for task
                     </span>
                     <select
-                      value={activeDuel?.id ?? ''}
+                      value={selection}
                       onChange={(event) => setSelectedDuelId(event.target.value)}
-                      disabled={duelList.length === 0}
-                      className="w-full bg-[#050506] border border-[#2a2a30] px-2.5 py-1.5 text-[15px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a] disabled:opacity-40"
+                      className="w-full bg-[#050506] border border-[#2a2a30] px-2.5 py-1.5 text-[15px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
                     >
-                      {duelList.length === 0 ? (
-                        <option value="">no duels yet</option>
-                      ) : (
-                        duelList.map((duel) => (
-                          <option key={duel.id} value={duel.id}>
-                            {duel.channelId} · @{duel.challenger} vs @{duel.opponent} · {duel.status}
-                          </option>
-                        ))
-                      )}
+                      <option value={GLOBAL_DUEL}>
+                        global / next duel - set before agents invite
+                      </option>
+                      {duelList.map((duel) => (
+                        <option key={duel.id} value={duel.id}>
+                          {duel.channelId} · @{duel.challenger} vs @{duel.opponent} · {duel.status}
+                        </option>
+                      ))}
                     </select>
                   </label>
-                  {activeDuel && (
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-[#a1a1aa]">
-                      <span className="uppercase tracking-wider text-[#4ade80]">
-                        {activeDuel.status}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-[#a1a1aa]">
+                    {activeDuel ? (
+                      <>
+                        <span className="uppercase tracking-wider text-[#4ade80]">
+                          {activeDuel.status}
+                        </span>
+                        <span>target {activeDuel.target}</span>
+                        <span>current task: {activeDuel.task || 'none'}</span>
+                      </>
+                    ) : (
+                      <span>
+                        applies to every new duel until unset · current:{' '}
+                        {snapshot.duelTask?.text || 'none'}
                       </span>
-                      <span>target {activeDuel.target}</span>
-                      <span>current task: {activeDuel.task || 'none'}</span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                   <label className="block space-y-1">
                     <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
                       duel task field
@@ -1117,30 +1137,28 @@ export default function AdminPanel({
                     <textarea
                       rows={3}
                       value={activeDraft}
-                      disabled={!activeDuel}
-                      onChange={(event) => {
-                        if (!activeDuel) return;
+                      onChange={(event) =>
                         setDuelTaskDrafts((current) => ({
                           ...current,
-                          [activeDuel.id]: event.target.value,
-                        }));
-                      }}
+                          [selection]: event.target.value,
+                        }))
+                      }
                       placeholder="specific task for this duel, e.g. find an unauthenticated high-impact issue in the login flow"
-                      className="w-full bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-[15px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y disabled:opacity-40"
+                      className="w-full bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-[15px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
                     />
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      disabled={!activeDuel || duelTaskBusy === activeDuel?.id}
+                      disabled={duelTaskBusy === selection}
                       onClick={() => saveTask(activeDraft)}
                       className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
                     >
-                      {activeDuel && duelTaskBusy === activeDuel.id ? 'saving…' : 'set task'}
+                      {duelTaskBusy === selection ? 'saving…' : 'set task'}
                     </button>
                     <button
                       type="button"
-                      disabled={!activeDuel || duelTaskBusy === activeDuel?.id}
+                      disabled={duelTaskBusy === selection}
                       onClick={() => saveTask('')}
                       className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#71717a] hover:text-[#f87171] disabled:opacity-40"
                     >

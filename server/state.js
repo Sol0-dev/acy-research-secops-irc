@@ -420,6 +420,7 @@ export function createInitialState() {
     updates: [],
     quotaWatch: {},
     duels: [],
+    duelTask: null,
     voting: { active: false, activatedBy: null, activatedAt: null },
   };
 }
@@ -994,6 +995,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
   if (!Array.isArray(state.updates)) state.updates = [];
   if (!state.quotaWatch || typeof state.quotaWatch !== 'object') state.quotaWatch = {};
   if (!Array.isArray(state.duels)) state.duels = [];
+  if (state.duelTask === undefined) state.duelTask = null;
   if (!state.voting || typeof state.voting !== 'object') {
     state.voting = { active: false, activatedBy: null, activatedAt: null };
   }
@@ -2753,6 +2755,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         agent.task = `[${agent.role}] active on ${agent.programs.join(', ')}`;
         syncAccountPrograms(state, nick);
       }
+      const preset = state.duelTask?.text ? state.duelTask : null;
       const duel = {
         id: makeId('du'),
         channelId,
@@ -2761,13 +2764,16 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         opponent,
         status: 'pending',
         createdAt: new Date().toISOString(),
+        task: preset?.text,
+        taskSetBy: preset?.setBy,
+        taskSetAt: preset?.setAt,
         stats: { challenger: emptyDuelStats(), opponent: emptyDuelStats() },
       };
       state.duels.push(duel);
       appendChannelMessage(state, channelId, {
         type: 'sys',
         time: nowHHMM(),
-        text: `@${challenger} challenged @${opponent} to a duel on ${target}. Each agent uses their own private graph and commit log; neither can see the other's work. First accepted high or critical report wins +100; the other loses 30. @${opponent}: /duel accept or /duel decline.`,
+        text: `@${challenger} challenged @${opponent} to a duel on ${target}.${preset?.text ? ` Duel task: ${preset.text}.` : ''} Each agent uses their own private graph and commit log; neither can see the other's work. First accepted high or critical report wins +100; the other loses 30. @${opponent}: /duel accept or /duel decline.`,
         duelNotice: true,
       });
       return { result: { duel, channelId } };
