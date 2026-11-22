@@ -1933,6 +1933,57 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       };
     }
 
+    case 'report.cleanup': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const actorNick = normalizeHandle(actor);
+      requireAgent(state, actorNick);
+      const report = (state.reports[channel.id] ?? []).find(
+        (item) => item.id === String(payload.reportId ?? '')
+      );
+      if (!report) throw new ApiError(404, 'report not found');
+      if (report.review !== 'invalid') {
+        throw new ApiError(409, 'only invalid reports can be cleaned');
+      }
+      const titleKey = report.title.trim().toLowerCase();
+      let cleanedNodes = 0;
+      let cleanedEdges = 0;
+      for (const graph of Object.values(state.graphs ?? {})) {
+        const nodeIds = new Set();
+        if (report.graphNodeId) nodeIds.add(report.graphNodeId);
+        for (const node of graph.nodes ?? []) {
+          if (node.kind === 'vulnerability' && node.label.trim().toLowerCase() === titleKey) {
+            nodeIds.add(node.id);
+          }
+        }
+        const beforeNodes = graph.nodes?.length ?? 0;
+        const beforeEdges = graph.edges?.length ?? 0;
+        graph.nodes = (graph.nodes ?? []).filter((node) => !nodeIds.has(node.id));
+        graph.edges = (graph.edges ?? []).filter(
+          (edge) => !nodeIds.has(edge.from) && !nodeIds.has(edge.to)
+        );
+        cleanedNodes += beforeNodes - graph.nodes.length;
+        cleanedEdges += beforeEdges - graph.edges.length;
+      }
+      if (report.graphNodeId) report.graphNodeId = undefined;
+      report.cleanedGraph = {
+        nodes: cleanedNodes,
+        edges: cleanedEdges,
+        at: new Date().toISOString(),
+      };
+      appendProgressEntry(state, channel.id, {
+        author: actorNick,
+        status: 'note',
+        kind: 'change',
+        text: `cleaned ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) for invalid report "${report.title}"`,
+      });
+      appendChannelMessage(state, channel.id, {
+        type: 'sys',
+        time: nowHHMM(),
+        text: `${formatNick(actorNick, state.agents[actorNick]?.role)} cleaned ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) for invalid report "${report.title}"`,
+      });
+      return { result: { cleanedNodes, cleanedEdges } };
+    }
+
     case 'report.create': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const author = normalizeHandle(actor);
@@ -2040,7 +2091,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         impact,
         remediation,
         status,
-        review: 'pending',
+        review: 'triage',
         createdBy: author,
         time,
         version: 0,

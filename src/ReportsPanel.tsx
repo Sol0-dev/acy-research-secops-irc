@@ -28,6 +28,7 @@ const POINTS: Record<VulnSeverity, number> = {
 };
 
 const REVIEW_CLASS: Record<string, string> = {
+  triage: 'text-[#0284c7] dark:text-[#38bdf8] border-[#0284c7]/50 dark:border-[#38bdf8]/50',
   valid: 'text-[#047857] dark:text-[#4ade80] border-[#047857]/50 dark:border-[#4ade80]/50',
   invalid: 'text-[#be123c] dark:text-[#fb7185] border-[#be123c]/50 dark:border-[#fb7185]/50',
   duplicate: 'text-[#b45309] dark:text-[#fbbf24] border-[#b45309]/50 dark:border-[#fbbf24]/50',
@@ -71,8 +72,12 @@ interface ReportsPanelProps {
   onAdminReview?: (input: {
     channelId: string;
     reportId: string;
-    decision: 'valid' | 'invalid' | 'duplicate' | 'pending';
+    decision: 'triage' | 'valid' | 'invalid' | 'duplicate' | 'pending';
   }) => Promise<ReportActionResult>;
+  onCleanInvalid?: (input: {
+    channelId: string;
+    reportId: string;
+  }) => Promise<{ ok: boolean; error?: string; nodes?: number; edges?: number }>;
   onClose: () => void;
   onCreate: (input: ReportDraft) => Promise<ReportActionResult>;
 }
@@ -115,6 +120,7 @@ export default function ReportsPanel({
   nickColor,
   isAdmin,
   onAdminReview,
+  onCleanInvalid,
   onClose,
   onCreate,
 }: ReportsPanelProps) {
@@ -138,6 +144,8 @@ export default function ReportsPanel({
   const [error, setError] = useState('');
   const [reviewBusy, setReviewBusy] = useState('');
   const [reviewNotice, setReviewNotice] = useState('');
+  const [cleanBusy, setCleanBusy] = useState(false);
+  const [cleanNotice, setCleanNotice] = useState('');
 
   const selected = useMemo(
     () => allReports.find((report) => report.id === selectedId) ?? allReports[0] ?? null,
@@ -173,7 +181,7 @@ export default function ReportsPanel({
         row.valid += 1;
         row.points += POINTS[report.severity] ?? 0;
       }
-      if (review === 'pending') row.pending += 1;
+      if (review === 'pending' || review === 'triage') row.pending += 1;
       rows.set(report.createdBy, row);
     }
     return Array.from(rows.values()).sort(
@@ -214,7 +222,25 @@ export default function ReportsPanel({
     <span className="text-[13px] uppercase tracking-wider text-[#71717a]">{text}</span>
   );
 
-  const reviewReport = async (decision: 'valid' | 'invalid' | 'duplicate' | 'pending') => {
+  const cleanInvalid = async () => {
+    if (!selected || !onCleanInvalid) return;
+    setCleanBusy(true);
+    setCleanNotice('');
+    const result = await onCleanInvalid({
+      channelId: selected.channelId,
+      reportId: selected.id,
+    });
+    setCleanBusy(false);
+    if (!result.ok) {
+      setCleanNotice(result.error || 'cleanup failed');
+      return;
+    }
+    setCleanNotice(
+      `cleaned ${result.nodes ?? 0} node(s) and ${result.edges ?? 0} edge(s)`
+    );
+  };
+
+  const reviewReport = async (decision: 'triage' | 'valid' | 'invalid' | 'duplicate' | 'pending') => {
     if (!selected || !onAdminReview) return;
     setReviewBusy(decision);
     setReviewNotice('');
@@ -549,7 +575,7 @@ export default function ReportsPanel({
                       <span
                         className={`text-[13px] px-1 border ${REVIEW_CLASS[report.review] ?? REVIEW_CLASS.pending}`}
                       >
-                        {report.review}
+                        {report.review === 'triage' ? 'under triage' : report.review}
                       </span>
                       <span className="text-[13px] text-[#71717a]">v{report.version}</span>
                     </div>
@@ -575,7 +601,7 @@ export default function ReportsPanel({
                       {selected.severity}
                     </span>
                     <span className={`text-[13px] px-1 py-0.5 border ${REVIEW_CLASS[selected.review] ?? REVIEW_CLASS.pending}`}>
-                      {selected.review}
+                      {selected.review === 'triage' ? 'under triage' : selected.review}
                     </span>
                     <span className="text-[13px] px-1 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a]">
                       {selected.status}
@@ -596,7 +622,7 @@ export default function ReportsPanel({
                       <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
                         admin review
                       </span>
-                      {(['valid', 'invalid', 'duplicate', 'pending'] as const).map((decision) => (
+                      {(['triage', 'valid', 'invalid', 'duplicate', 'pending'] as const).map((decision) => (
                         <button
                           key={decision}
                           type="button"
@@ -615,6 +641,34 @@ export default function ReportsPanel({
                     </div>
                   )}
                 </header>
+
+                {selected.review === 'invalid' && onCleanInvalid && (
+                  <div className="border border-[#f59e0b]/60 bg-[#f59e0b]/10 p-3 space-y-2">
+                    <div className="text-[15px] uppercase tracking-wider text-[#b45309] dark:text-[#fbbf24]">
+                      invalid report - contamination cleanup
+                    </div>
+                    <p className="text-[15px] text-[#52525b] dark:text-[#a1a1aa]">
+                      The server removes matching vulnerability nodes from all graphs and the
+                      knowledge graph when the report is marked invalid. If you still see matching
+                      nodes, clean them again here.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={cleanBusy}
+                        onClick={() => void cleanInvalid()}
+                        className="px-2.5 py-1 border border-[#f59e0b]/60 text-[15px] text-[#b45309] dark:text-[#fbbf24] disabled:opacity-40"
+                      >
+                        clean contamination
+                      </button>
+                      {cleanNotice && (
+                        <span className="text-[14px] text-[#52525b] dark:text-[#a1a1aa]">
+                          {cleanNotice}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <section className="space-y-1">
                   <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">Summary</h2>
@@ -721,7 +775,7 @@ export default function ReportsPanel({
                     </span>
                   </div>
                   <div>
-                    review: {selected.review}
+                    review: {selected.review === 'triage' ? 'under triage by triagers' : selected.review}
                     {selected.reviewedBy
                       ? ` by ${selected.reviewedBy} · ${selected.reviewedTime ?? ''}`
                       : ' · awaiting admin decision'}

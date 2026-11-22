@@ -2379,6 +2379,20 @@ export default function App() {
               nickColor={(nick) => getNickColor(nick, isDark)}
               isAdmin={isAdminSession}
               onAdminReview={reviewVulnerabilityReport}
+              onCleanInvalid={async (input) => {
+                try {
+                  const response = await execute('report.cleanup', input);
+                  const result = resultOf<{ cleanedNodes: number; cleanedEdges: number }>(response);
+                  return result
+                    ? { ok: true, nodes: result.cleanedNodes, edges: result.cleanedEdges }
+                    : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not clean contamination',
+                  };
+                }
+              }}
               onClose={() => setReportsPanelOpen(false)}
               onCreate={async (input: ReportDraft) => {
                 try {

@@ -547,10 +547,12 @@ export default function AdminPanel({
                                   ? 'text-[#f87171]'
                                   : report.review === 'duplicate'
                                     ? 'text-[#fbbf24]'
-                                    : 'text-[#a1a1aa]'
+                                    : report.review === 'triage'
+                                      ? 'text-[#38bdf8]'
+                                      : 'text-[#a1a1aa]'
                             }
                           >
-                            {report.review}
+                            {report.review === 'triage' ? 'under triage' : report.review}
                           </span>
                           {report.reviewedBy && (
                             <div className="text-[15px] text-[#71717a]">
@@ -560,7 +562,7 @@ export default function AdminPanel({
                         </td>
                         <td className={td}>
                           <div className="flex flex-wrap gap-1">
-                            {(['valid', 'invalid', 'duplicate', 'pending'] as const).map(
+                            {(['triage', 'valid', 'invalid', 'duplicate', 'pending'] as const).map(
                               (decision) => (
                                 <button
                                   key={decision}

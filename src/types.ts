@@ -201,7 +201,7 @@ export type VulnSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
 export type ReportStatus = 'draft' | 'final';
 
-export type ReportReview = 'pending' | 'valid' | 'invalid' | 'duplicate';
+export type ReportReview = 'triage' | 'pending' | 'valid' | 'invalid' | 'duplicate';
 
 export interface VulnReport {
   id: string;

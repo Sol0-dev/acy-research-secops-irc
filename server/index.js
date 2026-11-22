@@ -321,8 +321,8 @@ app.post('/api/admin/report/review', async (req, res) => {
   const reportId = String(req.body?.reportId ?? '');
   const decision = String(req.body?.decision ?? '').toLowerCase();
   const note = String(req.body?.note ?? '').trim();
-  if (!['valid', 'invalid', 'duplicate', 'pending'].includes(decision)) {
-    return res.status(400).json({ error: 'decision must be valid, invalid, duplicate, or pending' });
+  if (!['triage', 'valid', 'invalid', 'duplicate', 'pending'].includes(decision)) {
+    return res.status(400).json({ error: 'decision must be triage, valid, invalid, duplicate, or pending' });
   }
   try {
     const state = structuredClone(getState());
@@ -338,9 +338,8 @@ app.post('/api/admin/report/review', async (req, res) => {
     let cleanedNodes = 0;
     let cleanedEdges = 0;
     if (decision === 'invalid') {
-      const graph = state.graphs?.[channelId];
-      if (graph) {
-        const titleKey = report.title.trim().toLowerCase();
+      const titleKey = report.title.trim().toLowerCase();
+      for (const graph of Object.values(state.graphs ?? {})) {
         const nodeIds = new Set();
         if (report.graphNodeId) nodeIds.add(report.graphNodeId);
         for (const node of graph.nodes ?? []) {
@@ -354,15 +353,15 @@ app.post('/api/admin/report/review', async (req, res) => {
         graph.edges = (graph.edges ?? []).filter(
           (edge) => !nodeIds.has(edge.from) && !nodeIds.has(edge.to)
         );
-        cleanedNodes = beforeNodes - graph.nodes.length;
-        cleanedEdges = beforeEdges - graph.edges.length;
-        if (report.graphNodeId) report.graphNodeId = undefined;
-        report.cleanedGraph = {
-          nodes: cleanedNodes,
-          edges: cleanedEdges,
-          at: new Date().toISOString(),
-        };
+        cleanedNodes += beforeNodes - graph.nodes.length;
+        cleanedEdges += beforeEdges - graph.edges.length;
       }
+      if (report.graphNodeId) report.graphNodeId = undefined;
+      report.cleanedGraph = {
+        nodes: cleanedNodes,
+        edges: cleanedEdges,
+        at: new Date().toISOString(),
+      };
     }
 
     const mentions = Object.values(state.agents)
@@ -371,7 +370,7 @@ app.post('/api/admin/report/review', async (req, res) => {
       .join(' ');
     const channelText =
       decision === 'invalid'
-        ? `${mentions}${mentions ? ' ' : ''}INVALID report: "${report.title}". Do not follow this rabbit hole again. Removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from the graph and the knowledge graph.`
+        ? `${mentions}${mentions ? ' ' : ''}INVALID report: "${report.title}". Do not follow this rabbit hole again. Removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from all graphs and the knowledge graph. Agents: use Clean contamination in the report if you still see matching nodes.`
         : `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}`;
 
     const log = state.progress[channelId] || (state.progress[channelId] = { channelId, entries: [] });
