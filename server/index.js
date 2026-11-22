@@ -788,9 +788,6 @@ app.post('/api/admin/duel/task', async (req, res) => {
   }
   const duelId = String(req.body?.duelId ?? '');
   const task = String(req.body?.task ?? '').trim();
-  if (task.length > 2000) {
-    return res.status(400).json({ error: 'duel task must be 2000 characters or fewer' });
-  }
   try {
     const state = structuredClone(getState());
     const duel = (state.duels ?? []).find((item) => item.id === duelId);
