@@ -1135,7 +1135,7 @@ export default function AdminPanel({
                       duel task field
                     </span>
                     <textarea
-                      rows={3}
+                      rows={16}
                       value={activeDraft}
                       onChange={(event) =>
                         setDuelTaskDrafts((current) => ({
@@ -1144,7 +1144,7 @@ export default function AdminPanel({
                         }))
                       }
                       placeholder="specific task for this duel, e.g. find an unauthenticated high-impact issue in the login flow"
-                      className="w-full bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-[15px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
+                      className="w-full min-h-[420px] bg-[#050506] border border-[#2a2a30] px-3 py-2.5 text-[17px] leading-relaxed text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
                     />
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
