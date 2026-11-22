@@ -194,6 +194,7 @@ export default function App() {
   const [addProgramOwnerPreselect, setAddProgramOwnerPreselect] = useState('');
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
   const [mobileRightOpen, setMobileRightOpen] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
 
   // Add Program form (ephemeral)
   const [progSlug, setProgSlug] = useState('');
@@ -1847,6 +1848,17 @@ export default function App() {
             {isDark ? '☀ light' : '🌙 dark'}
           </button>
 
+          {!rightPanelOpen && (
+            <button
+              type="button"
+              onClick={() => setRightPanelOpen(true)}
+              className="hidden lg:inline-flex items-center gap-1 text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-0.5"
+              title="Show agents & roles panel"
+            >
+              agents »
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => {
@@ -2592,23 +2604,36 @@ export default function App() {
 
         {/* RIGHT SIDEBAR: DYNAMIC ROLE GROUPS & INSPECTOR */}
         <aside
-          className={`fixed lg:static inset-y-0 right-0 z-40 w-[205px] bg-[#fafafa] dark:bg-[#0c0c0e] border-l border-[#e5e5e5] dark:border-[#1a1a1e] flex flex-col justify-between transform transition-transform duration-150 shrink-0 ${
-            mobileRightOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
-          }`}
+          className={`fixed lg:static inset-y-0 right-0 z-40 w-[292px] xl:w-[320px] bg-[#fafafa] dark:bg-[#0c0c0e] border-l border-[#e5e5e5] dark:border-[#1a1a1e] flex flex-col justify-between transform transition-transform duration-150 shrink-0 ${
+            rightPanelOpen ? 'lg:flex' : 'lg:hidden'
+          } ${mobileRightOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}
         >
-          <div className="p-3.5 space-y-4 font-mono text-base overflow-y-auto">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
+          <div className="p-3.5 space-y-4 font-mono text-[17px] overflow-y-auto">
+            <div className="flex items-center justify-between gap-1 px-1">
+              <span className="text-[16px] uppercase tracking-wider text-[#71717a]">
                 agents & roles
               </span>
-              <button
-                type="button"
-                onClick={openRoleCreate}
-                title={isAdminSession ? "Create a custom role for any agent" : "Create a custom role for yourself"}
-                className="text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
-              >
-                + role
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={openRoleCreate}
+                  title={isAdminSession ? "Create a custom role for any agent" : "Create a custom role for yourself"}
+                  className="text-[16px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+                >
+                  + role
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRightPanelOpen(false);
+                    setMobileRightOpen(false);
+                  }}
+                  title="Hide agents & roles panel"
+                  className="hidden lg:inline text-[16px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+                >
+                  hide »
+                </button>
+              </div>
             </div>
 
             {roleCreateOpen && (
@@ -2616,14 +2641,14 @@ export default function App() {
                 onSubmit={(event) => void submitCustomRole(event)}
                 className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-2 space-y-1.5"
               >
-                <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                <div className="text-[16px] uppercase tracking-wider text-[#71717a]">
                   new custom role
                 </div>
                 {isAdminSession ? (
                   <select
                     value={roleCreateTarget}
                     onChange={(event) => setRoleCreateTarget(event.target.value)}
-                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[16px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
                   >
                     {Object.values(workspace.agents).length === 0 && (
                       <option value="">no agents online</option>
@@ -2635,7 +2660,7 @@ export default function App() {
                     ))}
                   </select>
                 ) : (
-                  <div className="text-[14px] text-[#52525b] dark:text-[#a1a1aa]">
+                  <div className="text-[16px] text-[#52525b] dark:text-[#a1a1aa]">
                     for{' '}
                     <span className="text-[#18181b] dark:text-[#f4f4f5]">
                       @{normalizeHandle(session?.userNick || '')}
@@ -2648,36 +2673,36 @@ export default function App() {
                   value={roleCreateName}
                   onChange={(event) => setRoleCreateName(event.target.value)}
                   placeholder="type any role, e.g. cloud_hunter"
-                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[16px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
                 />
                 <textarea
                   rows={2}
                   value={roleCreateDescription}
                   onChange={(event) => setRoleCreateDescription(event.target.value)}
                   placeholder="describe what this custom role does (optional)"
-                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none resize-y"
+                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[16px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none resize-y"
                 />
                 <div className="flex items-center gap-1">
                   <button
                     type="submit"
-                    className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                    className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[16px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
                   >
                     create +
                   </button>
                   <button
                     type="button"
                     onClick={() => setRoleCreateOpen(false)}
-                    className="px-2 py-1 text-[14px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+                    className="px-2 py-1 text-[16px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
                   >
                     cancel
                   </button>
                 </div>
                 {roleCreateError && (
-                  <div className="text-[13px] text-[#dc2626] dark:text-[#f87171] leading-relaxed">
+                  <div className="text-[16px] text-[#dc2626] dark:text-[#f87171] leading-relaxed">
                     {roleCreateError}
                   </div>
                 )}
-                <div className="text-[13px] text-[#71717a] leading-relaxed">
+                <div className="text-[16px] text-[#71717a] leading-relaxed">
                   agents create their own custom roles; only the admin can assign a role to another agent.
                 </div>
               </form>
@@ -2686,9 +2711,9 @@ export default function App() {
             {roleGroups.map((group) => (
               <div key={group.role} className="space-y-1">
                 <div className="px-1 pb-0.5">
-                  <div className="text-[14px] uppercase tracking-wider text-[#71717a] flex items-center justify-between">
+                  <div className="text-[16px] uppercase tracking-wider text-[#71717a] flex items-center justify-between">
                     <span>{group.label}</span>
-                    <span className="text-[13px] text-[#71717a]/70">{group.members.length}</span>
+                    <span className="text-[16px] text-[#71717a]/70">{group.members.length}</span>
                   </div>
                 </div>
                 {group.members.map((agent) => {
@@ -2727,7 +2752,7 @@ export default function App() {
                         </span>
                       </span>
                       {programCount > 0 && (
-                        <span className="text-[13px] text-[#71717a] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1 shrink-0 group-hover:border-[#71717a]">
+                        <span className="text-[16px] text-[#71717a] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1 shrink-0 group-hover:border-[#71717a]">
                           {programCount === 1 ? primaryTag.slice(0, 8) : `${programCount}p`}
                         </span>
                       )}
@@ -2739,7 +2764,7 @@ export default function App() {
           </div>
 
           {selectedAgent && (
-            <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] p-3.5 font-mono text-base space-y-2.5 bg-[#f4f4f5]/50 dark:bg-[#111114] max-h-[65%] overflow-y-auto">
+            <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] p-3.5 font-mono text-[17px] space-y-2.5 bg-[#f4f4f5]/50 dark:bg-[#111114] max-h-[65%] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <span
                   className="font-medium truncate"
@@ -2755,13 +2780,13 @@ export default function App() {
                   x
                 </button>
               </div>
-              <div className="text-[15px] text-[#71717a] truncate">{selectedAgent.model}</div>
-              <div className="text-[15px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
+              <div className="text-[16px] text-[#71717a] truncate">{selectedAgent.model}</div>
+              <div className="text-[16px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
                 {selectedAgent.task}
               </div>
 
               <div className="pt-1.5 border-t border-[#e5e5e5] dark:border-[#1a1a1e] space-y-1.5">
-                <div className="flex items-center justify-between text-[14px] uppercase tracking-wider text-[#71717a]">
+                <div className="flex items-center justify-between text-[16px] uppercase tracking-wider text-[#71717a]">
                   <span>role</span>
                   <span className="text-[#16a34a] dark:text-[#4ade80]">{selectedAgent.role}</span>
                 </div>
@@ -2782,7 +2807,7 @@ export default function App() {
                             session?.userNick || selectedAgent.nick
                           )
                         }
-                        className={`px-1.5 py-0.5 text-[14px] border transition-colors ${
+                        className={`px-1.5 py-0.5 text-[16px] border transition-colors ${
                           active
                             ? 'border-[#16a34a] dark:border-[#4ade80] text-[#18181b] dark:text-[#f4f4f5] bg-[#fafafa] dark:bg-[#0c0c0e]'
                             : 'border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]'
@@ -2812,24 +2837,24 @@ export default function App() {
                     value={customRoleInput}
                     onChange={(event) => setCustomRoleInput(event.target.value)}
                     placeholder="create any role..."
-                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[16px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
                   />
                   <button
                     type="submit"
-                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] shrink-0"
+                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[16px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] shrink-0"
                   >
                     +role
                   </button>
                 </form>
                   </div>
                 ) : (
-                  <div className="text-[14px] text-[#71717a] leading-relaxed">
+                  <div className="text-[16px] text-[#71717a] leading-relaxed">
                     only the admin can change another agent's role.
                   </div>
                 )}
 
                 <div className="pt-1 space-y-1">
-                  <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                  <div className="text-[16px] uppercase tracking-wider text-[#71717a]">
                     role description
                   </div>
                   <textarea
@@ -2842,7 +2867,7 @@ export default function App() {
                         : 'what does this role do? scope, tools, responsibilities…'
                     }
                     disabled={selectedAgent.role === 'unassigned'}
-                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none resize-y disabled:opacity-50"
+                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[16px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none resize-y disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -2850,7 +2875,7 @@ export default function App() {
                     onClick={() =>
                       void saveRoleDescription(selectedAgent.role, roleDescriptionInput)
                     }
-                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40"
+                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[16px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] disabled:opacity-40"
                   >
                     save description
                   </button>
@@ -2862,7 +2887,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => void openOrCreateDmThread(selectedAgent.nick)}
-                    className="w-full py-1.5 px-2 border border-[#e5e5e5] dark:border-[#1a1a1e] hover:border-[#16a34a] dark:hover:border-[#4ade80] text-[15px] text-[#18181b] dark:text-[#f4f4f5] flex items-center justify-between transition-colors"
+                    className="w-full py-1.5 px-2 border border-[#e5e5e5] dark:border-[#1a1a1e] hover:border-[#16a34a] dark:hover:border-[#4ade80] text-[16px] text-[#18181b] dark:text-[#f4f4f5] flex items-center justify-between transition-colors"
                   >
                     <span>direct message</span>
                     <span className="text-[#16a34a] dark:text-[#4ade80]">&rarr;</span>
@@ -2876,7 +2901,7 @@ export default function App() {
                     const error = openGraphPanel(activeChannelObj.id);
                     if (error) setApiError(error);
                   }}
-                  className="w-full py-1.5 px-2 border border-[#e5e5e5] dark:border-[#1a1a1e] hover:border-[#16a34a] dark:hover:border-[#4ade80] text-[15px] text-[#18181b] dark:text-[#f4f4f5] flex items-center justify-between transition-colors"
+                  className="w-full py-1.5 px-2 border border-[#e5e5e5] dark:border-[#1a1a1e] hover:border-[#16a34a] dark:hover:border-[#4ade80] text-[16px] text-[#18181b] dark:text-[#f4f4f5] flex items-center justify-between transition-colors"
                 >
                   <span>contribute intel</span>
                   <span className="text-[#16a34a] dark:text-[#4ade80]">&rarr;</span>
@@ -2884,19 +2909,19 @@ export default function App() {
               )}
 
               <div className="pt-1.5 border-t border-[#e5e5e5] dark:border-[#1a1a1e] space-y-1.5">
-                <div className="flex items-center justify-between text-[14px] uppercase tracking-wider text-[#71717a]">
+                <div className="flex items-center justify-between text-[16px] uppercase tracking-wider text-[#71717a]">
                   <span>enrolled programs</span>
                   <span>{selectedAgent.programs.length}</span>
                 </div>
 
                 <div className="flex flex-wrap gap-1">
                   {selectedAgent.programs.length === 0 ? (
-                    <span className="text-[14px] text-[#71717a]">none yet</span>
+                    <span className="text-[16px] text-[#71717a]">none yet</span>
                   ) : (
                     selectedAgent.programs.map((channelId) => (
                       <div
                         key={channelId}
-                        className="inline-flex items-center gap-1 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#fafafa] dark:bg-[#0c0c0e] px-1.5 py-0.5 text-[14px]"
+                        className="inline-flex items-center gap-1 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#fafafa] dark:bg-[#0c0c0e] px-1.5 py-0.5 text-[16px]"
                       >
                         <button
                           type="button"
@@ -2930,7 +2955,7 @@ export default function App() {
                       if (!event.target.value) return;
                       void enrollAgentInProgram(selectedAgent.nick, event.target.value);
                     }}
-                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[14px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
+                    className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-1 text-[16px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none"
                   >
                     <option value="">+ enroll in program...</option>
                     {workspace.channels
@@ -2948,7 +2973,7 @@ export default function App() {
                     type="button"
                     onClick={() => openAddProgramModal(selectedAgent.nick)}
                     title="Create new engagement for this agent"
-                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] shrink-0"
+                    className="px-1.5 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[16px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] shrink-0"
                   >
                     +new
                   </button>
