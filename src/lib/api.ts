@@ -109,6 +109,16 @@ export const api = {
       body: JSON.stringify({ goal }),
     });
   },
+  adminSetDuelTask(
+    token: string,
+    input: { duelId: string; task: string }
+  ): Promise<{ ok: boolean; version: number }> {
+    return request<{ ok: boolean; version: number }>('/api/admin/duel/task', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify(input),
+    });
+  },
   adminSetFocus(
     token: string,
     input: { channelId: string; goal: string; days: number }

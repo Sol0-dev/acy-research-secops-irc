@@ -11,7 +11,7 @@ import { api } from './lib/api';
 import GraphView from './GraphView';
 import type { AdminSnapshot } from './types';
 
-type AdminTab = 'goal' | 'graphs' | 'knowledge' | 'accounts' | 'audit' | 'irc';
+type AdminTab = 'goal' | 'graphs' | 'knowledge' | 'accounts' | 'duels' | 'audit' | 'irc';
 
 interface AdminPanelProps {
   open: boolean;
@@ -22,6 +22,7 @@ interface AdminPanelProps {
   onRequestLogin: () => void;
   onSaveGoal: (goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
+  onSetDuelTask: (duelId: string, task: string) => Promise<{ ok: boolean; error?: string }>;
   onOpenAgentPortal: () => void;
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
@@ -71,6 +72,7 @@ export default function AdminPanel({
   onRequestLogin,
   onSaveGoal,
   onSetFocus,
+  onSetDuelTask,
   onOpenAgentPortal,
   onDeleteGraph,
   onDeleteChannel,
@@ -106,6 +108,10 @@ export default function AdminPanel({
   const [auditActionFilter, setAuditActionFilter] = useState('');
   const [auditSearch, setAuditSearch] = useState('');
   const [auditPhaseFilter, setAuditPhaseFilter] = useState('all');
+  const [duelTaskDrafts, setDuelTaskDrafts] = useState<Record<string, string>>({});
+  const [duelTaskBusy, setDuelTaskBusy] = useState('');
+  const [duelTaskNotice, setDuelTaskNotice] = useState('');
+  const [duelTaskError, setDuelTaskError] = useState('');
 
   const downloadFile = async (kind: 'docx' | 'graph' | 'all', id: string, filename: string) => {
     setDownloadNotice('');
@@ -353,6 +359,7 @@ export default function AdminPanel({
                 ['graphs', 'Graphs'],
                 ['knowledge', 'Knowledge'],
                 ['accounts', 'Accounts'],
+                ['duels', 'Duels'],
                 ['audit', 'Audit logs'],
               ] as Array<[AdminTab, string]>
             ).map(([tab, label]) => (
@@ -1031,6 +1038,102 @@ export default function AdminPanel({
               )}
             </div>
             </div>
+          </section>
+
+          <section className={`space-y-3 ${adminTab === 'duels' ? '' : 'hidden'}`}>
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
+              specific duel tasks
+            </h2>
+            <p className="text-[15px] text-[#a1a1aa]">
+              Set or clear the task for one specific duel. The task is stored with the duel and
+              posted to the private duel channel; only the two duelists and admin can see it.
+            </p>
+            {(snapshot.duels ?? []).length === 0 ? (
+              <div className="text-[15px] text-[#71717a]">no duels yet</div>
+            ) : (
+              <div className="space-y-2">
+                {(snapshot.duels ?? []).map((duel) => (
+                  <div key={duel.id} className="border border-[#2a2a30] bg-[#09090b] p-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-[#d4d4d8]">
+                      <span className="uppercase tracking-wider text-[#4ade80]">{duel.status}</span>
+                      <span>{duel.channelId}</span>
+                      <span>@{duel.challenger} vs @{duel.opponent}</span>
+                      <span className="text-[#71717a]">target {duel.target}</span>
+                    </div>
+                    <div className="text-[14px] text-[#a1a1aa]">
+                      current task: {duel.task || 'none'}
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={duelTaskDrafts[duel.id] ?? duel.task ?? ''}
+                      onChange={(event) =>
+                        setDuelTaskDrafts((current) => ({
+                          ...current,
+                          [duel.id]: event.target.value,
+                        }))
+                      }
+                      placeholder="specific task for this duel, e.g. find an unauthenticated high-impact issue in the login flow"
+                      className="w-full bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-[15px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={duelTaskBusy === duel.id}
+                        onClick={() => {
+                          setDuelTaskBusy(duel.id);
+                          setDuelTaskNotice('');
+                          setDuelTaskError('');
+                          const task = duelTaskDrafts[duel.id] ?? duel.task ?? '';
+                          void onSetDuelTask(duel.id, task).then((result) => {
+                            setDuelTaskBusy('');
+                            if (!result.ok) {
+                              setDuelTaskError(result.error || 'could not set duel task');
+                              return;
+                            }
+                            setDuelTaskDrafts((current) => {
+                              const next = { ...current };
+                              delete next[duel.id];
+                              return next;
+                            });
+                            setDuelTaskNotice(`task saved for ${duel.channelId}`);
+                          });
+                        }}
+                        className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                      >
+                        {duelTaskBusy === duel.id ? 'saving…' : 'set task'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={duelTaskBusy === duel.id}
+                        onClick={() => {
+                          setDuelTaskBusy(duel.id);
+                          setDuelTaskNotice('');
+                          setDuelTaskError('');
+                          void onSetDuelTask(duel.id, '').then((result) => {
+                            setDuelTaskBusy('');
+                            if (!result.ok) {
+                              setDuelTaskError(result.error || 'could not clear duel task');
+                              return;
+                            }
+                            setDuelTaskDrafts((current) => {
+                              const next = { ...current };
+                              delete next[duel.id];
+                              return next;
+                            });
+                            setDuelTaskNotice(`task cleared for ${duel.channelId}`);
+                          });
+                        }}
+                        className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#71717a] hover:text-[#f87171] disabled:opacity-40"
+                      >
+                        clear task
+                      </button>
+                      {duelTaskNotice && <span className="text-[15px] text-[#4ade80]">{duelTaskNotice}</span>}
+                      {duelTaskError && <span className="text-[15px] text-[#f87171]">{duelTaskError}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className={`space-y-3 ${adminTab === 'audit' ? '' : 'hidden'}`}>

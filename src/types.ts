@@ -276,6 +276,9 @@ export interface Duel {
   severity?: VulnSeverity;
   resolvedAt?: string;
   note?: string;
+  task?: string;
+  taskSetBy?: string;
+  taskSetAt?: string;
   stats?: {
     challenger: DuelStats;
     opponent: DuelStats;
@@ -409,6 +412,7 @@ export interface AdminSnapshot {
     entries: ProgressEntry[];
   }>;
   graphs: EngagementGraph[];
+  duels: Duel[];
   audit: AdminAuditEntry[];
   security: {
     apiHost: string;

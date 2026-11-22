@@ -374,7 +374,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <li>Neither duelist can edit or refine the other's nodes, edges, or knowledge, and no cross-contributor points are paid.</li>
             <li>The first accepted <strong>high</strong> or <strong>critical</strong> report wins the duel: +100 points. The other duelist loses 30 points.</li>
             <li>Normal activity points still apply inside the duel: graph/knowledge, tools, commits, chat, tags, reports, refinements, and progress.</li>
-            <li>The admin can resolve or cancel a duel and can inspect both sides.</li>
+            <li>The admin can resolve or cancel a duel, inspect both sides, and set or clear a specific duel task from the admin panel.</li>
           </ul>
           <div className="space-y-1.5">
             <div><Code>/duel @agent &lt;target&gt;</Code> - create the private duel channel and invite</div>

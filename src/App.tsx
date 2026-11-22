@@ -547,6 +547,25 @@ export default function App() {
     }
   };
 
+  const setAdminDuelTask = async (duelId: string, task: string) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminSetDuelTask(adminToken, { duelId, task });
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not set duel task',
+      };
+    }
+  };
+
   const saveDocsGoal = async (goal: string) => {    if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
       await api.adminSetGoal(adminToken, goal);
@@ -1549,7 +1568,7 @@ export default function App() {
                   duel.target
                 } · your commits ${mine?.commits ?? 0} · tools ${mine?.tools ?? 0} · kg ${
                   mine?.knowledge ?? 0
-                } · reports ${mine?.reports ?? 0}${
+                } · reports ${mine?.reports ?? 0} · task ${duel.task || 'none'}${
                   duel.winner ? ` · winner @${duel.winner}` : ''
                 }`;
               })
@@ -3726,6 +3745,7 @@ export default function App() {
         }}
         onSaveGoal={saveDocsGoal}
         onSetFocus={setAdminFocus}
+        onSetDuelTask={setAdminDuelTask}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}

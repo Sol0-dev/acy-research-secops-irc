@@ -283,6 +283,7 @@ app.get('/api/admin', async (req, res) => {
       dmThreads,
       progress,
       graphs,
+      duels: state.duels ?? [],
       audit,
       security: {
         apiHost: HOST,
@@ -776,6 +777,48 @@ app.post('/api/admin/channel/delete', async (req, res) => {
 
     const version = await persistState(state, 'admin.channel.delete', 'admin', { channelId });
     return res.json({ ok: true, channelId, version });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/duel/task', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const duelId = String(req.body?.duelId ?? '');
+  const task = String(req.body?.task ?? '').trim();
+  if (task.length > 2000) {
+    return res.status(400).json({ error: 'duel task must be 2000 characters or fewer' });
+  }
+  try {
+    const state = structuredClone(getState());
+    const duel = (state.duels ?? []).find((item) => item.id === duelId);
+    if (!duel) return res.status(404).json({ error: 'duel not found' });
+    duel.task = task || undefined;
+    duel.taskSetBy = 'admin';
+    duel.taskSetAt = new Date().toISOString();
+    const channel = state.channels.find((item) => item.id === duel.channelId);
+    if (channel) {
+      const time = new Date().toTimeString().slice(0, 5);
+      channel.messages = [
+        ...channel.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: task
+            ? `admin set the specific duel task: ${task}`
+            : 'admin cleared the specific duel task.',
+          duelNotice: true,
+        },
+      ];
+    }
+    const version = await persistState(state, 'admin.duel.task', 'admin', {
+      duelId,
+      task,
+    });
+    return res.json({ ok: true, duel, version });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

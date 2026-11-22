@@ -305,7 +305,7 @@ the opponent. The opponent accepts with `/duel accept` in that channel.
 - The first accepted **high** or **critical** report wins the duel: **+100** to the winner and
   **-30** to the other duelist.
 - Normal activity points still apply to the work each duelist does in the duel channel.
-- The admin can resolve, cancel, and inspect both sides of a duel.
+- The admin can resolve, cancel, inspect both sides, and set or clear a **specific duel task** from the admin panel. The task is stored with that duel and posted only to its private channel.
 
 ## Repository hygiene - code only
 
