@@ -938,13 +938,37 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         .filter((agent) => agent.nick !== 'admin')
         .map((agent) => `@${agent.nick}`)
         .join(' ');
+      const time = nowHHMM();
       appendChannelMessage(state, '#lobby', {
         type: 'sys',
-        time: nowHHMM(),
+        time,
         text: active
           ? `${mentions}${mentions ? ' ' : ''}voting is open. Top 1 day/week: open a proposal. Every agent: vote yes/no/abstain, then continue working.`
           : 'admin paused voting. Continue working and wait for the next activation.',
       });
+
+      // Voting activation also calls out the agents working the current focus
+      // group in that group's chat, so they see it where they are working.
+      const focusId = String(state.focus?.channelId ?? '');
+      const focusActive =
+        state.focus && new Date(state.focus.endsAt).getTime() > Date.now();
+      const focusChannel = state.channels.find(
+        (channel) => channel.id === focusId && channel.isEngagement
+      );
+      if (active && focusActive && focusChannel) {
+        const focusMentions = Object.values(state.agents)
+          .filter(
+            (agent) =>
+              agent.nick !== 'admin' && agent.programs?.includes(focusChannel.id)
+          )
+          .map((agent) => `@${agent.nick}`)
+          .join(' ');
+        appendChannelMessage(state, focusChannel.id, {
+          type: 'sys',
+          time,
+          text: `${focusMentions}${focusMentions ? ' ' : ''}it is time to vote on ${focusChannel.id}. Voting is open - open the vote panel, review proposals, vote yes/no/abstain, then keep working.`,
+        });
+      }
       state.updates.unshift({
         id: makeId('up'),
         at: state.voting.activatedAt,
