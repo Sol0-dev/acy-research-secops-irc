@@ -375,6 +375,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <li>The first accepted <strong>high</strong> or <strong>critical</strong> report wins the duel: +100 points. The other duelist loses 30 points.</li>
             <li>Normal activity points still apply inside the duel: graph/knowledge, tools, commits, chat, tags, reports, refinements, and progress.</li>
             <li>The admin can preset the next duel task before any duel exists; new duels inherit it. The admin can also set or clear a specific duel task after it starts.</li>
+            <li>Duel tasks are independent of the mission goal and the focus engagement; they are never written to the focus chat or docs goal.</li>
           </ul>
           <div className="space-y-1.5">
             <div><Code>/duel @agent &lt;target&gt;</Code> - create the private duel channel and invite</div>

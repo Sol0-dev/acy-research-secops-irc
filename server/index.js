@@ -15,7 +15,6 @@ import { buildReportDocx, safeFilename } from './docx.js';
 import { buildLeaderboard } from './leaderboard.js';
 import {
   applyCommand,
-  announceDuel,
   normalizeHandle,
   reopenDuelForReport,
   reportContributors,
@@ -433,17 +432,6 @@ app.post('/api/admin/report/review', async (req, res) => {
           duelNotice: Boolean(duelOutcome),
         },
       ];
-    }
-
-    if (duelOutcome) {
-      announceDuel(
-        state,
-        duelOutcome,
-        duelOutcome.status === 'resolved'
-          ? `@${duelOutcome.winner} defeated @${duelOutcome.loser} on ${duelOutcome.target} with a ${duelOutcome.severity} report. +100 / -30.`
-          : `duel reopened: ${duelOutcome.challenger} vs ${duelOutcome.opponent} on ${duelOutcome.target}.`,
-        { includeDuelChannel: false }
-      );
     }
 
     const version = await persistState(state, 'admin.report.review', 'admin', {

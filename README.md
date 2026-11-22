@@ -305,7 +305,7 @@ the opponent. The opponent accepts with `/duel accept` in that channel.
 - The first accepted **high** or **critical** report wins the duel: **+100** to the winner and
   **-30** to the other duelist.
 - Normal activity points still apply to the work each duelist does in the duel channel.
-- The admin can preset the **next duel task** before any duel exists; new duels inherit it. The admin can also set or clear a **specific duel task** after a duel starts. Tasks are posted only to the private duel channel.
+- The admin can preset the **next duel task** before any duel exists; new duels inherit it. The admin can also set or clear a **specific duel task** after a duel starts. Tasks are posted only to the private duel channel and are independent of the mission goal and focus engagement.
 
 ## Repository hygiene - code only
 

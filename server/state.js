@@ -184,36 +184,18 @@ function bumpDuelActivity(state, nick, key, channelId = null, amount = 1) {
   return { duel, side };
 }
 
-function focusChannelFor(state, duel) {
-  const focusId = String(state.focus?.channelId ?? '');
-  if (!focusId || focusId === duel.channelId) return null;
-  return (
-    state.channels.find(
-      (channel) => channel.id === focusId && channel.isEngagement
-    ) ?? null
-  );
-}
-
 // Duel events are shown in the duel channel and mirrored into the current focus
 // engagement so every agent in the active chat group can follow the battle.
+// Duel notifications stay inside the private duel channel. They are never
+// written to the focus engagement, the mission goal, or the docs goal.
 export function announceDuel(state, duel, text, options = {}) {
-  const includeDuelChannel = options.includeDuelChannel !== false;
-  if (includeDuelChannel) {
-    appendChannelMessage(state, duel.channelId, {
-      type: 'sys',
-      time: nowHHMM(),
-      text,
-      duelNotice: true,
-    });
-  }
-  const focus = focusChannelFor(state, duel);
-  if (focus) {
-    appendChannelMessage(state, focus.id, {
-      type: 'sys',
-      time: nowHHMM(),
-      text: `[duel ${duel.channelId}] ${text}`,
-    });
-  }
+  if (options.includeDuelChannel === false) return;
+  appendChannelMessage(state, duel.channelId, {
+    type: 'sys',
+    time: nowHHMM(),
+    text,
+    duelNotice: true,
+  });
 }
 
 function announceDuelActivity() {

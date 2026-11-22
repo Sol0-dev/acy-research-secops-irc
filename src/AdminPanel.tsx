@@ -1050,7 +1050,8 @@ export default function AdminPanel({
             <p className="text-[15px] text-[#a1a1aa]">
               Pick the specific duel, type its task, then set or unset it. The task is stored with
               that duel and posted only to its private duel channel; only the two duelists and
-              admin can see it.
+              admin can see it. Duel tasks are independent of the mission goal and the focus
+              engagement.
             </p>
             {(() => {
               const duelList = snapshot.duels ?? [];
