@@ -14,6 +14,7 @@ import ProgressPanel, { type ProgressActionResult } from './ProgressPanel';
 import ReportsPanel, { type ReportActionResult, type ReportDraft } from './ReportsPanel';
 import ToolsPanel from './ToolsPanel';
 import KnowledgePanel from './KnowledgePanel';
+import ResearchPanel from './ResearchPanel';
 import AdminPanel from './AdminPanel';
 import type {
   AdminSnapshot,
@@ -221,6 +222,9 @@ export default function App() {
 
   // Read/retrieve whole knowledge graph panel
   const [knowledgePanelOpen, setKnowledgePanelOpen] = useState(false);
+
+  // Read-only 2026 single-agent research brief
+  const [researchPanelOpen, setResearchPanelOpen] = useState(false);
 
   // Chat / command input (ephemeral)
   const [inputText, setInputText] = useState('');
@@ -800,6 +804,7 @@ export default function App() {
     setReportsPanelOpen(false);
     setToolsPanelOpen(false);
     setKnowledgePanelOpen(false);
+    setResearchPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
     return null;
@@ -819,6 +824,7 @@ export default function App() {
     setReportsPanelOpen(false);
     setToolsPanelOpen(false);
     setKnowledgePanelOpen(false);
+    setResearchPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
     return null;
@@ -854,6 +860,7 @@ export default function App() {
     setDocsPanelOpen(false);
     setToolsPanelOpen(false);
     setKnowledgePanelOpen(false);
+    setResearchPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
     return null;
@@ -878,6 +885,7 @@ export default function App() {
     setReportsPanelOpen(false);
     setDocsPanelOpen(false);
     setKnowledgePanelOpen(false);
+    setResearchPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
     return null;
@@ -902,6 +910,7 @@ export default function App() {
     setReportsPanelOpen(false);
     setToolsPanelOpen(false);
     setDocsPanelOpen(false);
+    setResearchPanelOpen(false);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
     return null;
@@ -913,7 +922,20 @@ export default function App() {
     setReportsPanelOpen(false);
     setToolsPanelOpen(false);
     setKnowledgePanelOpen(false);
+    setResearchPanelOpen(false);
     setDocsPanelOpen(true);
+    setMobileLeftOpen(false);
+    setMobileRightOpen(false);
+  };
+
+  const openResearchPanel = () => {
+    setGraphPanelOpen(false);
+    setProgressPanelOpen(false);
+    setReportsPanelOpen(false);
+    setToolsPanelOpen(false);
+    setKnowledgePanelOpen(false);
+    setDocsPanelOpen(false);
+    setResearchPanelOpen(true);
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
   };
@@ -1009,7 +1031,7 @@ export default function App() {
 
       if (cmd === '/help') {
         await postNotice(
-          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /nick <name> · /clear (admin) · /logout'
+          'commands: /docs · /role <any_role> · /role @agent <role> · /msg <@agent> <text> · /group (or /add-program) · /enroll <#channel> [@agent] · /leave [#channel] · /graph · /knowledge · /research · /tools · /progress [start|check|note|commit] · /report · /node <kind> <label> · /edge <from> -> <to> [label] · /whois <agent> · /nick <name> · /clear (admin) · /logout'
         );
       } else if (cmd === '/docs') {
         openDocsPanel();
@@ -1125,6 +1147,8 @@ export default function App() {
       } else if (cmd === '/knowledge' || cmd === '/kg') {
         const error = openKnowledgePanel();
         if (error) await postNotice(error);
+      } else if (cmd === '/research') {
+        openResearchPanel();
       } else if (cmd === '/progress') {
         const sub = (rest[0] || '').toLowerCase();
         const body = rest.slice(1).join(' ').trim();
@@ -1348,7 +1372,8 @@ export default function App() {
         !progressPanelOpen &&
         !reportsPanelOpen &&
         !toolsPanelOpen &&
-        !knowledgePanelOpen
+        !knowledgePanelOpen &&
+        !researchPanelOpen
       ) {
         event.preventDefault();
         inputRef.current?.focus();
@@ -1360,6 +1385,7 @@ export default function App() {
         setReportsPanelOpen(false);
         setToolsPanelOpen(false);
         setKnowledgePanelOpen(false);
+        setResearchPanelOpen(false);
         setAdminOpen(false);
         if (session?.isAuthenticated) setAuthModalOpen(false);
         setMobileLeftOpen(false);
@@ -1378,6 +1404,7 @@ export default function App() {
     reportsPanelOpen,
     toolsPanelOpen,
     knowledgePanelOpen,
+    researchPanelOpen,
     session,
   ]);
 
@@ -1709,6 +1736,15 @@ export default function App() {
             className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
           >
             tools <span className="text-[14px] text-[#71717a]/70">{allToolCount}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={openResearchPanel}
+            className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
+            title="Read the 2026 single-agent performance research brief"
+          >
+            research
           </button>
 
           {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement && (
@@ -2239,6 +2275,8 @@ export default function App() {
               }}
               onClose={() => setKnowledgePanelOpen(false)}
             />
+          ) : researchPanelOpen ? (
+            <ResearchPanel onClose={() => setResearchPanelOpen(false)} />
           ) : toolsPanelOpen ? (
             <ToolsPanel
               channelId={toolsChannelId}
