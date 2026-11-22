@@ -335,6 +335,45 @@ app.post('/api/admin/report/review', async (req, res) => {
     report.reviewedTime = time;
     report.reviewNote = note || undefined;
 
+    let cleanedNodes = 0;
+    let cleanedEdges = 0;
+    if (decision === 'invalid') {
+      const graph = state.graphs?.[channelId];
+      if (graph) {
+        const titleKey = report.title.trim().toLowerCase();
+        const nodeIds = new Set();
+        if (report.graphNodeId) nodeIds.add(report.graphNodeId);
+        for (const node of graph.nodes ?? []) {
+          if (node.kind === 'vulnerability' && node.label.trim().toLowerCase() === titleKey) {
+            nodeIds.add(node.id);
+          }
+        }
+        const beforeNodes = graph.nodes?.length ?? 0;
+        const beforeEdges = graph.edges?.length ?? 0;
+        graph.nodes = (graph.nodes ?? []).filter((node) => !nodeIds.has(node.id));
+        graph.edges = (graph.edges ?? []).filter(
+          (edge) => !nodeIds.has(edge.from) && !nodeIds.has(edge.to)
+        );
+        cleanedNodes = beforeNodes - graph.nodes.length;
+        cleanedEdges = beforeEdges - graph.edges.length;
+        if (report.graphNodeId) report.graphNodeId = undefined;
+        report.cleanedGraph = {
+          nodes: cleanedNodes,
+          edges: cleanedEdges,
+          at: new Date().toISOString(),
+        };
+      }
+    }
+
+    const mentions = Object.values(state.agents)
+      .filter((agent) => agent.nick !== 'admin')
+      .map((agent) => `@${agent.nick}`)
+      .join(' ');
+    const channelText =
+      decision === 'invalid'
+        ? `${mentions}${mentions ? ' ' : ''}INVALID report: "${report.title}". Do not follow this rabbit hole again. Removed ${cleanedNodes} contaminated node(s) and ${cleanedEdges} edge(s) from the graph and the knowledge graph.`
+        : `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}`;
+
     const log = state.progress[channelId] || (state.progress[channelId] = { channelId, entries: [] });
     log.entries.push({
       id: `pg-${crypto.randomBytes(6).toString('hex')}`,
@@ -343,7 +382,10 @@ app.post('/api/admin/report/review', async (req, res) => {
       author: 'admin',
       status: decision === 'valid' ? 'ok' : decision === 'invalid' ? 'failed' : 'note',
       kind: 'progress',
-      text: `admin marked report "${report.title}" as ${decision}${note ? ` - ${note}` : ''}`,
+      text:
+        decision === 'invalid'
+          ? `invalid report "${report.title}" removed ${cleanedNodes} node(s) and ${cleanedEdges} edge(s) from the graph and knowledge graph - do not follow this path again`
+          : `admin marked report "${report.title}" as ${decision}${note ? ` - ${note}` : ''}`,
     });
 
     const channel = state.channels.find((item) => item.id === channelId);
@@ -354,7 +396,7 @@ app.post('/api/admin/report/review', async (req, res) => {
           id: `ch-${crypto.randomBytes(6).toString('hex')}`,
           type: 'sys',
           time,
-          text: `admin review: report "${report.title}" marked ${decision}${note ? ` - ${note}` : ''}`,
+          text: channelText,
         },
       ];
     }
