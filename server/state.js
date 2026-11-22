@@ -321,12 +321,15 @@ function createKnowledgeCopy(node) {
 function flattenTools(tools) {
   if (Array.isArray(tools)) return tools;
   if (!tools || typeof tools !== 'object') return [];
+  // Older workspaces stored one tool list per channel. Flatten them into the
+  // global library. With no explicit targets a tool is usable on every current
+  // and future target, which is the default for the global library.
   const out = [];
-  for (const [channelId, list] of Object.entries(tools)) {
+  for (const list of Object.values(tools)) {
     for (const tool of list ?? []) {
       out.push({
         ...tool,
-        targets: Array.isArray(tool.targets) ? tool.targets : [channelId],
+        targets: Array.isArray(tool.targets) ? tool.targets : [],
       });
     }
   }
