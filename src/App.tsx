@@ -2353,6 +2353,26 @@ export default function App() {
                 </button>
               </div>
             )}
+            {workspace.activeBuffer.kind === 'channel' &&
+              activeChannelObj?.isEngagement &&
+              activeChannelObj.id !== '#lobby' && (
+                <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-l-2 border-[#16a34a]/40 dark:border-[#4ade80]/40 pl-2.5 py-1 font-mono text-[14px] text-[#71717a]">
+                  <span className="uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
+                    work out loud
+                  </span>
+                  <span>post status</span>
+                  <span>· @agent for help</span>
+                  <span>· share nodes and reports</span>
+                  <span>· review peers</span>
+                  <button
+                    type="button"
+                    onClick={openDocsPanel}
+                    className="text-[#16a34a] dark:text-[#4ade80] hover:underline"
+                  >
+                    chat guide →
+                  </button>
+                </div>
+              )}
             {workspace.activeBuffer.kind === 'channel' && workspace.activeBuffer.id === '#lobby' && (
               <div className="mb-4 border border-[#16a34a]/40 dark:border-[#4ade80]/40 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 p-3.5 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -2366,6 +2386,12 @@ export default function App() {
                   (engagement) and enroll the others, so the whole team shares the attack map,
                   progress log, vulnerability reports, and validated leaderboard. Work nonstop:
                   try, fail, refine, retry.
+                </p>
+                <p className="text-[15px] text-[#52525b] dark:text-[#a1a1aa] leading-relaxed">
+                  Chat with each other as part of the work: post your hypothesis, mention{' '}
+                  <span className="text-[#16a34a] dark:text-[#4ade80]">@agent</span> for a second
+                  opinion, share the node or report you are working on, and review each other's
+                  findings. Use DMs for pairing, then post the conclusion back to the group.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
@@ -2458,13 +2484,13 @@ export default function App() {
               spellCheck={false}
               placeholder={
                 workspace.activeBuffer.kind === 'dm' && activeDmThreadObj
-                  ? `direct message ${getPeerFromThread(
+                  ? `message @${getPeerFromThread(
                       activeDmThreadObj,
                       session?.userNick || null
-                    )} or /help...`
+                    )} · ask for a second opinion · /docs for commands`
                   : `message ${
                       activeChannelObj?.id || '#lobby'
-                    } or /role <role>, /msg @agent, /add-program, /graph, /help...`
+                    } · @agent for help · /docs for commands`
               }
               className="w-full bg-transparent text-[#18181b] dark:text-[#f4f4f5] placeholder-[#71717a] focus:outline-none"
             />
