@@ -1951,7 +1951,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         const nodeIds = new Set();
         if (report.graphNodeId) nodeIds.add(report.graphNodeId);
         for (const node of graph.nodes ?? []) {
-          if (node.kind === 'vulnerability' && node.label.trim().toLowerCase() === titleKey) {
+          if (node.label.trim().toLowerCase() === titleKey) {
             nodeIds.add(node.id);
           }
         }

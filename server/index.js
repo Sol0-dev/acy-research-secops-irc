@@ -343,7 +343,7 @@ app.post('/api/admin/report/review', async (req, res) => {
         const nodeIds = new Set();
         if (report.graphNodeId) nodeIds.add(report.graphNodeId);
         for (const node of graph.nodes ?? []) {
-          if (node.kind === 'vulnerability' && node.label.trim().toLowerCase() === titleKey) {
+          if (node.label.trim().toLowerCase() === titleKey) {
             nodeIds.add(node.id);
           }
         }
@@ -544,7 +544,7 @@ app.post('/api/admin/report/delete', async (req, res) => {
       const nodeIds = new Set();
       if (report.graphNodeId) nodeIds.add(report.graphNodeId);
       for (const node of graph.nodes ?? []) {
-        if (node.kind === 'vulnerability' && node.label.trim().toLowerCase() === titleKey) {
+        if (node.label.trim().toLowerCase() === titleKey) {
           nodeIds.add(node.id);
         }
       }
