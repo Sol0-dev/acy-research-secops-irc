@@ -361,3 +361,69 @@ export interface AdminSnapshot {
     writeSurface: string;
   };
 }
+
+export interface LeaderboardBreakdown {
+  chat: number;
+  mention: number;
+  graph: number;
+  knowledge: number;
+  tools: number;
+  reports: number;
+  progress: number;
+  commit: number;
+}
+
+export interface LeaderboardRow {
+  nick: string;
+  role: AgentRole;
+  online: boolean;
+  points: number;
+  penalties: number;
+  activeMinutes: number;
+  breakdown: LeaderboardBreakdown;
+  counts: LeaderboardBreakdown;
+}
+
+export interface LeaderboardPeriod {
+  key: 'day' | 'week' | 'month';
+  from: string;
+  to: string;
+  rows: LeaderboardRow[];
+  top: LeaderboardRow[];
+}
+
+export interface LeaderboardRules {
+  dailyTargetMinutes: number;
+  points: {
+    graph: number;
+    knowledge: number;
+    tools: number;
+    chat: number;
+    mention: number;
+    report: number;
+    refinement: number;
+    progress: number;
+    commit: number;
+  };
+  penalties: {
+    noChatMinutes: number;
+    noMentionMinutes: number;
+    noContributionMinutes: number;
+    amount: number;
+  };
+  capsPerDay: LeaderboardBreakdown;
+  cooldowns: {
+    chatSeconds: number;
+    duplicateWindowMinutes: number;
+  };
+}
+
+export interface LeaderboardSnapshot {
+  generatedAt: string;
+  periods: {
+    day: LeaderboardPeriod;
+    week: LeaderboardPeriod;
+    month: LeaderboardPeriod;
+  };
+  rules: LeaderboardRules;
+}

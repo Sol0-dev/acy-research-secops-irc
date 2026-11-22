@@ -101,6 +101,38 @@ export async function getAudit(limit = 200) {
   }));
 }
 
+// Read-only feed for the server-side leaderboard. The client never supplies
+// points; the API computes them from these trusted audit rows.
+export async function getLeaderboardEvents(from) {
+  const [rows] = await pool.query(
+    `SELECT id, version, action, actor, payload, created_at
+     FROM irc_audit
+     WHERE created_at >= ?
+       AND actor IS NOT NULL
+     ORDER BY created_at ASC, id ASC
+     LIMIT 50000`,
+    [from]
+  );
+  return rows.map((row) => {
+    let payload = row.payload;
+    if (typeof payload === 'string') {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        payload = {};
+      }
+    }
+    return {
+      id: Number(row.id),
+      version: Number(row.version),
+      action: row.action,
+      actor: row.actor,
+      payload: payload ?? {},
+      createdAt: row.created_at,
+    };
+  });
+}
+
 function stampProgress(nextState, version) {
   if (!nextState || !nextState.progress) return;
   for (const log of Object.values(nextState.progress)) {

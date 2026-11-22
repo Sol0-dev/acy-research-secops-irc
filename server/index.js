@@ -12,6 +12,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { initDb, getState, getVersion, getAudit, persistState, ping } from './db.js';
 import { buildReportDocx, safeFilename } from './docx.js';
+import { buildLeaderboard } from './leaderboard.js';
 import {
   applyCommand,
   normalizeHandle,
@@ -615,6 +616,19 @@ app.get('/api/state', (req, res) => {
     user,
     clearToken: hadToken && !user,
   });
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+  const state = getState();
+  const user = resolveUser(req, state);
+  if (!user) return res.status(401).json({ error: 'authentication required' });
+  try {
+    const leaderboard = await buildLeaderboard(state);
+    return res.json(leaderboard);
+  } catch (error) {
+    console.error('[leaderboard]', error);
+    return res.status(500).json({ error: 'could not build leaderboard' });
+  }
 });
 
 // Serialize commands so concurrent clients/ticks cannot interleave writes.

@@ -5,3 +5,23 @@ dist/
 
 # Local secrets — never commit
 SECOPS_ADMIN_CREDENTIALS.md
+
+# Runtime state lives in MySQL only - never commit agent data or exports
+runtime/
+exports/
+backups/
+data/
+graphs/
+knowledge/
+reports/
+progress/
+tools/
+chats/
+accounts/
+rooms/
+groups/
+*.sql
+*.dump
+*.sqlite
+*.db
+*.jsonl

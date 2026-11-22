@@ -21,6 +21,10 @@ export class ApiError extends Error {
   }
 }
 
+// Process-local anti-farming guards. They reset on restart; durable scoring is
+// still recomputed from the server's audit table.
+const CHAT_GUARD = new Map();
+
 export const GRAPH_KINDS = [
   'target',
   'subdomain',
@@ -638,6 +642,19 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       ) {
         throw new ApiError(403, `${nick} is not enrolled in ${channel.id}`);
       }
+      const now = Date.now();
+      const guard = CHAT_GUARD.get(nick);
+      if (guard && now - guard.at < 1500) {
+        throw new ApiError(429, 'chat is moving too fast - wait a moment');
+      }
+      if (
+        guard &&
+        now - guard.at < 60_000 &&
+        guard.text === text.toLowerCase()
+      ) {
+        throw new ApiError(409, 'duplicate chat message - say something new');
+      }
+      CHAT_GUARD.set(nick, { at: now, text: text.toLowerCase() });
       const message = appendChannelMessage(state, channelId, {
         type: 'msg',
         time: nowHHMM(),
@@ -1113,6 +1130,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const label = limitText(payload.label, 200, 'node label').trim();
       if (!label) throw new ApiError(400, 'node label required');
+      if (label.length < 3) throw new ApiError(400, 'node label must be at least 3 characters');
       const kind = String(payload.kind || 'note').toLowerCase();
       if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
       const contributor = normalizeHandle(actor);
@@ -1203,6 +1221,12 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      const before = JSON.stringify({
+        label: node.label,
+        kind: node.kind,
+        notes: node.notes ?? '',
+        intel: node.intel ?? {},
+      });
 
       if (payload.label !== undefined) {
         const label = limitText(payload.label, 200, 'node label').trim();
@@ -1224,6 +1248,15 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (payload.intel !== undefined) {
         const intel = parseIntel(payload.intel);
         if (intel) node.intel = { ...(node.intel ?? {}), ...intel };
+      }
+      const after = JSON.stringify({
+        label: node.label,
+        kind: node.kind,
+        notes: node.notes ?? '',
+        intel: node.intel ?? {},
+      });
+      if (before === after) {
+        throw new ApiError(409, 'no changes to refine');
       }
       node.updatedBy = contributor;
       node.updatedTime = nowHHMM();
@@ -1314,6 +1347,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!name) throw new ApiError(400, 'tool name required');
       const code = limitText(payload.code, 500000, 'tool code');
       if (!code.trim()) throw new ApiError(400, 'tool code required');
+      if (code.trim().length < 20) {
+        throw new ApiError(400, 'tool code must be at least 20 characters');
+      }
       const status = String(payload.status ?? 'draft').toLowerCase();
       if (!['draft', 'stable', 'deprecated'].includes(status)) {
         throw new ApiError(400, `invalid tool status: ${status}`);
@@ -1359,6 +1395,19 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const list = state.tools[channel.id] ?? [];
       const tool = list.find((item) => item.id === String(payload.toolId ?? ''));
       if (!tool) throw new ApiError(404, 'tool not found');
+      const before = JSON.stringify({
+        name: tool.name,
+        category: tool.category,
+        language: tool.language,
+        description: tool.description,
+        problem: tool.problem,
+        code: tool.code,
+        usage: tool.usage,
+        inputs: tool.inputs,
+        outputs: tool.outputs,
+        tags: tool.tags,
+        status: tool.status,
+      });
       if (payload.name !== undefined) {
         const name = limitText(payload.name, 200, 'tool name').trim();
         if (!name) throw new ApiError(400, 'tool name required');
@@ -1402,6 +1451,22 @@ export function applyCommand(state, action, payload = {}, actor = null) {
           throw new ApiError(400, `invalid tool status: ${status}`);
         }
         tool.status = status;
+      }
+      const after = JSON.stringify({
+        name: tool.name,
+        category: tool.category,
+        language: tool.language,
+        description: tool.description,
+        problem: tool.problem,
+        code: tool.code,
+        usage: tool.usage,
+        inputs: tool.inputs,
+        outputs: tool.outputs,
+        tags: tool.tags,
+        status: tool.status,
+      });
+      if (before === after) {
+        throw new ApiError(409, 'no changes to refine');
       }
       tool.revisions.push({
         version: tool.version,
@@ -1470,6 +1535,21 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       requireEnrolled(state, author, channel);
       const text = limitText(payload.text, 4000, 'progress text').trim();
       if (!text) throw new ApiError(400, 'progress text required');
+      if (text.length < 20) {
+        throw new ApiError(400, 'progress note must be at least 20 characters');
+      }
+      const existingLog = progressLogFor(state, channel.id);
+      if (
+        existingLog.entries
+          .slice(-200)
+          .some(
+            (entry) =>
+              normalizeHandle(entry.author) === author &&
+              String(entry.text ?? '').trim().toLowerCase() === text.toLowerCase()
+          )
+      ) {
+        throw new ApiError(409, 'duplicate progress note - record something new');
+      }
       const status = String(payload.status || 'note').toLowerCase();
       if (!PROGRESS_STATUSES.includes(status)) {
         throw new ApiError(400, `invalid progress status: ${status}`);
@@ -1509,7 +1589,26 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       requireEnrolled(state, author, channel);
       const message = String(payload.message ?? '').trim();
       if (!message) throw new ApiError(400, 'commit message required');
+      if (message.length < 10) {
+        throw new ApiError(400, 'commit message must be at least 10 characters');
+      }
       const files = parseList(payload.files);
+      if (files.length === 0) {
+        throw new ApiError(400, 'commit must list at least one changed file or artifact');
+      }
+      const existingLog = progressLogFor(state, channel.id);
+      if (
+        existingLog.entries
+          .slice(-200)
+          .some(
+            (entry) =>
+              normalizeHandle(entry.author) === author &&
+              String(entry.commit?.message ?? '').trim().toLowerCase() ===
+                message.toLowerCase()
+          )
+      ) {
+        throw new ApiError(409, 'duplicate commit message - record something new');
+      }
       const status = ['ok', 'failed'].includes(String(payload.status))
         ? String(payload.status)
         : 'ok';
@@ -1587,6 +1686,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const steps = parseLines(payload.steps);
       const request = limitText(payload.request, 16000, 'request').trim();
       const response = limitText(payload.response, 16000, 'response').trim();
+      if (request.length < 20 || response.length < 20) {
+        throw new ApiError(400, 'full request and response are required (minimum 20 characters each)');
+      }
       const proof = limitText(payload.proof, 500, 'proof path').trim();
       const pocScript = limitText(payload.pocScript, 500, 'PoC script path').trim();
       const attackerValue = limitText(payload.attackerValue, 8000, 'attacker value').trim();

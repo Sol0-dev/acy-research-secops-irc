@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Block runtime data and secrets from GitHub. The canonical graphs,
+# knowledge, tools, progress, reports, chats, accounts, rooms, and groups live
+# in MySQL; only secops.irc code belongs in this repository.
+set -u
+
+blocked_re='(^|/)(runtime|exports|backups|graphs|knowledge|reports|progress|tools|chats|accounts|rooms|groups|data)/|\.(sql|dump|sqlite|db|jsonl)$|(^|/)\.env$|SECOPS_ADMIN_CREDENTIALS\.md$'
+status=0
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ -z "${local_sha:-}" ] && continue
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    range="$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+  while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    if printf '%s\n' "$file" | grep -Eq "$blocked_re"; then
+      echo "BLOCKED runtime/data file: $file" >&2
+      status=1
+    fi
+  done < <(git diff --name-only "$range" 2>/dev/null)
+done
+
+if [ "$status" -ne 0 ]; then
+  echo "Push blocked: only secops.irc code belongs in GitHub." >&2
+  echo "Runtime data stays in MySQL; do not commit exports, dumps, or agent data." >&2
+  exit 1
+fi
+exit 0

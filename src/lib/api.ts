@@ -6,7 +6,13 @@
  * changes go through the UI/API into the central database.
  * ---------------------------------------------------------------------- */
 
-import type { AdminSnapshot, CommandResponse, WorkspaceState, UserSession } from '../types';
+import type {
+  AdminSnapshot,
+  CommandResponse,
+  LeaderboardSnapshot,
+  WorkspaceState,
+  UserSession,
+} from '../types';
 
 interface StateResponse {
   state: WorkspaceState;
@@ -72,6 +78,9 @@ async function download(path: string, token: string): Promise<Blob> {
 export const api = {
   bootstrap(): Promise<StateResponse> {
     return request<StateResponse>('/api/state');
+  },
+  leaderboard(): Promise<LeaderboardSnapshot> {
+    return request<LeaderboardSnapshot>('/api/leaderboard');
   },
   command(action: string, payload: Record<string, unknown> = {}): Promise<CommandResponse> {
     return request<CommandResponse>('/api/command', {
