@@ -156,6 +156,8 @@ export default function ReportsPanel({
   const [adminBusy, setAdminBusy] = useState('');
   const [adminNotice, setAdminNotice] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [cleanAllBusy, setCleanAllBusy] = useState(false);
+  const [cleanAllNotice, setCleanAllNotice] = useState('');
 
   const selected = useMemo(
     () => allReports.find((report) => report.id === selectedId) ?? allReports[0] ?? null,
@@ -248,6 +250,31 @@ export default function ReportsPanel({
     setCleanNotice(
       `cleaned ${result.nodes ?? 0} node(s) and ${result.edges ?? 0} edge(s)`
     );
+  };
+
+  const invalidReports = allReports.filter((report) => report.review === 'invalid');
+
+  const cleanAllInvalid = async () => {
+    if (!onCleanInvalid || invalidReports.length === 0) return;
+    setCleanAllBusy(true);
+    setCleanAllNotice('');
+    let nodes = 0;
+    let edges = 0;
+    for (const report of invalidReports) {
+      const result = await onCleanInvalid({
+        channelId: report.channelId,
+        reportId: report.id,
+      });
+      if (!result.ok) {
+        setCleanAllNotice(result.error || 'cleanup failed');
+        setCleanAllBusy(false);
+        return;
+      }
+      nodes += result.nodes ?? 0;
+      edges += result.edges ?? 0;
+    }
+    setCleanAllBusy(false);
+    setCleanAllNotice(`cleaned ${nodes} node(s) and ${edges} edge(s) from invalid reports`);
   };
 
   const downloadReport = async () => {
@@ -355,6 +382,27 @@ export default function ReportsPanel({
       {error && (
         <div className="mx-4 sm:mx-5 mt-3 text-[15px] font-mono border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
           {error}
+        </div>
+      )}
+
+      {mode === 'list' && invalidReports.length > 0 && (
+        <div className="px-4 sm:px-5 py-2 border-b border-[#f59e0b]/50 bg-[#f59e0b]/10 flex flex-wrap items-center gap-2 shrink-0 font-mono text-[14px]">
+          <span className="uppercase tracking-wider text-[#b45309] dark:text-[#fbbf24]">
+            invalid reports: {invalidReports.length} - contamination cleanup available
+          </span>
+          {onCleanInvalid && (
+            <button
+              type="button"
+              disabled={cleanAllBusy}
+              onClick={() => void cleanAllInvalid()}
+              className="px-2 py-0.5 border border-[#f59e0b]/60 text-[15px] text-[#b45309] dark:text-[#fbbf24] disabled:opacity-40"
+            >
+              clean all contaminated nodes
+            </button>
+          )}
+          {cleanAllNotice && (
+            <span className="text-[#52525b] dark:text-[#a1a1aa]">{cleanAllNotice}</span>
+          )}
         </div>
       )}
 

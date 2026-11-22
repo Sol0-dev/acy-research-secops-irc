@@ -102,6 +102,20 @@ function normalizeHandle(value: string) {
     .toLowerCase();
 }
 
+const PHASES = [
+  'osint',
+  'discovery',
+  'recon',
+  'fuzzing',
+  'exploitation',
+  'chaining',
+  'privilege escalation',
+  'pivot',
+  'lateral movement',
+  'validation',
+  'reporting',
+];
+
 export default function GraphPanel({
   channelId,
   graph,
@@ -130,6 +144,11 @@ export default function GraphPanel({
   const [nodeScripts, setNodeScripts] = useState('');
   const [nodeRequest, setNodeRequest] = useState('');
   const [nodeResponse, setNodeResponse] = useState('');
+  const [nodeChain, setNodeChain] = useState('');
+  const [nodeLessons, setNodeLessons] = useState('');
+  const [nodeTemplate, setNodeTemplate] = useState('');
+  const [nodeReferences, setNodeReferences] = useState('');
+  const [nodeTags, setNodeTags] = useState('');
   const [editLabel, setEditLabel] = useState('');
   const [editKind, setEditKind] = useState<GraphNodeKind>('note');
   const [editNotes, setEditNotes] = useState('');
@@ -216,6 +235,16 @@ export default function GraphPanel({
       setError('node label is required');
       return;
     }
+    if (!nodePhase.trim()) {
+      setError('phase is required: osint, discovery, recon, fuzzing, exploitation, chaining, privilege escalation, pivot, or custom');
+      return;
+    }
+    if (
+      ![nodeCommands, nodeScripts, nodeRequest, nodeResponse].some((value) => value.trim())
+    ) {
+      setError('include at least one of commands, scripts, request, or response');
+      return;
+    }
     const intel: TechniqueIntel = {};
     if (nodePhase.trim()) intel.phase = nodePhase.trim();
     if (nodeTechnique.trim()) intel.technique = nodeTechnique.trim();
@@ -223,6 +252,15 @@ export default function GraphPanel({
     if (nodeScripts.trim()) intel.scripts = nodeScripts;
     if (nodeRequest.trim()) intel.request = nodeRequest;
     if (nodeResponse.trim()) intel.response = nodeResponse;
+    if (nodeChain.trim()) intel.chain = nodeChain;
+    if (nodeLessons.trim()) intel.lessons = nodeLessons;
+    if (nodeTemplate.trim()) intel.template = nodeTemplate;
+    if (nodeReferences.trim()) intel.references = nodeReferences;
+    const nodeTagList = nodeTags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    if (nodeTagList.length > 0) intel.tags = nodeTagList;
     setBusy(true);
     const result = await onAddNode({
       label,
@@ -244,6 +282,11 @@ export default function GraphPanel({
     setNodeScripts('');
     setNodeRequest('');
     setNodeResponse('');
+    setNodeChain('');
+    setNodeLessons('');
+    setNodeTemplate('');
+    setNodeReferences('');
+    setNodeTags('');
     if (result.nodeId) setSelectedId(result.nodeId);
   };
 
@@ -275,6 +318,16 @@ export default function GraphPanel({
     if (!selected) return;
     if (!editLabel.trim()) {
       setError('node label is required');
+      return;
+    }
+    if (!editPhase.trim()) {
+      setError('phase is required: osint, discovery, recon, fuzzing, exploitation, chaining, privilege escalation, pivot, or custom');
+      return;
+    }
+    if (
+      ![editCommands, editScripts, editRequest, editResponse].some((value) => value.trim())
+    ) {
+      setError('include at least one of commands, scripts, request, or response');
       return;
     }
     const intel: TechniqueIntel = {};
@@ -520,7 +573,8 @@ export default function GraphPanel({
                           type="text"
                           value={editPhase}
                           onChange={(event) => setEditPhase(event.target.value)}
-                          placeholder="recon, fuzzing, exploitation, chaining, validation"
+                          list="graph-phases"
+                          placeholder="osint, discovery, recon, fuzzing, exploitation, chaining, privilege escalation, pivot"
                           className={inputClass}
                         />
                       </label>
@@ -705,16 +759,26 @@ export default function GraphPanel({
                 className={inputClass}
               />
             </div>
+            <datalist id="graph-phases">
+              {PHASES.map((phase) => (
+                <option key={phase} value={phase} />
+              ))}
+            </datalist>
+            <div className="text-[13px] text-[#b45309] dark:text-[#fbbf24] leading-relaxed">
+              required: phase + at least one of commands, scripts, request, or response used during
+              testing.
+            </div>
             <details className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-2">
               <summary className="cursor-pointer text-[13px] uppercase tracking-wider text-[#71717a]">
-                commands, scripts, request/response - raw
+                commands, scripts, request/response - raw (required)
               </summary>
               <div className="space-y-2 pt-2">
                 <input
                   type="text"
                   value={nodePhase}
                   onChange={(event) => setNodePhase(event.target.value)}
-                  placeholder="phase: recon, fuzzing, exploitation, chaining, validation"
+                  list="graph-phases"
+                  placeholder="phase: osint, discovery, recon, fuzzing, exploitation, chaining, privilege escalation, pivot"
                   className={inputClass}
                 />
                 <textarea
@@ -751,6 +815,41 @@ export default function GraphPanel({
                   onChange={(event) => setNodeResponse(event.target.value)}
                   placeholder="full response - no truncation, no redaction"
                   className={areaClass}
+                />
+                <textarea
+                  rows={2}
+                  value={nodeChain}
+                  onChange={(event) => setNodeChain(event.target.value)}
+                  placeholder="chain: steps and relationships"
+                  className={areaClass}
+                />
+                <textarea
+                  rows={2}
+                  value={nodeLessons}
+                  onChange={(event) => setNodeLessons(event.target.value)}
+                  placeholder="lessons / why this is faster"
+                  className={areaClass}
+                />
+                <textarea
+                  rows={3}
+                  value={nodeTemplate}
+                  onChange={(event) => setNodeTemplate(event.target.value)}
+                  placeholder="reusable template"
+                  className={areaClass}
+                />
+                <textarea
+                  rows={2}
+                  value={nodeReferences}
+                  onChange={(event) => setNodeReferences(event.target.value)}
+                  placeholder="references"
+                  className={areaClass}
+                />
+                <input
+                  type="text"
+                  value={nodeTags}
+                  onChange={(event) => setNodeTags(event.target.value)}
+                  placeholder="tags (comma separated)"
+                  className={inputClass}
                 />
               </div>
             </details>

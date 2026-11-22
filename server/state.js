@@ -118,6 +118,26 @@ function limitText(value, max, field) {
   return text;
 }
 
+function requireNodeIntel(intel, action = 'create') {
+  const value = intel ?? {};
+  const phase = String(value.phase ?? '').trim();
+  if (!phase) {
+    throw new ApiError(
+      400,
+      `node ${action} requires phase: osint, discovery, recon, fuzzing, exploitation, chaining, privilege escalation, pivot, or custom`
+    );
+  }
+  const evidence = ['commands', 'scripts', 'request', 'response'].some(
+    (key) => String(value[key] ?? '').trim().length > 0
+  );
+  if (!evidence) {
+    throw new ApiError(
+      400,
+      `node ${action} requires at least one of commands, scripts, request, or response used during testing`
+    );
+  }
+}
+
 function parseIntel(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
   const fields = {
@@ -1397,6 +1417,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
       const intel = parseIntel(payload.intel);
+      requireNodeIntel(intel, 'create');
       const graph =
         state.graphs[channel.id] ||
         (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
@@ -1510,6 +1531,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         const intel = parseIntel(payload.intel);
         if (intel) node.intel = { ...(node.intel ?? {}), ...intel };
       }
+      requireNodeIntel(node.intel, 'update');
       const after = JSON.stringify({
         label: node.label,
         kind: node.kind,

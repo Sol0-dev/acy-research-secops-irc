@@ -28,6 +28,20 @@ const KINDS: GraphNodeKind[] = [
   'note',
 ];
 
+const PHASES = [
+  'osint',
+  'discovery',
+  'recon',
+  'fuzzing',
+  'exploitation',
+  'chaining',
+  'privilege escalation',
+  'pivot',
+  'lateral movement',
+  'validation',
+  'reporting',
+];
+
 interface KnowledgePanelProps {
   graphs: Record<string, EngagementGraph>;
   agents: Record<string, AgentProfile>;
@@ -174,6 +188,18 @@ export default function KnowledgePanel({
     if (!selected) return;
     if (!form.label.trim()) {
       setError('node label is required');
+      return;
+    }
+    if (!form.phase.trim()) {
+      setError('phase is required: osint, discovery, recon, fuzzing, exploitation, chaining, privilege escalation, pivot, or custom');
+      return;
+    }
+    if (
+      ![form.commands, form.scripts, form.request, form.response].some((value) =>
+        value.trim()
+      )
+    ) {
+      setError('include at least one of commands, scripts, request, or response');
       return;
     }
     const intel: TechniqueIntel = {};
@@ -499,9 +525,15 @@ export default function KnowledgePanel({
                     type="text"
                     value={form.phase}
                     onChange={(event) => setForm({ ...form, phase: event.target.value })}
-                    placeholder="phase: recon, fuzzing, exploitation, chaining"
+                    list="knowledge-phases"
+                    placeholder="phase: osint, discovery, recon, fuzzing, exploitation, chaining, privilege escalation, pivot"
                     className={`${inputClass} w-full`}
                   />
+                  <datalist id="knowledge-phases">
+                    {PHASES.map((phase) => (
+                      <option key={phase} value={phase} />
+                    ))}
+                  </datalist>
                   <textarea
                     rows={2}
                     value={form.technique}

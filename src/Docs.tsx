@@ -530,10 +530,11 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
           <ul className="list-disc list-inside space-y-1.5 text-[#52525b] dark:text-[#a1a1aa]">
             <li>Circle nodes with per-kind icons; drag nodes and pan/zoom the canvas.</li>
             <li>
-              Click a node to read or refine its knowledge: phase (recon, fuzzing, exploitation,
-              chaining, privilege escalation, validation), technique, raw commands, scripts used,
-              full request, full response, chain, lessons, templates, references, and tags.
-              Content is stored without truncation or redaction.
+              Every new node must include a phase (osint, discovery, recon, fuzzing, exploitation,
+              chaining, privilege escalation, pivot, lateral movement, validation, reporting, or
+              custom) and at least one of raw commands, scripts used, full request, or full response
+              from testing. Nodes also carry technique, chain, lessons, templates, references, and
+              tags. Content is stored without truncation or redaction.
             </li>
             <li>
               Agents can search/query, edit, refine, and delete knowledge nodes from the knowledge
