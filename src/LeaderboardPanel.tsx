@@ -100,25 +100,25 @@ export default function LeaderboardPanel({
         <button
           type="button"
           onClick={onClose}
-          className="font-mono text-[17px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+          className="font-mono text-[19px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
         >
           &larr; chat
         </button>
         <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-        <span className="font-mono text-lg font-medium truncate">
+        <span className="font-mono text-xl font-medium truncate">
           leaderboard // server scored
         </span>
-        <span className="font-mono text-[16px] text-[#71717a]">
+        <span className="font-mono text-[18px] text-[#71717a]">
           top 10 · {PERIOD_LABEL[period]} · top 3 highlighted
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <span className="font-mono text-[17px] text-[#71717a]">
+          <span className="font-mono text-[19px] text-[#71717a]">
             {data ? `updated ${new Date(data.generatedAt).toLocaleTimeString()}` : ''}
           </span>
           <button
             type="button"
             onClick={() => void load(false)}
-            className="font-mono text-[16px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+            className="font-mono text-[18px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
           >
             refresh
           </button>
@@ -131,7 +131,7 @@ export default function LeaderboardPanel({
             key={key}
             type="button"
             onClick={() => setPeriod(key)}
-            className={`px-2.5 py-1 font-mono text-[16px] border-b-2 -mb-px ${
+            className={`px-2.5 py-1 font-mono text-[18px] border-b-2 -mb-px ${
               period === key
                 ? 'border-[#16a34a] dark:border-[#4ade80] text-[#18181b] dark:text-[#f4f4f5]'
                 : 'border-transparent text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]'
@@ -142,7 +142,7 @@ export default function LeaderboardPanel({
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 font-mono text-[17px] leading-relaxed">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 font-mono text-[19px] leading-relaxed">
         {error && (
           <div className="border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
             {error}
@@ -165,17 +165,17 @@ export default function LeaderboardPanel({
                   className={`border p-3 space-y-1 ${medalClass(index)}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[17px] uppercase tracking-wider text-[#71717a]">
+                    <span className="text-[19px] uppercase tracking-wider text-[#71717a]">
                       {medalLabel(index)}
                     </span>
-                    <span className={`text-[17px] ${pointsClass(row.points)}`}>
+                    <span className={`text-[19px] ${pointsClass(row.points)}`}>
                       {signed(row.points)} pts
                     </span>
                   </div>
-                  <div className="text-[20px] text-[#18181b] dark:text-[#f4f4f5] truncate">
+                  <div className="text-[24px] text-[#18181b] dark:text-[#f4f4f5] truncate">
                     {formatNick(row.nick, row.role)}
                   </div>
-                  <div className="flex flex-wrap gap-x-2 text-[17px] text-[#71717a]">
+                  <div className="flex flex-wrap gap-x-2 text-[19px] text-[#71717a]">
                     <span>{formatMinutes(row.activeMinutes)} active</span>
                     <span>·</span>
                     <span className={pointsClass(row.penalties)}>
@@ -189,7 +189,7 @@ export default function LeaderboardPanel({
             </div>
 
             <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] overflow-x-auto">
-              <table className="w-full border-collapse text-[16px]">
+              <table className="w-full border-collapse text-[18px]">
                 <thead>
                   <tr className="border-b border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a]">
                     <th className="text-left px-2 py-1.5">#</th>
@@ -265,19 +265,19 @@ export default function LeaderboardPanel({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1">
-                <div className="text-[17px] uppercase tracking-wider text-[#71717a]">
+                <div className="text-[19px] uppercase tracking-wider text-[#71717a]">
                   daily work target
                 </div>
-                <div className="text-[17px] text-[#18181b] dark:text-[#f4f4f5]">
+                <div className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
                   around 2 hours per agent per day
                 </div>
-                <div className="text-[16px] text-[#71717a]">
+                <div className="text-[18px] text-[#71717a]">
                   period target: {formatMinutes(targetMinutes)} · top row active:{' '}
                   {formatMinutes(rows[0]?.activeMinutes ?? 0)}
                 </div>
               </div>
-              <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1 text-[16px] text-[#52525b] dark:text-[#a1a1aa]">
-                <div className="text-[17px] uppercase tracking-wider text-[#71717a]">
+              <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1 text-[18px] text-[#52525b] dark:text-[#a1a1aa]">
+                <div className="text-[19px] uppercase tracking-wider text-[#71717a]">
                   scoring
                 </div>
                 <div>

@@ -123,6 +123,8 @@ function scorePeriod(state, events, key, from, to) {
     if (event.time < from || event.time > to) continue;
     const actor = normalizeHandle(event.actor);
     if (!actor || !state.agents[actor]) continue;
+    // The admin can read and use the portal, but is not ranked on the board.
+    if (actor === 'admin') continue;
     const kind = actionKind(event.action);
 
     let row = agents.get(actor);
