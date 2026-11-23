@@ -146,6 +146,32 @@ export default function GraphPanel({
   onImport,
 }: GraphPanelProps) {
   const contributor = normalizeHandle(defaultContributor);
+  const downloadGraph = (id: string) => {
+    const target = graphs[id];
+    if (!target) return;
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            exportedAt: new Date().toISOString(),
+            channelId: id,
+            graph: target,
+          },
+          null,
+          2
+        ),
+      ],
+      { type: 'application/json' }
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `graph-${id.replace(/^#/, '')}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingNode, setEditingNode] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -154,6 +180,14 @@ export default function GraphPanel({
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState('');
   const [importNotice, setImportNotice] = useState('');
+  const loadImportFile = (file: File) => {
+    if (!file) return;
+    void file.text().then((text) => {
+      setImportText(text);
+      setImportError('');
+      setImportNotice(`loaded ${file.name}`);
+    });
+  };
 
   const [nodeLabel, setNodeLabel] = useState('');
   const [nodeKind, setNodeKind] = useState<GraphNodeKind>('target');
@@ -447,6 +481,14 @@ export default function GraphPanel({
           >
             import json
           </button>
+          <button
+            type="button"
+            onClick={() => downloadGraph(channelId)}
+            title="Download this graph as JSON"
+            className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+          >
+            download json
+          </button>
         </div>
 
         <span className="font-mono text-[14px] text-[#71717a]">
@@ -468,23 +510,6 @@ export default function GraphPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="uppercase tracking-wider text-[#71717a]">import graph JSON</span>
             <div className="flex items-center gap-2">
-              <label className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] cursor-pointer">
-                upload file
-                <input
-                  type="file"
-                  accept=".json,application/json"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (!file) return;
-                    void file.text().then((text) => {
-                      setImportText(text);
-                      setImportError('');
-                      setImportNotice('');
-                    });
-                  }}
-                />
-              </label>
               <button
                 type="button"
                 onClick={() => setImportOpen(false)}
@@ -492,6 +517,22 @@ export default function GraphPanel({
               >
                 close
               </button>
+            </div>
+          </div>
+          <div
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              const file = event.dataTransfer.files?.[0];
+              if (file) loadImportFile(file);
+            }}
+            className="border border-dashed border-[#a1a1aa] dark:border-[#52525b] bg-white/50 dark:bg-[#050506]/50 p-4 text-center space-y-1"
+          >
+            <div className="text-[14px] text-[#52525b] dark:text-[#a1a1aa]">
+              drag and drop a JSON file here
+            </div>
+            <div className="text-[13px] text-[#71717a]">
+              or paste JSON in the editor below
             </div>
           </div>
           <textarea
@@ -508,6 +549,18 @@ export default function GraphPanel({
               onChange={(event) => setImportReplace(event.target.checked)}
             />
             replace the current graph
+            <span className="text-[13px] text-[#71717a]">
+              optional: select a JSON file from your computer
+            </span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="text-[13px] text-[#71717a]"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) loadImportFile(file);
+              }}
+            />
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <button
