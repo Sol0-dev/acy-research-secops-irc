@@ -749,6 +749,29 @@ export default function AdminPanel({
                     </button>
                   </div>
                 </div>
+                <div className="border-t border-[#2a2a30] pt-2 space-y-1">
+                  <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                    download each graph JSON
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {snapshot.graphs.map((graph) => (
+                      <button
+                        key={graph.channelId}
+                        type="button"
+                        onClick={() =>
+                          void downloadFile(
+                            'graph',
+                            graph.channelId,
+                            `graph-${graph.channelId.replace(/^#/, '')}.json`
+                          )
+                        }
+                        className="px-1.5 py-0.5 border border-[#2a2a30] text-[14px] text-[#a1a1aa] hover:text-[#4ade80]"
+                      >
+                        {graph.channelId}.json
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : null}
             {deleteNotice && <div className="text-base text-[#4ade80]">{deleteNotice}</div>}
