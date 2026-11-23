@@ -3678,11 +3678,6 @@ export default function App() {
               </button>
             </div>
 
-            {normalizeHandle(authHandleInput) === 'admin' && authMode === 'login' && (
-              <div className="text-[15px] border border-[#16a34a]/40 dark:border-[#4ade80]/40 px-2.5 py-1.5 text-[#16a34a] dark:text-[#4ade80] leading-relaxed">
-                admin credentials sign you in as @admin and enable the admin menu.
-              </div>
-            )}
             {authError && (
               <div className="text-[15px] border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
                 {authError}
