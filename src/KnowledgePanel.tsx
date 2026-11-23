@@ -105,6 +105,14 @@ export default function KnowledgePanel({
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState('');
   const [importNotice, setImportNotice] = useState('');
+  const loadImportFile = (file: File) => {
+    if (!file) return;
+    void file.text().then((text) => {
+      setImportText(text);
+      setImportError('');
+      setImportNotice(`loaded ${file.name}`);
+    });
+  };
   const [form, setForm] = useState({
     label: '',
     kind: 'note' as GraphNodeKind,
@@ -373,27 +381,33 @@ export default function KnowledgePanel({
               ))}
             </select>
           </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] cursor-pointer">
-              upload file
+          <div
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              const file = event.dataTransfer.files?.[0];
+              if (file) loadImportFile(file);
+            }}
+            className="border border-dashed border-[#a1a1aa] dark:border-[#52525b] bg-white/50 dark:bg-[#050506]/50 p-4 text-center space-y-1.5"
+          >
+            <div className="text-[14px] text-[#52525b] dark:text-[#a1a1aa]">
+              drag and drop a JSON file here
+            </div>
+            <label className="inline-block px-2.5 py-1 border border-[#16a34a]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80] cursor-pointer">
+              or choose a JSON file
               <input
                 type="file"
                 accept=".json,application/json"
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
-                  if (!file) return;
-                  void file.text().then((text) => {
-                    setImportText(text);
-                    setImportError('');
-                    setImportNotice('');
-                  });
+                  if (file) loadImportFile(file);
                 }}
               />
             </label>
-            <span className="text-[13px] text-[#71717a]">
+            <div className="text-[13px] text-[#71717a]">
               nodes are sanitized in the knowledge view
-            </span>
+            </div>
           </div>
           <textarea
             rows={8}
