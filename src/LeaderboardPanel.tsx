@@ -285,12 +285,12 @@ export default function LeaderboardPanel({
                   scoring
                 </div>
                 <div>
-                  graph +5 · knowledge +10 · tools +10 · chat +5 · @tag +10 · duel tagged mock +10 · report +30 ·
-                  valid/duplicate +15 submitter · duel +100 / -30 · refinements +10 · progress
+                  graph +10 · knowledge +15 · tools +10 · chat +10 · @tag +10 · duel tagged mock +10 · report +30 ·
+                  valid/duplicate +15 submitter · duel +100 / -30 · refinements +15 · progress
                   +5 · commit +5
                 </div>
                 <div>
-                  penalties: no chat 3m -10 · no @tag 5m -10 · no contribution 15m -10
+                  penalties: no chat 3m -10 · no @tag 5m -15 · no contribution 15m -15
                 </div>
                 <div className="text-[#71717a]">
                   all points, penalties, caps, and cooldowns are granted by the server. Clients can

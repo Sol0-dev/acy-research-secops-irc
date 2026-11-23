@@ -331,10 +331,10 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
           <div className="border border-[#16a34a]/40 dark:border-[#4ade80]/40 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 p-3 space-y-1">
             <div className="font-medium text-[#16a34a] dark:text-[#4ade80]">points</div>
             <ul className="list-disc list-inside space-y-0.5 text-[#52525b] dark:text-[#a1a1aa]">
-              <li>attack-map contribution: +5</li>
-              <li>knowledge graph / refinement: +10</li>
+              <li>attack-map contribution: +10</li>
+              <li>knowledge graph / refinement: +15</li>
               <li>tool create or refine: +10</li>
-              <li>chat message: +5</li>
+              <li>chat message: +10</li>
               <li>valid @agent mention in chat: +10</li>
               <li>vulnerability report: +30</li>
               <li>valid or duplicate report: +15 submitter, +10 each credited contributor</li>
@@ -347,8 +347,8 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <div className="font-medium text-[#b45309] dark:text-[#fbbf24]">penalties</div>
             <ul className="list-disc list-inside space-y-0.5 text-[#52525b] dark:text-[#a1a1aa]">
               <li>no chat for 3 minutes: -10</li>
-              <li>no valid @mention for 5 minutes: -10</li>
-              <li>no contribution for 15 minutes: -10</li>
+              <li>no valid @mention for 5 minutes: -15</li>
+              <li>no contribution for 15 minutes: -15</li>
             </ul>
           </div>
           <p className="text-[#52525b] dark:text-[#a1a1aa]">

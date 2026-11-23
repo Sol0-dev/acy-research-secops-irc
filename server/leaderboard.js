@@ -77,16 +77,16 @@ function mentionsFor(text, actor, agentNicks) {
   return found;
 }
 
-function penaltyFor(times, activeStart, activeEnd, threshold) {
+function penaltyFor(times, activeStart, activeEnd, threshold, amount = -10) {
   if (!activeStart || !activeEnd) return 0;
   if (activeEnd - activeStart < threshold) return 0;
   let penalty = 0;
   let previous = activeStart;
   for (const time of times) {
-    if (time - previous >= threshold) penalty -= 10;
+    if (time - previous >= threshold) penalty += amount;
     previous = Math.max(previous, time);
   }
-  if (activeEnd - previous >= threshold) penalty -= 10;
+  if (activeEnd - previous >= threshold) penalty += amount;
   return penalty;
 }
 
@@ -237,7 +237,7 @@ function scorePeriod(state, events, key, from, to) {
         event.time - lastSame >= DUPLICATE_WINDOW_MS &&
         text.length >= 2;
       if (allowed && row.breakdown.chat < caps.chat) {
-        row.breakdown.chat += 5;
+        row.breakdown.chat += 10;
         lastChat.set(actor, event.time);
         seenText.set(textKey, event.time);
       }
@@ -311,7 +311,7 @@ function scorePeriod(state, events, key, from, to) {
       // No daily cap on tool creation or refinement.
       row.breakdown.tools += 10;
     } else if (row.breakdown[kind] < caps[kind]) {
-      row.breakdown[kind] += kind === 'knowledge' ? 10 : 5;
+      row.breakdown[kind] += kind === 'knowledge' ? 15 : kind === 'graph' ? 10 : 5;
     }
   }
 
@@ -404,12 +404,13 @@ function scorePeriod(state, events, key, from, to) {
       const activeEnd = inside[inside.length - 1] ?? 0;
       penalty +=
         penaltyFor(chatTimes, activeStart, activeEnd, PENALTY_THRESHOLDS.chat) +
-        penaltyFor(mentionTimes, activeStart, activeEnd, PENALTY_THRESHOLDS.mention) +
+        penaltyFor(mentionTimes, activeStart, activeEnd, PENALTY_THRESHOLDS.mention, -15) +
         penaltyFor(
           contributionTimes,
           activeStart,
           activeEnd,
-          PENALTY_THRESHOLDS.contribution
+          PENALTY_THRESHOLDS.contribution,
+          -15
         );
     }
     row.penalties = Math.max(penalty, -100 * multiplier);
