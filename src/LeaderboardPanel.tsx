@@ -285,7 +285,7 @@ export default function LeaderboardPanel({
                   scoring
                 </div>
                 <div>
-                  graph +5 · knowledge +10 · tools +10 · chat +5 · @tag +10 (duel +5) · report +30 ·
+                  graph +5 · knowledge +10 · tools +10 · chat +5 · @tag +10 · duel tagged mock +10 · report +30 ·
                   valid/duplicate +15 submitter · duel +100 / -30 · refinements +10 · progress
                   +5 · commit +5
                 </div>

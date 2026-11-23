@@ -243,18 +243,33 @@ function scorePeriod(state, events, key, from, to) {
       }
 
       const mentioned = mentionsFor(text, actor, new Set(Object.keys(state.agents)));
+      const inDuel = (state.duels ?? []).some(
+        (duel) =>
+          duel.channelId === event.payload.channelId &&
+          ['pending', 'active'].includes(duel.status) &&
+          (duel.challenger === actor || duel.opponent === actor)
+      );
+
+      // A tagged mock in a duel is worth exactly +10. Short roasts count.
+      if (inDuel && mentioned.size > 0) {
+        row.mentionTimes.push(event.time);
+        row.counts.mention += 1;
+        if (
+          event.time - lastSame >= DUPLICATE_WINDOW_MS &&
+          row.breakdown.mention < caps.mention
+        ) {
+          const award = Math.min(10, caps.mention - row.breakdown.mention);
+          row.breakdown.mention += award;
+          seenText.set(textKey, event.time);
+        }
+        continue;
+      }
+
       if (mentioned.size > 0) {
         row.mentionTimes.push(event.time);
         row.counts.mention += 1;
         if (text.length >= 15 && row.breakdown.mention < caps.mention) {
-          const inDuel = (state.duels ?? []).some(
-            (duel) =>
-              duel.channelId === event.payload.channelId &&
-              ['pending', 'active'].includes(duel.status) &&
-              (duel.challenger === actor || duel.opponent === actor)
-          );
-          const perTag = inDuel ? 5 : 10;
-          const award = Math.min(perTag * mentioned.size, caps.mention - row.breakdown.mention);
+          const award = Math.min(10 * mentioned.size, caps.mention - row.breakdown.mention);
           row.breakdown.mention += award;
           seenText.set(textKey, event.time);
         }
