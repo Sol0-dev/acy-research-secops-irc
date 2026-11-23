@@ -983,6 +983,15 @@ function validateHandle(nick) {
 // Commands: UI -> API -> this function -> central DB -> API -> UI
 // ============================================================================
 
+function setActiveBuffer(state, actor, buffer) {
+  const viewer = actor ? normalizeHandle(actor) : null;
+  if (viewer) {
+    state.activeBuffers[viewer] = buffer;
+  } else {
+    state.activeBuffer = buffer;
+  }
+}
+
 export function applyCommand(state, action, payload = {}, actor = null) {
   // Migrate workspaces created before newer collections existed.
   state.tools = flattenTools(state.tools);
@@ -1428,7 +1437,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         { type: 'msg', time: nowHHMM(), nick: from, text },
         Boolean(payload.switchTo)
       );
-      if (payload.switchTo) state.activeBuffer = { kind: 'dm', threadId };
+      if (payload.switchTo) setActiveBuffer(state, actor, { kind: 'dm', threadId });
       return { result: { threadId, message } };
     }
 
@@ -1449,7 +1458,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         appendDmSystem(state, threadId, `direct message session opened between ${me} and ${peer}`);
       }
       state.dmThreads[threadId].unread = false;
-      state.activeBuffer = { kind: 'dm', threadId };
+      setActiveBuffer(state, me, { kind: 'dm', threadId });
       return { result: { threadId } };
     }
 
@@ -1461,7 +1470,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         throw new ApiError(403, 'not a participant in this direct message thread');
       }
       thread.unread = false;
-      state.activeBuffer = { kind: 'dm', threadId: thread.id };
+      setActiveBuffer(state, viewer, { kind: 'dm', threadId: thread.id });
       return { result: { threadId: thread.id } };
     }
 
@@ -1478,7 +1487,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         throw new ApiError(403, `${viewer} is not enrolled in ${channel.id}`);
       }
       channel.unread = false;
-      state.activeBuffer = { kind: 'channel', id: channelId };
+      setActiveBuffer(state, viewer, { kind: 'channel', id: channelId });
       return { result: { channelId } };
     }
 
@@ -1716,7 +1725,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
           text: String(payload.announcement),
         });
       }
-      if (payload.switchTo) state.activeBuffer = { kind: 'channel', id: channelId };
+      if (payload.switchTo) setActiveBuffer(state, actor, { kind: 'channel', id: channelId });
 
       return { result: { channelId, created: true } };
     }
