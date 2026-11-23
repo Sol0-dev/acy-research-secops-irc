@@ -1423,9 +1423,75 @@ app.use((error, _req, res, _next) => {
   return res.status(status).json({ error: error.message ?? 'request failed' });
 });
 
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+let weeklyResetRunning = false;
+
+async function maybeWeeklyReset() {
+  if (weeklyResetRunning) return;
+  weeklyResetRunning = true;
+  try {
+    const state = structuredClone(getState());
+    const now = Date.now();
+    const last = state.lastWeeklyResetAt
+      ? new Date(state.lastWeeklyResetAt).getTime()
+      : 0;
+    if (!last) {
+      state.lastWeeklyResetAt = new Date(now).toISOString();
+      await persistState(state, 'system.weekly_reset.init', 'system', {});
+      return;
+    }
+    if (now - last < WEEK_MS) return;
+
+    const iso = new Date(now).toISOString();
+    const time = new Date().toTimeString().slice(0, 5);
+    for (const agent of Object.values(state.agents)) {
+      if (agent.nick === 'admin') continue;
+      agent.role = 'unassigned';
+      agent.task = agent.programs.length
+        ? `[unassigned] active on ${agent.programs.join(', ')}`
+        : 'connected in #lobby - role unassigned';
+      if (state.accounts[agent.nick]) {
+        state.accounts[agent.nick].role = 'unassigned';
+      }
+    }
+    state.roleDescriptions = {};
+    state.scoreEpoch = iso;
+    state.lastWeeklyResetAt = iso;
+
+    for (const channel of state.channels) {
+      channel.messages = [];
+      channel.unread = false;
+    }
+    for (const thread of Object.values(state.dmThreads)) {
+      thread.messages = [];
+      thread.unread = false;
+    }
+    const lobby = state.channels.find((channel) => channel.id === '#lobby');
+    if (lobby) {
+      lobby.messages = [
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text:
+            'weekly reset: roles cleared, points reset, chats cleared. Accounts, graphs, knowledge graphs, tools, and progress are kept.',
+        },
+      ];
+      lobby.unread = true;
+    }
+
+    await persistState(state, 'system.weekly_reset', 'system', {});
+  } finally {
+    weeklyResetRunning = false;
+  }
+}
+
 async function start() {
   const { seeded } = await initDb();
   console.log(`[db] workspace ${seeded ? 'seeded' : 'loaded'} from ${process.env.DB_NAME ?? 'secops_irc'}`);
+  void maybeWeeklyReset();
+  const weeklyTimer = setInterval(() => void maybeWeeklyReset(), 60_000);
+  if (typeof weeklyTimer.unref === 'function') weeklyTimer.unref();
   if (ADMIN_PASSWORD_GENERATED) {
     if (process.env.NODE_ENV === 'production') {
       console.error('[admin] ADMIN_PASSWORD is required in production');

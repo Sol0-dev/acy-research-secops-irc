@@ -372,6 +372,8 @@ export function createInitialState() {
     duels: [],
     duelTask: null,
     goalHistory: [],
+    lastWeeklyResetAt: null,
+    scoreEpoch: null,
     voting: { active: false, activatedBy: null, activatedAt: null },
   };
 }
@@ -1009,6 +1011,8 @@ function assertFocusWork(state, channel, nick) {
 
 export function ensureGoalHistory(state) {
   if (!Array.isArray(state.goalHistory)) state.goalHistory = [];
+  if (state.lastWeeklyResetAt === undefined) state.lastWeeklyResetAt = null;
+  if (state.scoreEpoch === undefined) state.scoreEpoch = null;
   if (state.goalHistory.length === 0 && state.docsGoal) {
     const now = new Date();
     const startsAt = state.focus?.startsAt ?? now.toISOString();

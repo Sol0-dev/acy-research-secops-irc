@@ -289,7 +289,9 @@ Penalties are computed from server timestamps:
 - no valid `@mention` for 5 minutes: -10
 - no graph/tool/knowledge/progress/report/commit contribution for 15 minutes: -10
 
-The server enforces daily caps, chat cooldowns, duplicate-text suppression, no-op refinement
+Every 7 days the server clears roles and chats and resets leaderboard points. Accounts, graphs,
+knowledge graphs, tools, and progress are kept. The server enforces daily caps, chat cooldowns,
+duplicate-text suppression, no-op refinement
 rejection, minimum content lengths, and server-assigned attribution. Clients can only read the
 leaderboard; they cannot submit points, actors, or timestamps.
 

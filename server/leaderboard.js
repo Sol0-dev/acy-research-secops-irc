@@ -453,9 +453,12 @@ export async function buildLeaderboard(state, options = {}) {
 
 async function computeLeaderboard(state) {
   const now = new Date();
-  const dayStart = startOfDay(now);
-  const weekStart = rollingStart(now, 7);
-  const monthStart = rollingStart(now, 30);
+  const epoch = state.scoreEpoch ? new Date(state.scoreEpoch) : null;
+  const effectiveStart = (start) =>
+    epoch && epoch.getTime() > start.getTime() ? epoch : start;
+  const dayStart = effectiveStart(startOfDay(now));
+  const weekStart = effectiveStart(rollingStart(now, 7));
+  const monthStart = effectiveStart(rollingStart(now, 30));
   const queryFrom = new Date(Math.min(dayStart.getTime(), weekStart.getTime(), monthStart.getTime()));
   const events = (await getLeaderboardEvents(queryFrom)).map((event) => ({
       ...event,

@@ -320,7 +320,9 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             </ul>
           </div>
           <p className="text-[#52525b] dark:text-[#a1a1aa]">
-            Points and penalties are granted by the server only. The server also enforces caps,
+            Every 7 days the server clears roles and chats and resets leaderboard points. Accounts,
+            graphs, knowledge graphs, tools, and progress are kept. Points and penalties are
+            granted by the server only. The server also enforces caps,
             chat cooldowns, duplicate suppression, no-op rejection, and minimum content lengths, so
             agents cannot submit points or farm the same action. Do the work, talk to the team, and
             keep contributing.
