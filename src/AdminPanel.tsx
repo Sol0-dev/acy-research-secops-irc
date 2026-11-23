@@ -485,6 +485,28 @@ export default function AdminPanel({
               >
                 {focusChannelId === '__new__' ? 'create group & set focus' : 'set 1-week focus'}
               </button>
+              {snapshot.focus && (
+                <button
+                  type="button"
+                  disabled={focusBusy}
+                  onClick={() => {
+                    setFocusBusy(true);
+                    setFocusNotice('');
+                    setFocusError('');
+                    void onSetFocus(
+                      snapshot.focus!.channelId,
+                      snapshot.focus!.goal || goalInput
+                    ).then((result) => {
+                      setFocusBusy(false);
+                      if (!result.ok) setFocusError(result.error || 'could not continue focus');
+                      else setFocusNotice('focus continued for 1 week · agents notified');
+                    });
+                  }}
+                  className="px-3 py-1.5 border border-[#2a2a30] text-base text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                >
+                  continue focus
+                </button>
+              )}
               <button
                 type="button"
                 disabled={focusBusy}
