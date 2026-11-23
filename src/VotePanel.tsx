@@ -130,11 +130,22 @@ export default function VotePanel({
   const myQuota = quotaWatch[sessionNick] ?? null;
   const proposalsList = useMemo(
     () =>
-      Object.values(proposals).sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ),
+      Object.values(proposals).sort((a, b) => {
+        const openRank = (proposal: Proposal) => (proposal.status === 'open' ? 0 : 1);
+        return (
+          openRank(a) - openRank(b) ||
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      }),
     [proposals]
   );
+  const canSubmitProposal = title.trim().length >= 5 && body.trim().length >= 20;
+  const topCardClass = (nick: string | null) =>
+    `border p-3 space-y-1 ${
+      nick === sessionNick
+        ? 'border-[#16a34a]/60 bg-[#16a34a]/5 dark:border-[#4ade80]/60 dark:bg-[#4ade80]/5'
+        : 'border-[#e5e5e5] dark:border-[#1a1a1e]'
+    }`;
 
   useEffect(() => {
     if (dayTop === sessionNick) setPeriod('day');
@@ -243,7 +254,7 @@ export default function VotePanel({
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1">
+          <div className={topCardClass(dayTop)}>
             <div className="text-[14px] uppercase tracking-wider text-[#71717a]">day top 1</div>
             <div className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
               {dayTop ? formatNick(dayTop) : 'no scored activity yet'}
@@ -251,8 +262,11 @@ export default function VotePanel({
             <div className="text-[14px] text-[#71717a]">
               {dayTop === sessionNick ? 'you can open a day proposal' : 'opens the day proposal'}
             </div>
+            {dayTop === sessionNick && (
+              <div className="text-[13px] text-[#16a34a] dark:text-[#4ade80]">you</div>
+            )}
           </div>
-          <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1">
+          <div className={topCardClass(weekTop)}>
             <div className="text-[14px] uppercase tracking-wider text-[#71717a]">7 days top 1</div>
             <div className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
               {weekTop ? formatNick(weekTop) : 'no scored activity yet'}
@@ -260,8 +274,11 @@ export default function VotePanel({
             <div className="text-[14px] text-[#71717a]">
               {weekTop === sessionNick ? 'you can open a 7-day proposal' : 'opens the 7-day proposal'}
             </div>
+            {weekTop === sessionNick && (
+              <div className="text-[13px] text-[#16a34a] dark:text-[#4ade80]">you</div>
+            )}
           </div>
-          <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-1">
+          <div className={topCardClass(monthTop)}>
             <div className="text-[14px] uppercase tracking-wider text-[#71717a]">month top 1</div>
             <div className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
               {monthTop ? formatNick(monthTop) : 'no scored activity yet'}
@@ -269,6 +286,9 @@ export default function VotePanel({
             <div className="text-[14px] text-[#71717a]">
               {monthTop === sessionNick ? 'you can open a month proposal' : 'opens the month proposal'}
             </div>
+            {monthTop === sessionNick && (
+              <div className="text-[13px] text-[#16a34a] dark:text-[#4ade80]">you</div>
+            )}
           </div>
           <div className="border border-[#f59e0b]/50 bg-[#f59e0b]/10 p-3 space-y-1">
             <div className="text-[14px] uppercase tracking-wider text-[#b45309] dark:text-[#fbbf24]">
@@ -368,21 +388,29 @@ export default function VotePanel({
             <input
               type="text"
               value={title}
+              maxLength={160}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="what should improve?"
               className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px]"
             />
+            <div className="text-[13px] text-[#71717a]">
+              {title.trim().length}/160 · at least 5 characters
+            </div>
             <textarea
               rows={3}
               value={body}
+              maxLength={5000}
               onChange={(event) => setBody(event.target.value)}
               placeholder="describe the change, wish, refinement, or quota need"
               className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px] resize-y"
             />
+            <div className="text-[13px] text-[#71717a]">
+              {body.trim().length}/5000 · at least 20 characters
+            </div>
             <button
               type="submit"
-              disabled={busy === 'create'}
-              className="px-3 py-1.5 border border-[#16a34a]/50 text-[#16a34a] dark:text-[#4ade80] text-[15px]"
+              disabled={busy === 'create' || !canSubmitProposal}
+              className="px-3 py-1.5 border border-[#16a34a]/50 text-[#16a34a] dark:text-[#4ade80] text-[15px] disabled:opacity-40"
             >
               open proposal +
             </button>
@@ -409,6 +437,19 @@ export default function VotePanel({
               const no = votes.filter(([, vote]) => vote.decision === 'no').length;
               const abstain = votes.filter(([, vote]) => vote.decision === 'abstain').length;
               const mine = proposal.votes?.[sessionNick];
+              const totalVotes = votes.length;
+              const voteClass = (decision: VoteDecision) => {
+                if (mine?.decision === decision) {
+                  if (decision === 'yes') {
+                    return 'border-[#16a34a]/60 bg-[#16a34a]/10 text-[#16a34a] dark:text-[#4ade80]';
+                  }
+                  if (decision === 'no') {
+                    return 'border-[#f87171]/60 bg-[#f87171]/10 text-[#dc2626] dark:text-[#f87171]';
+                  }
+                  return 'border-[#71717a]/60 bg-[#71717a]/10 text-[#18181b] dark:text-[#f4f4f5]';
+                }
+                return 'border-[#e5e5e5] dark:border-[#1a1a1e] text-[#52525b] dark:text-[#a1a1aa]';
+              };
               return (
                 <div
                   key={proposal.id}
@@ -416,7 +457,8 @@ export default function VotePanel({
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[13px] px-1.5 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a]">
-                      {proposal.period} · {proposal.category}
+                      {proposal.period === 'week' ? '7 days' : proposal.period} ·{' '}
+                      {proposal.category}
                     </span>
                     <span className={`text-[13px] px-1.5 py-0.5 border ${statusClass(proposal.status)}`}>
                       {proposal.status}
@@ -435,8 +477,45 @@ export default function VotePanel({
                     <span className="text-[#16a34a] dark:text-[#4ade80]">yes {yes}</span>
                     <span className="text-[#dc2626] dark:text-[#f87171]">no {no}</span>
                     <span>abstain {abstain}</span>
-                    {mine && <span>· your vote: {mine.decision}</span>}
+                    {mine && (
+                      <span className="text-[#18181b] dark:text-[#f4f4f5]">
+                        your vote: {mine.decision}
+                      </span>
+                    )}
                   </div>
+                  {totalVotes > 0 && (
+                    <div className="h-1.5 w-full flex overflow-hidden border border-[#e5e5e5] dark:border-[#1a1a1e]">
+                      <div
+                        className="bg-[#16a34a] dark:bg-[#4ade80]"
+                        style={{ width: `${(yes / totalVotes) * 100}%` }}
+                      />
+                      <div
+                        className="bg-[#dc2626] dark:bg-[#f87171]"
+                        style={{ width: `${(no / totalVotes) * 100}%` }}
+                      />
+                      <div
+                        className="bg-[#a1a1aa] dark:bg-[#52525b]"
+                        style={{ width: `${(abstain / totalVotes) * 100}%` }}
+                      />
+                    </div>
+                  )}
+                  {votes.filter(([, vote]) => vote.comment).length > 0 && (
+                    <div className="space-y-1 border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5">
+                      {votes
+                        .filter(([, vote]) => vote.comment)
+                        .map(([nick, vote]) => (
+                          <div key={nick} className="text-[14px]">
+                            <span className="text-[#18181b] dark:text-[#f4f4f5]">
+                              {formatNick(nick)}
+                            </span>
+                            <span className="text-[#71717a]"> voted {vote.decision}: </span>
+                            <span className="text-[#52525b] dark:text-[#a1a1aa]">
+                              {vote.comment}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                   {voting.active && proposal.status === 'open' && (
                     <div className="flex flex-wrap items-center gap-1.5">
                       <input
@@ -457,7 +536,7 @@ export default function VotePanel({
                           type="button"
                           disabled={busy === `vote-${proposal.id}`}
                           onClick={() => void submitVote(proposal, decision)}
-                          className="px-2 py-1 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[15px] text-[#52525b] dark:text-[#a1a1aa]"
+                          className={`px-2 py-1 border text-[15px] ${voteClass(decision)}`}
                         >
                           {decision}
                         </button>
@@ -470,11 +549,11 @@ export default function VotePanel({
                     </div>
                   )}
                   {isAdmin && (
-                    <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2 space-y-1.5">
-                      <div className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                    <details className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-2">
+                      <summary className="cursor-pointer text-[13px] uppercase tracking-wider text-[#71717a]">
                         admin decision
-                      </div>
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      </summary>
+                      <div className="pt-2 flex flex-wrap items-center gap-1.5">
                         <select
                           value={statusDraft[proposal.id] ?? proposal.status}
                           onChange={(event) =>
@@ -512,7 +591,7 @@ export default function VotePanel({
                           save status
                         </button>
                       </div>
-                    </div>
+                    </details>
                   )}
                 </div>
               );
