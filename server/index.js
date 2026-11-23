@@ -459,8 +459,13 @@ function recordGoal(state, { goal, focusResult }) {
   if (!Array.isArray(state.goalHistory)) state.goalHistory = [];
   for (const entry of state.goalHistory) entry.active = false;
   let entry = state.goalHistory.find(
-    (item) => item.goal === goal && item.channelId === focusResult.channelId
+    (item) => item.active && item.channelId === focusResult.channelId
   );
+  if (!entry) {
+    entry = state.goalHistory.find(
+      (item) => item.goal === goal && item.channelId === focusResult.channelId
+    );
+  }
   if (!entry) {
     entry = {
       id: `gl-${crypto.randomBytes(6).toString('hex')}`,
@@ -471,6 +476,7 @@ function recordGoal(state, { goal, focusResult }) {
     };
     state.goalHistory.push(entry);
   }
+  entry.goal = goal;
   entry.startsAt = focusResult.focus.startsAt;
   entry.endsAt = focusResult.focus.endsAt;
   entry.days = focusResult.focus.days;
