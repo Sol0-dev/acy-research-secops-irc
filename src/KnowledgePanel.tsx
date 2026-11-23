@@ -44,6 +44,8 @@ const PHASES = [
 
 interface KnowledgePanelProps {
   graphs: Record<string, EngagementGraph>;
+  channelIds: string[];
+  defaultChannelId: string;
   agents: Record<string, AgentProfile>;
   formatNick: (nick: string, role?: string) => string;
   onOpenGraph: (channelId: string) => void;
@@ -59,16 +61,32 @@ interface KnowledgePanelProps {
     channelId: string;
     nodeId: string;
   }) => Promise<{ ok: boolean; error?: string }>;
+  onImport: (input: {
+    channelId: string;
+    nodes: unknown[];
+    edges: unknown[];
+    replace: boolean;
+  }) => Promise<{
+    ok: boolean;
+    error?: string;
+    importedNodes?: number;
+    importedEdges?: number;
+    skippedNodes?: number;
+    skippedEdges?: number;
+  }>;
   onClose: () => void;
 }
 
 export default function KnowledgePanel({
   graphs,
+  channelIds,
+  defaultChannelId,
   agents,
   formatNick,
   onOpenGraph,
   onUpdateNode,
   onRemoveNode,
+  onImport,
   onClose,
 }: KnowledgePanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -78,6 +96,15 @@ export default function KnowledgePanel({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importChannel, setImportChannel] = useState(
+    defaultChannelId || channelIds[0] || ''
+  );
+  const [importText, setImportText] = useState('');
+  const [importReplace, setImportReplace] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importNotice, setImportNotice] = useState('');
   const [form, setForm] = useState({
     label: '',
     kind: 'note' as GraphNodeKind,
@@ -303,7 +330,140 @@ export default function KnowledgePanel({
         >
           edit target graph
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setImportOpen((value) => !value);
+            setImportError('');
+            setImportNotice('');
+          }}
+          className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+        >
+          import json
+        </button>
       </div>
+
+      {importOpen && (
+        <div className="mx-4 sm:mx-5 mt-3 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#fafafa] dark:bg-[#09090b] p-3 space-y-2 font-mono text-[14px]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="uppercase tracking-wider text-[#71717a]">
+              import JSON into the knowledge graph
+            </span>
+            <button
+              type="button"
+              onClick={() => setImportOpen(false)}
+              className="text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+            >
+              close
+            </button>
+          </div>
+          <label className="block space-y-1">
+            <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+              target graph
+            </span>
+            <select
+              value={importChannel}
+              onChange={(event) => setImportChannel(event.target.value)}
+              className="w-full bg-white dark:bg-[#050506] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[14px]"
+            >
+              {channelIds.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] cursor-pointer">
+              upload file
+              <input
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  void file.text().then((text) => {
+                    setImportText(text);
+                    setImportError('');
+                    setImportNotice('');
+                  });
+                }}
+              />
+            </label>
+            <span className="text-[13px] text-[#71717a]">
+              nodes are sanitized in the knowledge view
+            </span>
+          </div>
+          <textarea
+            rows={8}
+            value={importText}
+            onChange={(event) => setImportText(event.target.value)}
+            placeholder={'{"nodes":[{"label":"technique or asset","kind":"note","intel":{"phase":"recon","technique":"CWE-...","commands":"..."}}],"edges":[]}'}
+            className="w-full bg-white dark:bg-[#050506] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 font-mono text-[13px] resize-y"
+          />
+          <label className="flex items-center gap-2 text-[#71717a]">
+            <input
+              type="checkbox"
+              checked={importReplace}
+              onChange={(event) => setImportReplace(event.target.checked)}
+            />
+            replace the target graph
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={importBusy || !importText.trim() || !importChannel}
+              onClick={() => {
+                setImportBusy(true);
+                setImportError('');
+                setImportNotice('');
+                try {
+                  const parsed = JSON.parse(importText) as {
+                    nodes?: unknown[];
+                    edges?: unknown[];
+                  };
+                  const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
+                  const edges = Array.isArray(parsed?.edges) ? parsed.edges : [];
+                  void onImport({
+                    channelId: importChannel,
+                    nodes,
+                    edges,
+                    replace: importReplace,
+                  }).then((result) => {
+                    setImportBusy(false);
+                    if (!result.ok) {
+                      setImportError(result.error || 'could not import knowledge graph');
+                      return;
+                    }
+                    setImportNotice(
+                      `imported ${result.importedNodes ?? 0} nodes and ${
+                        result.importedEdges ?? 0
+                      } edges · skipped ${result.skippedNodes ?? 0} nodes and ${
+                        result.skippedEdges ?? 0
+                      } edges`
+                    );
+                    setImportText('');
+                  });
+                } catch {
+                  setImportBusy(false);
+                  setImportError('invalid JSON. expected an object with nodes and edges arrays.');
+                }
+              }}
+              className="px-2.5 py-1 border border-[#16a34a]/50 text-[#16a34a] dark:text-[#4ade80] disabled:opacity-40"
+            >
+              {importBusy ? 'importing…' : 'import into knowledge graph'}
+            </button>
+            {importError && <span className="text-[#dc2626] dark:text-[#f87171]">{importError}</span>}
+            {importNotice && <span className="text-[#16a34a] dark:text-[#4ade80]">{importNotice}</span>}
+          </div>
+          <div className="text-[13px] text-[#71717a]">
+            nodes use label, kind, notes, intel.phase and at least one of intel.commands, scripts,
+            request, response. edges use from, to, and optional label. values are sanitized for the
+            knowledge view.
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex min-h-0 flex-col xl:flex-row">
         <div className="flex-1 min-w-0 h-[62vh] xl:h-auto min-h-[560px] bg-[#fafafa] dark:bg-[#0c0c0e]">

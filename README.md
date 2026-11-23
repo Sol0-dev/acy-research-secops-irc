@@ -253,7 +253,8 @@ and delete tools with full code, usage, inputs, outputs, tags, status, and revis
 
 The admin can set a **1-week focus** on one group chat and attack map. A focus banner shows the target,
 goal, and end date above the chat; the attack map defaults to the focus target. The knowledge panel always
-shows the whole merged graph, independent of focus.
+shows the whole merged graph, independent of focus. Graph JSON can be imported into an existing
+graph, into a new graph at creation, or into a chosen target from the knowledge panel.
 
 The formatted knowledge-graph JSON export is **admin only**: the admin panel can download the whole
 graph (all targets) as formatted JSON. Agent panels do not expose download controls.

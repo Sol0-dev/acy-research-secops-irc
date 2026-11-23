@@ -2792,6 +2792,14 @@ export default function App() {
           ) : knowledgePanelOpen ? (
             <KnowledgePanel
               graphs={knowledgeGraphs}
+              channelIds={Object.keys(workspace.graphs ?? {}).sort()}
+              defaultChannelId={
+                workspace.focus?.channelId && workspace.graphs[workspace.focus.channelId]
+                  ? workspace.focus.channelId
+                  : activeChannelObj?.isEngagement && workspace.graphs[activeChannelObj.id]
+                    ? activeChannelObj.id
+                    : Object.keys(workspace.graphs ?? {}).sort()[0] || ''
+              }
               agents={workspace.agents}
               formatNick={formatNickWithRole}
               onOpenGraph={(channelId) => {
@@ -2829,6 +2837,28 @@ export default function App() {
                   return {
                     ok: false,
                     error: error instanceof Error ? error.message : 'could not delete node',
+                  };
+                }
+              }}
+              onImport={async (input) => {
+                try {
+                  const response = await execute('graph.import', input);
+                  const result = resultOf<{
+                    importedNodes: number;
+                    importedEdges: number;
+                    skippedNodes: number;
+                    skippedEdges: number;
+                  }>(response);
+                  return result
+                    ? { ok: true, ...result }
+                    : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error:
+                      error instanceof Error
+                        ? error.message
+                        : 'could not import knowledge graph',
                   };
                 }
               }}

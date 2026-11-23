@@ -619,6 +619,12 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
           <ul className="list-disc list-inside space-y-1.5 text-[#52525b] dark:text-[#a1a1aa]">
             <li>Circle nodes with per-kind icons; drag nodes and pan/zoom the canvas.</li>
             <li>
+              Import JSON from the graph panel into an existing graph, or use the graph JSON field
+              when creating a new engagement. The knowledge panel can import JSON into a chosen
+              target; knowledge values are sanitized. JSON uses nodes and edges, and every node
+              needs intel.phase plus commands, scripts, request, or response.
+            </li>
+            <li>
               Every new node must include a phase (osint, discovery, recon, fuzzing, exploitation,
               chaining, privilege escalation, pivot, lateral movement, validation, reporting, or
               custom) and at least one of raw commands, scripts used, full request, or full response
