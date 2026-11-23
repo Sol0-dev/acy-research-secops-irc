@@ -587,7 +587,11 @@ export function toPublicState(state, viewerNick = null) {
       );
       continue;
     }
-    reports[channelId] = list;
+    reports[channelId] = isAdminViewer
+      ? list.filter((report) => normalizeHandle(report.createdBy) !== 'admin')
+      : list.filter(
+          (report) => normalizeHandle(report.createdBy) === viewer
+        );
   }
 
   const duels = (state.duels ?? []).map((duel) => {
@@ -922,7 +926,21 @@ function removeUserAgent(state, nick) {
 
 function validatePassphrase(passphrase) {
   const value = String(passphrase ?? '').trim();
-  if (value.length < 8) throw new ApiError(400, 'passphrase must be at least 8 characters');
+  if (value.length < 12) {
+    throw new ApiError(400, 'passphrase must be at least 12 characters');
+  }
+  if (!/[A-Z]/.test(value)) {
+    throw new ApiError(400, 'passphrase must include an uppercase letter');
+  }
+  if (!/[a-z]/.test(value)) {
+    throw new ApiError(400, 'passphrase must include a lowercase letter');
+  }
+  if (!/[0-9]/.test(value)) {
+    throw new ApiError(400, 'passphrase must include a number');
+  }
+  if (!/[^A-Za-z0-9]/.test(value)) {
+    throw new ApiError(400, 'passphrase must include a symbol');
+  }
   return value;
 }
 
@@ -2483,18 +2501,19 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         };
       }
       const reports = state.reports[channel.id] ?? [];
+      const visibleReports =
+        viewer === 'admin'
+          ? reports.filter(
+              (report) => normalizeHandle(report.createdBy) !== 'admin'
+            )
+          : reports.filter(
+              (report) => normalizeHandle(report.createdBy) === viewer
+            );
       return {
         result: {
           access: true,
           channelId: channel.id,
-          reports:
-            channel.duelChannel &&
-            viewer !== 'admin' &&
-            isDuelist(state, channel.id, viewer)
-              ? reports.filter(
-                  (report) => normalizeHandle(report.createdBy) === viewer
-                )
-              : reports,
+          reports: visibleReports,
         },
       };
     }

@@ -243,6 +243,7 @@ app.get('/api/admin', async (req, res) => {
     const reports = [];
     for (const [channelId, list] of Object.entries(state.reports ?? {})) {
       for (const report of list) {
+        if (normalizeHandle(report.createdBy) === 'admin') continue;
         reports.push({
           id: report.id,
           channelId,
@@ -844,6 +845,32 @@ app.post('/api/admin/duel/task', async (req, res) => {
     // invite each other after the admin prepares it.
     if (!duelId) {
       state.duelTask = task ? { text: task, setBy: 'admin', setAt: now } : null;
+
+      // Notify every open duel in its own chat group, tagging both duelists.
+      for (const duel of state.duels ?? []) {
+        if (!['pending', 'active'].includes(duel.status)) continue;
+        duel.task = task || undefined;
+        duel.taskSetBy = 'admin';
+        duel.taskSetAt = now;
+        const duelChannel = state.channels.find((item) => item.id === duel.channelId);
+        if (!duelChannel) continue;
+        duelChannel.messages = [
+          ...duelChannel.messages.slice(-199),
+          {
+            id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+            type: 'sys',
+            time,
+            text: `@${duel.challenger} @${duel.opponent} ${
+              task
+                ? `admin set the duel task: ${task}`
+                : 'admin cleared the duel task.'
+            }`,
+            duelNotice: true,
+          },
+        ];
+        duelChannel.unread = true;
+      }
+
       const lobby = state.channels.find((item) => item.id === '#lobby');
       if (lobby) {
         const mentions = Object.values(state.agents)

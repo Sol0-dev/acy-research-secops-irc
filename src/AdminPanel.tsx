@@ -25,7 +25,6 @@ interface AdminPanelProps {
   onSaveGoal: (goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetDuelTask: (duelId: string, task: string) => Promise<{ ok: boolean; error?: string }>;
-  onResolveDuel: (duelId: string, winner: string, note?: string) => Promise<{ ok: boolean; error?: string }>;
   onOpenAgentPortal: () => void;
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
@@ -76,7 +75,6 @@ export default function AdminPanel({
   onSaveGoal,
   onSetFocus,
   onSetDuelTask,
-  onResolveDuel,
   onOpenAgentPortal,
   onDeleteGraph,
   onDeleteChannel,
@@ -112,14 +110,11 @@ export default function AdminPanel({
   const [auditActionFilter, setAuditActionFilter] = useState('');
   const [auditSearch, setAuditSearch] = useState('');
   const [auditPhaseFilter, setAuditPhaseFilter] = useState('all');
-  const [selectedDuelId, setSelectedDuelId] = useState('');
   const [duelTaskDrafts, setDuelTaskDrafts] = useState<Record<string, string>>({});
+  const [duelEditing, setDuelEditing] = useState(false);
   const [duelTaskBusy, setDuelTaskBusy] = useState('');
   const [duelTaskNotice, setDuelTaskNotice] = useState('');
   const [duelTaskError, setDuelTaskError] = useState('');
-  const [duelResolveBusy, setDuelResolveBusy] = useState('');
-  const [duelResolveNotice, setDuelResolveNotice] = useState('');
-  const [duelResolveError, setDuelResolveError] = useState('');
 
   const downloadFile = async (kind: 'docx' | 'graph' | 'all', id: string, filename: string) => {
     setDownloadNotice('');
@@ -1054,313 +1049,80 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-3 ${adminTab === 'duels' ? '' : 'hidden'}`}>
-            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
-              duel chat groups - who is dueling inside
-            </h2>
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">duel task</h2>
             {(() => {
-              const duelChannels = (snapshot.duels ?? [])
-                .map((duel) => duel.channelId)
-                .filter((channelId, index, list) => list.indexOf(channelId) === index)
-                .map((channelId) => ({
-                  channel: snapshot.channels.find((channel) => channel.id === channelId),
-                  duels: (snapshot.duels ?? []).filter((duel) => duel.channelId === channelId),
-                  enrolled:
-                    snapshot.engagements.find((engagement) => engagement.id === channelId)
-                      ?.enrolled ?? [],
-                }))
-                .filter((entry) => entry.channel);
-              const nodesFor = (channelId: string, nick: string) =>
-                (snapshot.graphs.find((graph) => graph.channelId === channelId)?.nodes ?? [])
-                  .filter((node) => node.createdBy === nick);
-              const reportsFor = (channelId: string, nick: string) =>
-                (snapshot.reports ?? []).filter(
-                  (report) => report.channelId === channelId && report.createdBy === nick
-                );
-              if (duelChannels.length === 0) {
-                return <div className="text-[15px] text-[#71717a]">no duel chat groups yet</div>;
-              }
-              return (
-                <div className="space-y-2">
-                  {duelChannels.map(({ channel, duels, enrolled }) => (
-                    <details
-                      key={channel!.id}
-                      className="border border-[#2a2a30] bg-[#09090b] p-2"
-                    >
-                      <summary className="cursor-pointer text-[15px] text-[#d4d4d8]">
-                        {channel!.id} · {enrolled.length} enrolled · {channel!.messages.length}{' '}
-                        messages ·{' '}
-                        {duels
-                          .map((duel) => `@${duel.challenger} vs @${duel.opponent} (${duel.status})`)
-                          .join(' · ')}
-                      </summary>
-                      <div className="pt-2 space-y-2">
-                        <div className="text-[14px] text-[#a1a1aa]">
-                          enrolled inside: {enrolled.length ? enrolled.map((nick) => `@${nick}`).join(' ') : 'none'}
-                        </div>
-                        {duels.map((duel) => (
-                          <div
-                            key={duel.id}
-                            className="border border-[#2a2a30] bg-[#050506] p-2 text-[14px] text-[#d4d4d8]"
-                          >
-                            <div>
-                              <span className="uppercase tracking-wider text-[#4ade80]">
-                                {duel.status}
-                              </span>{' '}
-                              · @{duel.challenger} vs @{duel.opponent} · target {duel.target}
-                            </div>
-                            <div className="text-[#a1a1aa]">
-                              task: {duel.task || 'none'}
-                            </div>
-                            {duel.stats && (
-                              <div className="text-[#71717a]">
-                                challenger commits {duel.stats.challenger?.commits ?? 0} · tools{' '}
-                                {duel.stats.challenger?.tools ?? 0} · kg{' '}
-                                {duel.stats.challenger?.knowledge ?? 0} · reports{' '}
-                                {duel.stats.challenger?.reports ?? 0} | opponent commits{' '}
-                                {duel.stats.opponent?.commits ?? 0} · tools{' '}
-                                {duel.stats.opponent?.tools ?? 0} · kg{' '}
-                                {duel.stats.opponent?.knowledge ?? 0} · reports{' '}
-                                {duel.stats.opponent?.reports ?? 0}
-                              </div>
-                            )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
-                              {[duel.challenger, duel.opponent].map((nick) => {
-                                const nodes = nodesFor(channel!.id, nick);
-                                const reports = reportsFor(channel!.id, nick);
-                                return (
-                                  <div key={nick} className="border border-[#2a2a30] p-2 space-y-1">
-                                    <div className="text-[#4ade80]">
-                                      @{nick} graph · {nodes.length} nodes
-                                    </div>
-                                    <div className="text-[#71717a]">
-                                      reports: {reports.length}
-                                    </div>
-                                    {reports.length === 0 ? (
-                                      <div className="text-[#71717a]">no reports yet</div>
-                                    ) : (
-                                      reports.map((report) => (
-                                        <div key={report.id} className="text-[13px] text-[#a1a1aa]">
-                                          [{report.review}] {report.severity} · {report.title}
-                                        </div>
-                                      ))
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {duel.winner && (
-                              <div className="text-[#4ade80]">
-                                winner @{duel.winner} · loser @{duel.loser}
-                              </div>
-                            )}
-                            {['pending', 'active'].includes(duel.status) && (
-                              <div className="flex flex-wrap items-center gap-2 pt-1">
-                                <button
-                                  type="button"
-                                  disabled={Boolean(duelResolveBusy)}
-                                  onClick={() => {
-                                    const key = `${duel.id}:${duel.challenger}`;
-                                    setDuelResolveBusy(key);
-                                    setDuelResolveNotice('');
-                                    setDuelResolveError('');
-                                    void onResolveDuel(duel.id, duel.challenger).then((result) => {
-                                      setDuelResolveBusy('');
-                                      if (!result.ok) {
-                                        setDuelResolveError(result.error || 'could not resolve duel');
-                                        return;
-                                      }
-                                      setDuelResolveNotice(
-                                        `@${duel.challenger} declared winner of ${channel!.id}`
-                                      );
-                                    });
-                                  }}
-                                  className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
-                                >
-                                  declare @{duel.challenger} winner
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={Boolean(duelResolveBusy)}
-                                  onClick={() => {
-                                    const key = `${duel.id}:${duel.opponent}`;
-                                    setDuelResolveBusy(key);
-                                    setDuelResolveNotice('');
-                                    setDuelResolveError('');
-                                    void onResolveDuel(duel.id, duel.opponent).then((result) => {
-                                      setDuelResolveBusy('');
-                                      if (!result.ok) {
-                                        setDuelResolveError(result.error || 'could not resolve duel');
-                                        return;
-                                      }
-                                      setDuelResolveNotice(
-                                        `@${duel.opponent} declared winner of ${channel!.id}`
-                                      );
-                                    });
-                                  }}
-                                  className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
-                                >
-                                  declare @{duel.opponent} winner
-                                </button>
-                                {duelResolveBusy.startsWith(duel.id) && (
-                                  <span className="text-[13px] text-[#71717a]">saving…</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {duelResolveNotice && (
-                          <div className="text-[14px] text-[#4ade80]">{duelResolveNotice}</div>
-                        )}
-                        {duelResolveError && (
-                          <div className="text-[14px] text-[#f87171]">{duelResolveError}</div>
-                        )}
-                        <div className="max-h-64 overflow-y-auto space-y-1">
-                          {channel!.messages.map((message) => (
-                            <div key={message.id} className="text-[14px] leading-relaxed">
-                              <span className="text-[#71717a]">[{message.time}]</span>{' '}
-                              {message.type === 'sys' ? (
-                                <span className="text-[#71717a]">- {message.text}</span>
-                              ) : (
-                                <>
-                                  <span className="text-[#a1a1aa]">&lt;{message.nick}&gt;</span>{' '}
-                                  <span className="text-[#d4d4d8]">{message.text}</span>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              );
-            })()}
-
-            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
-              specific duel tasks
-            </h2>
-            <p className="text-[15px] text-[#a1a1aa]">
-              The selected duel's saved task loads into the editor. Edit it and press save
-              changes, or unset it. The task is stored with that duel and posted only to its
-              private duel channel; only the two duelists and admin can see it. Duel tasks are
-              independent of the mission goal and the focus engagement.
-            </p>
-            {(() => {
-              const duelList = snapshot.duels ?? [];
-              const selection = selectedDuelId || GLOBAL_DUEL;
-              const activeDuel =
-                selection === GLOBAL_DUEL
-                  ? null
-                  : duelList.find((duel) => duel.id === selection) ?? null;
-              const activeTask =
-                selection === GLOBAL_DUEL
-                  ? snapshot.duelTask?.text ?? ''
-                  : activeDuel?.task ?? '';
-              const activeDraft = duelTaskDrafts[selection] ?? activeTask;
-              const saveTask = (task: string) => {
-                setDuelTaskBusy(selection);
+              const activeTask = snapshot.duelTask?.text ?? '';
+              const draft = duelTaskDrafts[GLOBAL_DUEL] ?? activeTask;
+              const saveTask = () => {
+                setDuelTaskBusy(GLOBAL_DUEL);
                 setDuelTaskNotice('');
                 setDuelTaskError('');
-                void onSetDuelTask(
-                  selection === GLOBAL_DUEL ? '' : selection,
-                  task
-                ).then((result) => {
+                void onSetDuelTask('', draft).then((result) => {
                   setDuelTaskBusy('');
                   if (!result.ok) {
                     setDuelTaskError(result.error || 'could not save duel task');
                     return;
                   }
-                  // Keep the saved value in the editable field so the admin can
-                  // immediately change it again and press set task.
-                  setDuelTaskDrafts((current) => ({
-                    ...current,
-                    [selection]: task,
-                  }));
-                  setDuelTaskNotice(
-                    task
-                      ? selection === GLOBAL_DUEL
-                        ? 'next duel task set - new duels will inherit it'
-                        : `task set for ${activeDuel?.channelId ?? selection}`
-                      : selection === GLOBAL_DUEL
-                        ? 'next duel task unset'
-                        : `task unset for ${activeDuel?.channelId ?? selection}`
-                  );
+                  setDuelEditing(false);
+                  setDuelTaskDrafts((current) => {
+                    const next = { ...current };
+                    delete next[GLOBAL_DUEL];
+                    return next;
+                  });
+                  setDuelTaskNotice('duel task saved - duelists notified');
                 });
               };
               return (
-                <div className="space-y-2 border border-[#2a2a30] bg-[#09090b] p-3">
-                  <label className="block space-y-1">
-                    <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                      duel target for task
-                    </span>
-                    <select
-                      value={selection}
-                      onChange={(event) => setSelectedDuelId(event.target.value)}
-                      className="w-full bg-[#050506] border border-[#2a2a30] px-2.5 py-1.5 text-[15px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
-                    >
-                      <option value={GLOBAL_DUEL}>
-                        global / next duel - set before agents invite
-                      </option>
-                      {duelList.map((duel) => (
-                        <option key={duel.id} value={duel.id}>
-                          {duel.channelId} · @{duel.challenger} vs @{duel.opponent} · {duel.status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-[#a1a1aa]">
-                    {activeDuel ? (
-                      <>
-                        <span className="uppercase tracking-wider text-[#4ade80]">
-                          {activeDuel.status}
-                        </span>
-                        <span>target {activeDuel.target}</span>
-                      </>
-                    ) : (
-                      <span>applies to every new duel until unset</span>
-                    )}
-                  </div>
-                  <label className="block space-y-1">
-                    <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
-                      edit duel task
-                    </span>
-                    <textarea
-                      rows={16}
-                      value={activeDraft}
-                      onChange={(event) =>
+                <div className="space-y-2">
+                  <textarea
+                    rows={16}
+                    readOnly={!duelEditing}
+                    value={duelEditing ? draft : activeTask}
+                    onChange={(event) =>
+                      setDuelTaskDrafts((current) => ({
+                        ...current,
+                        [GLOBAL_DUEL]: event.target.value,
+                      }))
+                    }
+                    placeholder={duelEditing ? 'type the duel task...' : 'no duel task set'}
+                    className={`w-full min-h-[420px] bg-[#050506] border border-[#2a2a30] px-3 py-2.5 text-[17px] leading-relaxed text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y ${
+                      duelEditing ? '' : 'cursor-default opacity-90'
+                    }`}
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      disabled={duelEditing}
+                      onClick={() => {
                         setDuelTaskDrafts((current) => ({
                           ...current,
-                          [selection]: event.target.value,
-                        }))
-                      }
-                      placeholder="specific task for this duel, e.g. find an unauthenticated high-impact issue in the login flow"
-                      className="w-full min-h-[420px] bg-[#050506] border border-[#2a2a30] px-3 py-2.5 text-[17px] leading-relaxed text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
-                    />
-                  </label>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={duelTaskBusy === selection}
-                      onClick={() => saveTask(activeDraft)}
+                          [GLOBAL_DUEL]: activeTask,
+                        }));
+                        setDuelEditing(true);
+                        setDuelTaskNotice('');
+                        setDuelTaskError('');
+                      }}
                       className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
                     >
-                      {duelTaskBusy === selection ? 'saving…' : 'save changes'}
+                      edit
                     </button>
-                    <button
-                      type="button"
-                      disabled={duelTaskBusy === selection}
-                      onClick={() => saveTask('')}
-                      className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#71717a] hover:text-[#f87171] disabled:opacity-40"
-                    >
-                      unset task
-                    </button>
-                    {duelTaskNotice && <span className="text-[15px] text-[#4ade80]">{duelTaskNotice}</span>}
-                    {duelTaskError && <span className="text-[15px] text-[#f87171]">{duelTaskError}</span>}
+                    {duelEditing && (
+                      <button
+                        type="button"
+                        disabled={duelTaskBusy === GLOBAL_DUEL}
+                        onClick={() => saveTask()}
+                        className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                      >
+                        {duelTaskBusy === GLOBAL_DUEL ? 'saving…' : 'save changes'}
+                      </button>
+                    )}
                   </div>
-                  <div className="text-[14px] text-[#71717a]">
-                    change the editor above and press save changes to update the task, or unset
-                    it to remove it. Duelists are notified in their duel channel.
-                  </div>
+                  {duelTaskNotice && (
+                    <div className="text-[14px] text-[#4ade80]">{duelTaskNotice}</div>
+                  )}
+                  {duelTaskError && (
+                    <div className="text-[14px] text-[#f87171]">{duelTaskError}</div>
+                  )}
                 </div>
               );
             })()}

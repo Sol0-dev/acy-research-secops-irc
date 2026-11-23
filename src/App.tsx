@@ -157,6 +157,15 @@ function getPeerFromThread(thread: DirectMessageThread, currentUserNick: string 
 }
 
 
+function passwordPolicyError(pass: string) {
+  if (pass.length < 12) return 'passphrase must be at least 12 characters';
+  if (!/[A-Z]/.test(pass)) return 'passphrase must include an uppercase letter';
+  if (!/[a-z]/.test(pass)) return 'passphrase must include a lowercase letter';
+  if (!/[0-9]/.test(pass)) return 'passphrase must include a number';
+  if (!/[^A-Za-z0-9]/.test(pass)) return 'passphrase must include a symbol';
+  return null;
+}
+
 function resultOf<T>(response: CommandResponse | null): T | null {
   if (!response) return null;
   return (response.result as T) ?? null;
@@ -433,13 +442,17 @@ export default function App() {
       setAuthError('handle must be at least 2 characters');
       return;
     }
-    if (pass.length < 8) {
-      setAuthError('passphrase must be at least 8 characters');
-      return;
-    }
-    if (!authHarnessInput) {
-      setAuthError('select the ai agent harness: agy, opencode, freebuff, or other');
-      return;
+    if (authMode === 'login') {
+      if (!pass) {
+        setAuthError('passphrase required');
+        return;
+      }
+    } else {
+      const policyError = passwordPolicyError(pass);
+      if (policyError) {
+        setAuthError(policyError);
+        return;
+      }
     }
     if (authMode === 'login' && cleanHandle === 'admin') {
       try {
@@ -468,6 +481,10 @@ export default function App() {
         );
         return;
       }
+    }
+    if (!authHarnessInput) {
+      setAuthError('select the ai agent harness: agy, opencode, freebuff, or other');
+      return;
     }
     try {
       const response = await execute(authMode === 'register' ? 'auth.register' : 'auth.login', {
@@ -3704,6 +3721,7 @@ export default function App() {
                 </div>
               </div>
 
+              {normalizeHandle(authHandleInput) !== 'admin' && (
               <div className="space-y-1">
                 <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
                   ai agent harness
@@ -3721,6 +3739,7 @@ export default function App() {
                   <option value="other">other</option>
                 </select>
               </div>
+              )}
 
               {authMode === 'register' && (
                 <div className="space-y-1">
@@ -3753,6 +3772,11 @@ export default function App() {
                   placeholder="••••••••"
                   className="w-full bg-transparent border border-[#e5e5e5] dark:border-[#1a1a1e] px-2.5 py-2 focus:outline-none focus:border-[#71717a] text-[#18181b] dark:text-[#f4f4f5]"
                 />
+                {authMode === 'register' && (
+                  <div className="text-[13px] text-[#71717a]">
+                    12+ characters with uppercase, lowercase, number, and symbol.
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
@@ -3811,7 +3835,6 @@ export default function App() {
         onSaveGoal={saveDocsGoal}
         onSetFocus={setAdminFocus}
         onSetDuelTask={setAdminDuelTask}
-        onResolveDuel={resolveAdminDuel}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}
