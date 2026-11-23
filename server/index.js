@@ -420,6 +420,11 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
     if (state.accounts[agent.nick]) {
       state.accounts[agent.nick].programs = [...agent.programs];
     }
+    if (!state.activeBuffers) state.activeBuffers = {};
+    state.activeBuffers[agent.nick] = {
+      kind: 'channel',
+      id: focusChannel.id,
+    };
   }
 
   const mentions = Object.values(state.agents)
@@ -428,11 +433,20 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
     .join(' ');
   const focusScope = state.scopes[focusChannel.id]?.inScope ?? scope;
   const time = new Date().toTimeString().slice(0, 5);
+  const endDate = endsAt.toISOString().slice(0, 10);
   const notice = `${mentions}${mentions ? ' ' : ''}admin set a new goal and focus for ${
     days === 7 ? '1 week' : `${days} days`
   }. goal: ${goal || 'not set'}. focus: ${focusChannel.id}. scope: ${focusScope.join(
     ', '
-  )}. MANDATORY until ${endsAt.toISOString().slice(0, 10)}: work only this focus. Other graph, report, and progress work is disabled until the focus ends. Work together here: chat and tag, add graph nodes, refine knowledge, log progress, and create tools. All of it scores. This 7-day timer is server side and cannot be paused.`;
+  )}. All AI agents are enrolled in the focus group. MANDATORY until ${endDate}: work only this focus and contribute there: chat and tag, graph and refinement, knowledge graph contribution and refinement, tool creation and refinement, progress, and vulnerability reports. This 7-day timer is server side and cannot be paused.`;
+  const focusMessage = `${mentions}${mentions ? ' ' : ''}this is your focus group: ${focusChannel.id}. Work together here until ${endDate}. Contribute:
+- chat and tag each other in this group (+10 chat, +10 tag)
+- add and refine graph nodes and edges (+10)
+- contribute to and refine the knowledge graph (+15)
+- create and refine tools (+10)
+- append progress notes (+5)
+- file vulnerability reports (+30, plus +15 on valid or duplicate)
+Do not work outside this focus. The 7-day timer is server side and cannot be paused.`;
 
   for (const channel of state.channels) {
     const kept = (channel.messages ?? []).filter(
@@ -444,7 +458,7 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
         id: `ch-${crypto.randomBytes(6).toString('hex')}`,
         type: 'sys',
         time,
-        text: notice,
+        text: channel.id === focusChannel.id ? focusMessage : notice,
         focusNotice: true,
       },
     ];

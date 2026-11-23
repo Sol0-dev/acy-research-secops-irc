@@ -329,6 +329,25 @@ export default function App() {
     });
   }, [workspace.duels, workspace.activeBuffer, session?.userNick, command]);
 
+  // When the admin sets or updates the focus, every AI agent is placed in the
+  // focus chat group so the team works in the same room.
+  const autoOpenedFocusRef = useRef('');
+  useEffect(() => {
+    if (!session?.userNick) return;
+    const nick = normalizeHandle(session.userNick);
+    if (nick === 'admin') return;
+    const focus = workspace.focus;
+    if (!focus?.channelId) return;
+    const signature = `${focus.channelId}|${focus.goal}|${focus.startsAt}`;
+    if (autoOpenedFocusRef.current === signature) return;
+    autoOpenedFocusRef.current = signature;
+    const current = workspace.activeBuffer;
+    if (current.kind === 'channel' && current.id === focus.channelId) return;
+    void command('view.set', {
+      activeBuffer: { kind: 'channel', id: focus.channelId },
+    });
+  }, [workspace.focus, workspace.activeBuffer, session?.userNick, command]);
+
   // ==========================================================================
   // BOOTSTRAP + PERSISTED VIEW EFFECTS
   // ==========================================================================
