@@ -26,6 +26,7 @@ interface AdminPanelProps {
   onSaveGoal: (goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetDuelTask: (duelId: string, task: string) => Promise<{ ok: boolean; error?: string }>;
+  onContinueGoal: (goalId: string) => Promise<{ ok: boolean; error?: string }>;
   onOpenAgentPortal: () => void;
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
@@ -76,6 +77,7 @@ export default function AdminPanel({
   onSaveGoal,
   onSetFocus,
   onSetDuelTask,
+  onContinueGoal,
   onOpenAgentPortal,
   onDeleteGraph,
   onDeleteChannel,
@@ -90,6 +92,9 @@ export default function AdminPanel({
   const [focusError, setFocusError] = useState('');
   const [goalNotice, setGoalNotice] = useState('');
   const [goalError, setGoalError] = useState('');
+  const [goalContinueBusy, setGoalContinueBusy] = useState('');
+  const [goalContinueNotice, setGoalContinueNotice] = useState('');
+  const [goalContinueError, setGoalContinueError] = useState('');
   const [goalBusy, setGoalBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState('');
   const [confirmAccountDelete, setConfirmAccountDelete] = useState<string | null>(null);
@@ -543,6 +548,85 @@ export default function AdminPanel({
               create new focus group uses links in the goal as the scope and a short part of the
               goal as the group name. every ai agent is enrolled, tagged, and notified.
             </div>
+          </section>
+
+          <section className={`space-y-3 ${adminTab === 'goal' ? '' : 'hidden'}`}>
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
+              goal timers - server side 7 days per goal
+            </h2>
+            {(snapshot.goalHistory ?? []).length === 0 ? (
+              <div className="text-[15px] text-[#71717a]">no goals recorded yet</div>
+            ) : (
+              <div className="space-y-2">
+                {(snapshot.goalHistory ?? [])
+                  .slice()
+                  .reverse()
+                  .map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="border border-[#2a2a30] bg-[#09090b] p-2.5 space-y-1.5"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px]">
+                        <span
+                          className={`uppercase tracking-wider ${
+                            entry.active ? 'text-[#4ade80]' : 'text-[#71717a]'
+                          }`}
+                        >
+                          {entry.active ? 'active' : 'inactive'}
+                        </span>
+                        <span className="text-[#d4d4d8]">{entry.channelId}</span>
+                        <span className="text-[#71717a]">
+                          timer <Countdown endsAt={entry.endsAt} />
+                        </span>
+                        <span className="text-[#71717a]">
+                          ends {new Date(entry.endsAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-[14px] text-[#a1a1aa] whitespace-pre-wrap break-words">
+                        {entry.goal}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={goalContinueBusy === entry.id}
+                          onClick={() => {
+                            setGoalContinueBusy(entry.id);
+                            setGoalContinueNotice('');
+                            setGoalContinueError('');
+                            void onContinueGoal(entry.id).then((result) => {
+                              setGoalContinueBusy('');
+                              if (!result.ok) {
+                                setGoalContinueError(
+                                  result.error || 'could not continue goal'
+                                );
+                                return;
+                              }
+                              setGoalContinueNotice(
+                                `7-day timer restored for ${entry.channelId}`
+                              );
+                            });
+                          }}
+                          className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                        >
+                          {goalContinueBusy === entry.id
+                            ? 'restoring…'
+                            : 'bring back 7-day timer'}
+                        </button>
+                        {goalContinueNotice && (
+                          <span className="text-[13px] text-[#4ade80]">
+                            {goalContinueNotice}
+                          </span>
+                        )}
+                        {goalContinueError && (
+                          <span className="text-[13px] text-[#f87171]">
+                            {goalContinueError}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </section>
 
           <section className={`space-y-2 ${adminTab === 'irc' ? '' : 'hidden'}`}>

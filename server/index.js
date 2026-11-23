@@ -17,6 +17,7 @@ import { buildReportDocx, safeFilename } from './docx.js';
 import { buildLeaderboard } from './leaderboard.js';
 import {
   applyCommand,
+  ensureGoalHistory,
   normalizeHandle,
   reportContributors,
   toPublicState,
@@ -188,6 +189,7 @@ app.get('/api/admin', async (req, res) => {
   }
   try {
     const state = getState();
+    ensureGoalHistory(state);
     const audit = await getAudit(500);
     const accounts = Object.values(state.accounts).map((account) => ({
       nick: account.nick,
@@ -293,6 +295,7 @@ app.get('/api/admin', async (req, res) => {
       graphs,
       duels: state.duels ?? [],
       duelTask: state.duelTask ?? null,
+      goalHistory: state.goalHistory ?? [],
       audit,
       security: {
         apiHost: HOST,
@@ -437,6 +440,31 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
   return { focus: state.focus, channelId: focusChannel.id, createdGroup, scope: focusScope };
 }
 
+function recordGoal(state, { goal, focusResult }) {
+  if (!goal || !focusResult?.focus) return null;
+  if (!Array.isArray(state.goalHistory)) state.goalHistory = [];
+  for (const entry of state.goalHistory) entry.active = false;
+  let entry = state.goalHistory.find(
+    (item) => item.goal === goal && item.channelId === focusResult.channelId
+  );
+  if (!entry) {
+    entry = {
+      id: `gl-${crypto.randomBytes(6).toString('hex')}`,
+      goal,
+      channelId: focusResult.channelId,
+      createdAt: new Date().toISOString(),
+      createdBy: 'admin',
+    };
+    state.goalHistory.push(entry);
+  }
+  entry.startsAt = focusResult.focus.startsAt;
+  entry.endsAt = focusResult.focus.endsAt;
+  entry.days = focusResult.focus.days;
+  entry.active = true;
+  state.goalHistory = state.goalHistory.slice(-50);
+  return entry;
+}
+
 app.post('/api/admin/goal', async (req, res) => {
   if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });
@@ -460,6 +488,7 @@ app.post('/api/admin/goal', async (req, res) => {
         goal,
         days: 7,
       });
+      recordGoal(state, { goal, focusResult });
     }
     const version = await persistState(state, 'admin.goal.set', 'admin', {
       goal,
@@ -475,6 +504,42 @@ app.post('/api/admin/goal', async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/goal/continue', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const goalId = String(req.body?.goalId ?? '');
+  try {
+    const state = structuredClone(getState());
+    const entry = (state.goalHistory ?? []).find((item) => item.id === goalId);
+    if (!entry) return res.status(404).json({ error: 'goal not found' });
+    const channelExists = state.channels.some(
+      (item) => item.id === entry.channelId && item.isEngagement
+    );
+    const focusResult = applyFocus(state, {
+      channelId: channelExists ? entry.channelId : '__new__',
+      goal: entry.goal,
+      days: 7,
+    });
+    entry.channelId = focusResult.channelId;
+    state.docsGoal = entry.goal;
+    recordGoal(state, { goal: entry.goal, focusResult });
+    const version = await persistState(state, 'admin.goal.continue', 'admin', {
+      goalId,
+      goal: entry.goal,
+    });
+    return res.json({
+      ok: true,
+      goal: entry.goal,
+      focus: focusResult.focus,
+      channelId: focusResult.channelId,
+      version,
+    });
+  } catch (error) {
+    return res.status(error.status ?? 500).json({ error: error.message });
   }
 });
 

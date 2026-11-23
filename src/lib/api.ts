@@ -122,6 +122,19 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
+  adminContinueGoal(
+    token: string,
+    goalId: string
+  ): Promise<{ ok: boolean; goal: string; version: number }> {
+    return request<{ ok: boolean; goal: string; version: number }>(
+      '/api/admin/goal/continue',
+      {
+        method: 'POST',
+        headers: { 'x-secops-admin': token },
+        body: JSON.stringify({ goalId }),
+      }
+    );
+  },
   adminSetDuelTask(
     token: string,
     input: { duelId: string; task: string }

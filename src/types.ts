@@ -393,6 +393,18 @@ export interface AdminReportSummary {
   reviewNote?: string;
 }
 
+export interface GoalHistoryEntry {
+  id: string;
+  goal: string;
+  channelId: string;
+  startsAt: string;
+  endsAt: string;
+  days: number;
+  active: boolean;
+  createdAt?: string;
+  createdBy?: string;
+}
+
 export interface AdminSnapshot {
   version: number;
   goal: string;
@@ -428,6 +440,7 @@ export interface AdminSnapshot {
   graphs: EngagementGraph[];
   duels: Duel[];
   duelTask: DuelTaskConfig | null;
+  goalHistory: GoalHistoryEntry[];
   audit: AdminAuditEntry[];
   security: {
     apiHost: string;

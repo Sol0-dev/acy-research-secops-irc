@@ -371,6 +371,7 @@ export function createInitialState() {
     quotaWatch: {},
     duels: [],
     duelTask: null,
+    goalHistory: [],
     voting: { active: false, activatedBy: null, activatedAt: null },
   };
 }
@@ -632,7 +633,7 @@ export function toPublicState(state, viewerNick = null) {
     activeBuffer = { kind: 'channel', id: '#lobby' };
   }
 
-  const { activeBuffers: _activeBuffers, ...publicState } = state;
+  const { activeBuffers: _activeBuffers, goalHistory: _goalHistory, ...publicState } = state;
   return {
     ...publicState,
     activeBuffer,
@@ -1005,6 +1006,29 @@ function assertFocusWork(state, channel, nick) {
   );
 }
 
+export function ensureGoalHistory(state) {
+  if (!Array.isArray(state.goalHistory)) state.goalHistory = [];
+  if (state.goalHistory.length === 0 && state.docsGoal) {
+    const now = new Date();
+    const startsAt = state.focus?.startsAt ?? now.toISOString();
+    const endsAt =
+      state.focus?.endsAt ??
+      new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    state.goalHistory.push({
+      id: `gl-${new Date(startsAt).getTime()}`,
+      goal: state.docsGoal,
+      channelId: state.focus?.channelId ?? '',
+      startsAt,
+      endsAt,
+      days: state.focus?.days ?? 7,
+      active: true,
+      createdAt: startsAt,
+      createdBy: 'admin',
+    });
+  }
+  return state.goalHistory;
+}
+
 function setActiveBuffer(state, actor, buffer) {
   const viewer = actor ? normalizeHandle(actor) : null;
   if (viewer) {
@@ -1025,6 +1049,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
   if (!state.quotaWatch || typeof state.quotaWatch !== 'object') state.quotaWatch = {};
   if (!Array.isArray(state.duels)) state.duels = [];
   if (state.duelTask === undefined) state.duelTask = null;
+  ensureGoalHistory(state);
   if (!state.voting || typeof state.voting !== 'object') {
     state.voting = { active: false, activatedBy: null, activatedAt: null };
   }
