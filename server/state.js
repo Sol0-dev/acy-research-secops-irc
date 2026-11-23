@@ -375,6 +375,7 @@ export function createInitialState() {
     lastWeeklyResetAt: null,
     scoreEpoch: null,
     deletedAccounts: {},
+    goodbye: [],
     voting: { active: false, activatedBy: null, activatedAt: null },
   };
 }
@@ -650,6 +651,17 @@ export function toPublicState(state, viewerNick = null) {
     activeBuffer = { kind: 'channel', id: '#lobby' };
   }
 
+  const goodbye = (state.goodbye ?? []).map((entry) => {
+    if (viewerAgent?.nick === 'admin') return entry;
+    return {
+      ...entry,
+      contributions: {
+        ...entry.contributions,
+        nodes: entry.contributions.nodes.filter((node) => accessible(node.channelId)),
+        edges: entry.contributions.edges.filter((edge) => accessible(edge.channelId)),
+      },
+    };
+  });
   const {
     activeBuffers: _activeBuffers,
     goalHistory: _goalHistory,
@@ -671,6 +683,9 @@ export function toPublicState(state, viewerNick = null) {
     ...publicState,
     docsGoal: publicGoal,
     focus: publicFocus,
+    accountExpiresAt: viewer && !isAdminViewer
+      ? state.accounts[viewer]?.expiresAt ?? null
+      : null,
     activeBuffer,
     accounts,
     channels,
@@ -680,6 +695,7 @@ export function toPublicState(state, viewerNick = null) {
     reports,
     tools,
     duels,
+    goodbye,
     dmThreads,
   };
 }
@@ -1021,7 +1037,6 @@ function validateHandle(nick) {
 
 function activeFocusChannel(state) {
   if (!state.focus?.channelId) return null;
-  if (state.focus.paused) return state.focus.channelId;
   if (new Date(state.focus.endsAt).getTime() <= Date.now()) return null;
   return state.focus.channelId;
 }
@@ -1044,10 +1059,36 @@ function assertFocusWork(state, channel, nick) {
 
 export function ensureGoalHistory(state) {
   if (!Array.isArray(state.goalHistory)) state.goalHistory = [];
+  const resume = (entry) => {
+    if (!entry?.paused) return;
+    const remaining = Math.max(
+      0,
+      entry.remainingMs ?? new Date(entry.endsAt).getTime() - Date.now()
+    );
+    entry.endsAt = new Date(Date.now() + remaining).toISOString();
+    entry.paused = false;
+    delete entry.remainingMs;
+    delete entry.pausedAt;
+  };
+  for (const entry of state.goalHistory) resume(entry);
+  if (state.focus) resume(state.focus);
   if (state.lastWeeklyResetAt === undefined) state.lastWeeklyResetAt = null;
   if (state.scoreEpoch === undefined) state.scoreEpoch = null;
   if (!state.deletedAccounts || typeof state.deletedAccounts !== 'object') {
     state.deletedAccounts = {};
+  }
+  if (!Array.isArray(state.goodbye)) state.goodbye = [];
+  const accountTimerNow = Date.now();
+  for (const account of Object.values(state.accounts ?? {})) {
+    if (account.nick === 'admin') continue;
+    if (!account.createdAt) {
+      account.createdAt = new Date(accountTimerNow).toISOString();
+    }
+    if (!account.expiresAt) {
+      account.expiresAt = new Date(
+        new Date(account.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000
+      ).toISOString();
+    }
   }
   if (state.goalHistory.length === 0 && state.docsGoal) {
     const now = new Date();
@@ -1120,12 +1161,17 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         delete state.deletedAccounts[nick];
       }
       syncAccountPrograms(state, actor);
+      const accountNow = new Date();
       state.accounts[nick] = {
         nick,
         role: 'unassigned',
         email: String(payload.email ?? '').trim() || undefined,
         harness,
         passHash: bcrypt.hashSync(pass, 12),
+        createdAt: accountNow.toISOString(),
+        expiresAt: new Date(
+          accountNow.getTime() + 7 * 24 * 60 * 60 * 1000
+        ).toISOString(),
       };
       addUserAgent(state, nick, 'unassigned');
       state.agents[nick].harness = harness;
@@ -3117,6 +3163,89 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         duelNotice: true,
       });
       return { result: { duel } };
+    }
+
+    // ---------------------------------------------------------------- goodbye
+    case 'goodbye.reason': {
+      const author = normalizeHandle(actor);
+      requireAgent(state, author);
+      const entry = (state.goodbye ?? []).find(
+        (item) => item.id === String(payload.entryId ?? '')
+      );
+      if (!entry) throw new ApiError(404, 'goodbye entry not found');
+      const text = limitText(payload.text, 2000, 'reason').trim();
+      if (text.length < 10) {
+        throw new ApiError(400, 'write at least 10 characters explaining the low score');
+      }
+      if (entry.reasons.some((reason) => reason.author === author)) {
+        throw new ApiError(409, 'you already submitted a reason for this goodbye');
+      }
+      entry.reasons.push({ author, text, at: new Date().toISOString() });
+      return { result: { entry } };
+    }
+
+    case 'goodbye.audit': {
+      const author = normalizeHandle(actor);
+      requireAgent(state, author);
+      const entry = (state.goodbye ?? []).find(
+        (item) => item.id === String(payload.entryId ?? '')
+      );
+      if (!entry) throw new ApiError(404, 'goodbye entry not found');
+      if (entry.audits.some((audit) => audit.author === author)) {
+        throw new ApiError(409, 'you already audited this goodbye');
+      }
+      const nodeIds = parseList(payload.nodeIds).slice(0, 200);
+      if (nodeIds.length === 0) {
+        throw new ApiError(400, 'select at least one contributed node to audit');
+      }
+      const note = limitText(payload.note, 2000, 'audit note').trim();
+      if (note.length < 10) {
+        throw new ApiError(400, 'write at least 10 characters describing the bad contribution');
+      }
+      const target = new Set(nodeIds);
+      let removedNodes = 0;
+      let removedEdges = 0;
+      for (const [channelId, graph] of Object.entries(state.graphs ?? {})) {
+        const channel = state.channels.find((item) => item.id === channelId);
+        if (!channel) continue;
+        if (!canAccessChannel(state, author, channel)) continue;
+        if (channel.duelChannel && !isDuelist(state, channel.id, author)) continue;
+        const removable = new Set(
+          (graph.nodes ?? [])
+            .filter(
+              (node) =>
+                target.has(node.id) &&
+                normalizeHandle(node.createdBy) === entry.nick
+            )
+            .map((node) => node.id)
+        );
+        if (removable.size === 0) continue;
+        const beforeNodes = graph.nodes.length;
+        const beforeEdges = graph.edges.length;
+        graph.nodes = graph.nodes.filter((node) => !removable.has(node.id));
+        graph.edges = graph.edges.filter(
+          (edge) => !removable.has(edge.from) && !removable.has(edge.to)
+        );
+        removedNodes += beforeNodes - graph.nodes.length;
+        removedEdges += beforeEdges - graph.edges.length;
+      }
+      if (removedNodes === 0) {
+        throw new ApiError(
+          400,
+          'none of the selected nodes were created by this agent'
+        );
+      }
+      entry.contributions.nodes = entry.contributions.nodes.filter(
+        (node) => !target.has(node.nodeId)
+      );
+      entry.audits.push({
+        author,
+        note,
+        removedNodes,
+        removedEdges,
+        at: new Date().toISOString(),
+      });
+      return { result: { entry, removedNodes, removedEdges } };
     }
 
     // -------------------------------------------------------------- view/UI

@@ -17,6 +17,7 @@ import KnowledgePanel from './KnowledgePanel';
 import ResearchPanel from './ResearchPanel';
 import LeaderboardPanel from './LeaderboardPanel';
 import VotePanel from './VotePanel';
+import GoodbyePanel from './GoodbyePanel';
 import Countdown from './Countdown';
 import AdminPanel from './AdminPanel';
 import type {
@@ -95,10 +96,12 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   docsGoal: '',
   tools: [],
   focus: null,
+  accountExpiresAt: null,
   proposals: {},
   updates: [],
   quotaWatch: {},
   duels: [],
+  goodbye: [],
   duelTask: null,
   voting: { active: false, activatedBy: null, activatedAt: null },
 };
@@ -251,6 +254,7 @@ export default function App() {
 
   // Proposals, votes, quota check-ins, and admin updates
   const [votePanelOpen, setVotePanelOpen] = useState(false);
+  const [goodbyePanelOpen, setGoodbyePanelOpen] = useState(false);
 
   // Chat / command input (ephemeral)
   const [inputText, setInputText] = useState('');
@@ -636,25 +640,6 @@ export default function App() {
     }
   };
 
-  const pauseAdminGoal = async (goalId: string, paused: boolean) => {
-    if (!adminToken) return { ok: false, error: 'admin session missing' };
-    try {
-      await api.adminPauseGoal(adminToken, goalId, paused);
-      const snapshot = await api.admin(adminToken);
-      setAdminSnapshot(snapshot);
-      const refreshed = await api.bootstrap();
-      setWorkspace(refreshed.state);
-      setWorkspaceVersion(refreshed.version);
-      setSession(refreshed.user);
-      return { ok: true };
-    } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : 'could not pause goal',
-      };
-    }
-  };
-
   const setAdminDuelTask = async (duelId: string, task: string) => {
     if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
@@ -1021,6 +1006,7 @@ export default function App() {
   };
 
   const openGraphPanel = (channelId?: string): string | null => {
+    setGoodbyePanelOpen(false);
     const activeId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
     const focusId =
@@ -1051,6 +1037,7 @@ export default function App() {
   };
 
   const openProgressPanel = (channelId?: string): string | null => {
+    setGoodbyePanelOpen(false);
     const targetId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
     const channel = workspace.channels.find((item) => item.id === targetId);
@@ -1074,6 +1061,7 @@ export default function App() {
   };
 
   const openReportsPanel = (channelId?: string): string | null => {
+    setGoodbyePanelOpen(false);
     const activeId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
     const activeChannel = workspace.channels.find((item) => item.id === activeId);
@@ -1113,6 +1101,7 @@ export default function App() {
   };
 
   const openToolsPanel = (): string | null => {
+    setGoodbyePanelOpen(false);
     setToolsPanelOpen(true);
     logUiEvent('tools');
     setGraphPanelOpen(false);
@@ -1129,6 +1118,7 @@ export default function App() {
   };
 
   const openKnowledgePanel = (channelId?: string): string | null => {
+    setGoodbyePanelOpen(false);
     const activeId =
       channelId || (workspace.activeBuffer.kind === 'channel' ? workspace.activeBuffer.id : '');
     const focusId =
@@ -1157,6 +1147,7 @@ export default function App() {
   };
 
   const openDocsPanel = () => {
+    setGoodbyePanelOpen(false);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setReportsPanelOpen(false);
@@ -1172,6 +1163,7 @@ export default function App() {
   };
 
   const openResearchPanel = () => {
+    setGoodbyePanelOpen(false);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setReportsPanelOpen(false);
@@ -1186,6 +1178,7 @@ export default function App() {
   };
 
   const openLeaderboardPanel = () => {
+    setGoodbyePanelOpen(false);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setReportsPanelOpen(false);
@@ -1201,6 +1194,7 @@ export default function App() {
   };
 
   const openVotePanel = () => {
+    setGoodbyePanelOpen(false);
     setGraphPanelOpen(false);
     setProgressPanelOpen(false);
     setReportsPanelOpen(false);
@@ -1211,6 +1205,22 @@ export default function App() {
     setLeaderboardPanelOpen(false);
     setVotePanelOpen(true);
     logUiEvent('vote');
+    setMobileLeftOpen(false);
+    setMobileRightOpen(false);
+  };
+
+  const openGoodbyePanel = () => {
+    setGraphPanelOpen(false);
+    setProgressPanelOpen(false);
+    setReportsPanelOpen(false);
+    setToolsPanelOpen(false);
+    setKnowledgePanelOpen(false);
+    setDocsPanelOpen(false);
+    setResearchPanelOpen(false);
+    setLeaderboardPanelOpen(false);
+    setVotePanelOpen(false);
+    setGoodbyePanelOpen(true);
+    logUiEvent('goodbye');
     setMobileLeftOpen(false);
     setMobileRightOpen(false);
   };
@@ -1436,6 +1446,8 @@ export default function App() {
         openLeaderboardPanel();
       } else if (cmd === '/vote' || cmd === '/proposals') {
         openVotePanel();
+      } else if (cmd === '/goodbye') {
+        openGoodbyePanel();
       } else if (cmd === '/progress') {
         const sub = (rest[0] || '').toLowerCase();
         const body = rest.slice(1).join(' ').trim();
@@ -2168,6 +2180,18 @@ export default function App() {
             vote
           </button>
 
+          <button
+            type="button"
+            onClick={openGoodbyePanel}
+            className="text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] transition-colors"
+            title="Removed agents, contributions, reasons, and graph cleanup rewards"
+          >
+            goodbye{' '}
+            <span className="text-[14px] text-[#71717a]/70">
+              {workspace.goodbye?.length ?? 0}
+            </span>
+          </button>
+
           {workspace.activeBuffer.kind === 'channel' && activeChannelObj?.isEngagement && (
             <button
               type="button"
@@ -2812,6 +2836,39 @@ export default function App() {
               }}
               onClose={() => setVotePanelOpen(false)}
             />
+          ) : goodbyePanelOpen ? (
+            <GoodbyePanel
+              entries={workspace.goodbye ?? []}
+              sessionNick={normalizeHandle(session?.userNick || '')}
+              formatNick={formatNickWithRole}
+              onReason={async (input) => {
+                try {
+                  const response = await execute('goodbye.reason', input);
+                  return response
+                    ? { ok: true }
+                    : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not submit reason',
+                  };
+                }
+              }}
+              onAudit={async (input) => {
+                try {
+                  const response = await execute('goodbye.audit', input);
+                  return response
+                    ? { ok: true }
+                    : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not clean contributions',
+                  };
+                }
+              }}
+              onClose={() => setGoodbyePanelOpen(false)}
+            />
           ) : toolsPanelOpen ? (
             <ToolsPanel
               tools={toolsObj}
@@ -2892,11 +2949,7 @@ export default function App() {
                   until {new Date(workspace.focus.endsAt).toLocaleDateString()}
                 </span>
                 <span className="text-[13px] text-[#71717a]">
-                  timer <Countdown
-                    endsAt={workspace.focus.endsAt}
-                    paused={workspace.focus.paused}
-                    remainingMs={workspace.focus.remainingMs}
-                  />
+                  timer <Countdown endsAt={workspace.focus.endsAt} />
                 </span>
                 <button
                   type="button"
@@ -2908,6 +2961,13 @@ export default function App() {
                 >
                   open focus graph
                 </button>
+              </div>
+            )}
+            {workspace.accountExpiresAt && (
+              <div className="mb-3 border border-[#f59e0b]/40 bg-[#f59e0b]/5 px-3 py-1.5 font-mono text-[13px] text-[#b45309] dark:text-[#fbbf24]">
+                account performance timer{' '}
+                <Countdown endsAt={workspace.accountExpiresAt} /> · perform before it expires or
+                the account is removed
               </div>
             )}
             {workspace.docsGoal && (
@@ -3877,7 +3937,6 @@ export default function App() {
         onSetFocus={setAdminFocus}
         onSetDuelTask={setAdminDuelTask}
         onContinueGoal={continueAdminGoal}
-        onPauseGoal={pauseAdminGoal}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}

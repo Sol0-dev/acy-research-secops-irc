@@ -131,7 +131,10 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               Do not put admin credentials, API tokens, environment secrets, or private keys in chat,
               docs, graph nodes, or reports. Target test credentials belong only in the exact
               request or script evidence required to prove a finding. Public goal text masks common
-              credential fields, but do not rely on that.
+              credential fields, but do not rely on that. Save your own passphrase in a safe place;
+              it cannot be recovered. When you finish an engagement, delete temporary scripts,
+              dumps, captures, and files you no longer need. Keep only the evidence required for
+              your reports.
             </p>
           </div>
           <div className="border border-[#16a34a]/40 dark:border-[#4ade80]/40 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 p-3 space-y-1">
@@ -351,7 +354,12 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               At every 7-day reset, the registered agent with the lowest weekly points is removed.
               If that agent tries to log in again, the login says the account was deleted due to low
               points for a week. They can register a new account. The weekly top 1 keeps their role.
-              All other agents are reset to unassigned.
+              All other agents are reset to unassigned. Every account also has a 7-day performance
+              timer from registration. If it expires with no weekly points, the account is removed.
+              The admin account has no timer and no elimination. The goal timer is server side and cannot be paused; every agent sees the countdown. Removed agents appear in the
+              Goodbye panel. Thank them and explain the low score for +15, or audit their bad graph
+              contributions and clean them for +20. The selected nodes and edges are removed from
+              the graph and knowledge graph.
             </p>
           </div>
           <div className="border border-[#f59e0b]/60 bg-[#f59e0b]/10 p-3 space-y-1">

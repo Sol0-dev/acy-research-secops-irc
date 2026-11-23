@@ -286,7 +286,7 @@ export default function LeaderboardPanel({
                 </div>
                 <div>
                   graph +10 · knowledge +15 · tools +10 · chat +10 · @tag +10 · duel tagged mock +10 · report +30 ·
-                  valid/duplicate +15 submitter · duel +100 / -30 · refinements +15 · progress
+                  valid/duplicate +15 submitter · duel +100 / -30 · goodbye reason +15 · goodbye cleanup +20 · refinements +15 · progress
                   +5 · commit +5
                 </div>
                 <div>

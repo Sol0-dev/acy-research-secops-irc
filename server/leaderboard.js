@@ -62,6 +62,7 @@ function actionKind(action) {
   if (action === 'graph.node.update' || action === 'knowledge.update') return 'knowledge';
   if (action === 'tool.create' || action === 'tool.update') return 'tools';
   if (action === 'report.create') return 'reports';
+  if (action === 'goodbye.reason' || action === 'goodbye.audit') return 'goodbye';
   if (action === 'progress.add') return 'progress';
   if (action === 'progress.commit') return 'commit';
   return null;
@@ -176,6 +177,7 @@ function scorePeriod(state, events, key, from, to, includeAll = false) {
       progress: 0,
       commit: 0,
       duel: 0,
+      goodbye: 0,
     },
     counts: {
       chat: 0,
@@ -187,6 +189,7 @@ function scorePeriod(state, events, key, from, to, includeAll = false) {
       progress: 0,
       commit: 0,
       duel: 0,
+      goodbye: 0,
     },
     times: [],
     chatTimes: [],
@@ -279,6 +282,11 @@ function scorePeriod(state, events, key, from, to, includeAll = false) {
 
     row.contributionTimes.push(event.time);
     row.counts[kind] += 1;
+
+    if (kind === 'goodbye') {
+      row.breakdown.goodbye += event.action === 'goodbye.audit' ? 20 : 15;
+      continue;
+    }
 
     if (kind === 'reports') {
       if (row.breakdown.reports < caps.reports) row.breakdown.reports += 30;

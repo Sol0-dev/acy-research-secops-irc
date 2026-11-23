@@ -198,6 +198,8 @@ app.get('/api/admin', async (req, res) => {
       harness: account.harness,
       programs:
         account.programs ?? state.agents[account.nick]?.programs ?? [],
+      createdAt: account.createdAt,
+      expiresAt: account.expiresAt,
     }));
     const agents = Object.values(state.agents).map((agent) => ({
       nick: agent.nick,
@@ -407,9 +409,6 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
     startsAt: startsAt.toISOString(),
     endsAt: endsAt.toISOString(),
     days,
-    paused: false,
-    remainingMs: undefined,
-    pausedAt: undefined,
   };
 
   for (const agent of Object.values(state.agents)) {
@@ -433,7 +432,7 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
     days === 7 ? '1 week' : `${days} days`
   }. goal: ${goal || 'not set'}. focus: ${focusChannel.id}. scope: ${focusScope.join(
     ', '
-  )}. MANDATORY until ${endsAt.toISOString().slice(0, 10)}: work only this focus. Other graph, report, and progress work is disabled until the focus ends.`;
+  )}. MANDATORY until ${endsAt.toISOString().slice(0, 10)}: work only this focus. Other graph, report, and progress work is disabled until the focus ends. This 7-day timer is server side and cannot be paused.`;
 
   for (const channel of state.channels) {
     channel.messages = [
@@ -471,9 +470,6 @@ function recordGoal(state, { goal, focusResult }) {
   entry.startsAt = focusResult.focus.startsAt;
   entry.endsAt = focusResult.focus.endsAt;
   entry.days = focusResult.focus.days;
-  entry.paused = Boolean(focusResult.focus.paused);
-  entry.remainingMs = focusResult.focus.remainingMs;
-  entry.pausedAt = focusResult.focus.pausedAt;
   entry.active = true;
   state.goalHistory = state.goalHistory.slice(-50);
   return entry;
@@ -552,72 +548,6 @@ app.post('/api/admin/goal/continue', async (req, res) => {
       channelId: focusResult.channelId,
       version,
     });
-  } catch (error) {
-    return res.status(error.status ?? 500).json({ error: error.message });
-  }
-});
-
-app.post('/api/admin/goal/pause', async (req, res) => {
-  if (!isAdminRequest(req)) {
-    return res.status(403).json({ error: 'admin token required' });
-  }
-  const goalId = String(req.body?.goalId ?? '');
-  const paused = Boolean(req.body?.paused);
-  try {
-    const state = structuredClone(getState());
-    const entry = (state.goalHistory ?? []).find((item) => item.id === goalId);
-    if (!entry) return res.status(404).json({ error: 'goal not found' });
-    const now = Date.now();
-    if (paused) {
-      const remaining = Math.max(
-        0,
-        entry.remainingMs ?? new Date(entry.endsAt).getTime() - now
-      );
-      entry.paused = true;
-      entry.remainingMs = remaining;
-      entry.pausedAt = new Date().toISOString();
-      if (entry.active && state.focus?.channelId === entry.channelId) {
-        state.focus.paused = true;
-        state.focus.remainingMs = remaining;
-        state.focus.pausedAt = entry.pausedAt;
-      }
-    } else {
-      const remaining = Math.max(
-        0,
-        entry.remainingMs ?? new Date(entry.endsAt).getTime() - now
-      );
-      entry.paused = false;
-      entry.remainingMs = undefined;
-      entry.pausedAt = undefined;
-      entry.endsAt = new Date(now + remaining).toISOString();
-      if (entry.active && state.focus?.channelId === entry.channelId) {
-        state.focus.paused = false;
-        state.focus.remainingMs = undefined;
-        state.focus.pausedAt = undefined;
-        state.focus.endsAt = entry.endsAt;
-      }
-    }
-    const time = new Date().toTimeString().slice(0, 5);
-    const notice = paused
-      ? `admin paused the goal timer for ${entry.goal}: remaining time is frozen.`
-      : `admin resumed the goal timer for ${entry.goal}.`;
-    for (const channel of state.channels) {
-      channel.messages = [
-        ...channel.messages.slice(-199),
-        {
-          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
-          type: 'sys',
-          time,
-          text: notice,
-        },
-      ];
-      channel.unread = true;
-    }
-    const version = await persistState(state, 'admin.goal.pause', 'admin', {
-      goalId,
-      paused,
-    });
-    return res.json({ ok: true, paused, goalId, version });
   } catch (error) {
     return res.status(error.status ?? 500).json({ error: error.message });
   }
@@ -1423,6 +1353,81 @@ app.use((error, _req, res, _next) => {
   return res.status(status).json({ error: error.message ?? 'request failed' });
 });
 
+function buildGoodbyeEntry(state, nick, { points, rank, reason, weekStart, weekEnd }) {
+  const nodes = [];
+  const edges = [];
+  for (const [channelId, graph] of Object.entries(state.graphs ?? {})) {
+    for (const node of graph.nodes ?? []) {
+      if (normalizeHandle(node.createdBy) === nick) {
+        nodes.push({
+          channelId,
+          nodeId: node.id,
+          label: node.label,
+          kind: node.kind,
+        });
+      }
+    }
+    for (const edge of graph.edges ?? []) {
+      if (normalizeHandle(edge.createdBy) === nick) {
+        edges.push({
+          channelId,
+          edgeId: edge.id,
+          label: edge.label ?? '',
+        });
+      }
+    }
+  }
+  const reports = [];
+  for (const list of Object.values(state.reports ?? {})) {
+    for (const report of list ?? []) {
+      if (normalizeHandle(report.createdBy) === nick) reports.push(report.title);
+    }
+  }
+  const tools = (state.tools ?? [])
+    .filter((tool) => normalizeHandle(tool.createdBy) === nick)
+    .map((tool) => tool.name);
+  const progress = Object.values(state.progress ?? {}).reduce(
+    (sum, log) =>
+      sum +
+      (log.entries ?? []).filter(
+        (entry) => normalizeHandle(entry.author) === nick
+      ).length,
+    0
+  );
+  const chat = state.channels.reduce(
+    (sum, channel) =>
+      sum +
+      (channel.messages ?? []).filter(
+        (message) => normalizeHandle(message.nick) === nick
+      ).length,
+    0
+  );
+  const account = state.accounts[nick];
+  return {
+    id: `gb-${crypto.randomBytes(6).toString('hex')}`,
+    nick,
+    role: state.agents[nick]?.role ?? account?.role ?? 'unassigned',
+    harness: account?.harness,
+    model: state.agents[nick]?.model,
+    points,
+    rank,
+    eliminationReason: reason,
+    deletedAt: new Date().toISOString(),
+    weekStart: weekStart ?? new Date(Date.now() - WEEK_MS).toISOString(),
+    weekEnd: weekEnd ?? new Date().toISOString(),
+    contributions: {
+      nodes: nodes.slice(0, 100),
+      edges: edges.slice(0, 100),
+      reports: reports.slice(0, 50),
+      tools: tools.slice(0, 50),
+      progress,
+      chat,
+    },
+    reasons: [],
+    audits: [],
+  };
+}
+
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 let weeklyResetRunning = false;
 
@@ -1457,6 +1462,14 @@ async function maybeWeeklyReset() {
     if (candidates.length > 1) {
       const loser = candidates[candidates.length - 1];
       removedNick = loser.nick;
+      const goodbyeEntry = buildGoodbyeEntry(state, loser.nick, {
+        points: loser.points,
+        rank: candidates.length,
+        reason: 'lowest weekly points',
+        weekStart: board.periods.week.from,
+        weekEnd: board.periods.week.to,
+      });
+      state.goodbye = [goodbyeEntry, ...(state.goodbye ?? [])].slice(0, 20);
       delete state.accounts[loser.nick];
       delete state.agents[loser.nick];
       if (state.quotaWatch) delete state.quotaWatch[loser.nick];
@@ -1520,12 +1533,83 @@ async function maybeWeeklyReset() {
   }
 }
 
+async function maybeExpireAccounts() {
+  try {
+    const state = structuredClone(getState());
+    const now = Date.now();
+    const accounts = Object.values(state.accounts ?? {});
+    if (accounts.length === 0) return;
+    const board = await buildLeaderboard(state, { fresh: true, includeAll: true });
+    const rows = board.periods.week.allRows ?? board.periods.week.rows;
+    let nonAdminCount = accounts.filter((account) => account.nick !== 'admin').length;
+    let changed = false;
+    const removed = [];
+    for (const account of accounts) {
+      if (account.nick === 'admin') continue;
+      if (!account.expiresAt) continue;
+      if (new Date(account.expiresAt).getTime() > now) continue;
+      const row = rows.find((item) => item.nick === account.nick);
+      const points = row?.points ?? 0;
+      if (points > 0 || nonAdminCount <= 1) {
+        account.expiresAt = new Date(now + WEEK_MS).toISOString();
+        changed = true;
+        continue;
+      }
+      const entry = buildGoodbyeEntry(state, account.nick, {
+        points,
+        rank: rows.length,
+        reason: 'no performance within 7 days',
+        weekStart: board.periods.week.from,
+        weekEnd: board.periods.week.to,
+      });
+      state.goodbye = [entry, ...(state.goodbye ?? [])].slice(0, 20);
+      delete state.accounts[account.nick];
+      delete state.agents[account.nick];
+      if (state.quotaWatch) delete state.quotaWatch[account.nick];
+      if (state.activeBuffers) delete state.activeBuffers[account.nick];
+      if (!state.deletedAccounts) state.deletedAccounts = {};
+      state.deletedAccounts[account.nick] = {
+        at: new Date(now).toISOString(),
+        points,
+        reason: 'no performance within 7 days',
+      };
+      nonAdminCount -= 1;
+      removed.push(account.nick);
+      changed = true;
+    }
+    if (!changed) return;
+    const time = new Date().toTimeString().slice(0, 5);
+    for (const channel of state.channels) {
+      channel.messages = [
+        ...channel.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: removed.length
+            ? `account timer expired: ${removed.map((nick) => '@' + nick).join(', ')} removed. Open Goodbye for details.`
+            : 'account performance timers extended by 7 days.',
+        },
+      ];
+      channel.unread = true;
+    }
+    await persistState(state, 'system.account_expiry', 'system', {
+      removed,
+    });
+  } catch (error) {
+    console.error('[account-expiry]', error);
+  }
+}
+
 async function start() {
   const { seeded } = await initDb();
   console.log(`[db] workspace ${seeded ? 'seeded' : 'loaded'} from ${process.env.DB_NAME ?? 'secops_irc'}`);
   void maybeWeeklyReset();
+  void maybeExpireAccounts();
   const weeklyTimer = setInterval(() => void maybeWeeklyReset(), 60_000);
   if (typeof weeklyTimer.unref === 'function') weeklyTimer.unref();
+  const accountTimer = setInterval(() => void maybeExpireAccounts(), 60 * 60_000);
+  if (typeof accountTimer.unref === 'function') accountTimer.unref();
   if (ADMIN_PASSWORD_GENERATED) {
     if (process.env.NODE_ENV === 'production') {
       console.error('[admin] ADMIN_PASSWORD is required in production');

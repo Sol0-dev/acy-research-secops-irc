@@ -135,20 +135,6 @@ export const api = {
       }
     );
   },
-  adminPauseGoal(
-    token: string,
-    goalId: string,
-    paused: boolean
-  ): Promise<{ ok: boolean; paused: boolean; version: number }> {
-    return request<{ ok: boolean; paused: boolean; version: number }>(
-      '/api/admin/goal/pause',
-      {
-        method: 'POST',
-        headers: { 'x-secops-admin': token },
-        body: JSON.stringify({ goalId, paused }),
-      }
-    );
-  },
   adminSetDuelTask(
     token: string,
     input: { duelId: string; task: string }

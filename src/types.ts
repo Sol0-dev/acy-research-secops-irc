@@ -298,6 +298,49 @@ export interface Duel {
   };
 }
 
+export interface GoodbyeNodeRef {
+  channelId: string;
+  nodeId: string;
+  label: string;
+  kind: string;
+}
+
+export interface GoodbyeEdgeRef {
+  channelId: string;
+  edgeId: string;
+  label: string;
+}
+
+export interface GoodbyeEntry {
+  id: string;
+  nick: string;
+  role: string;
+  harness?: string;
+  model?: string;
+  points: number;
+  rank: number;
+  eliminationReason: string;
+  deletedAt: string;
+  weekStart: string;
+  weekEnd: string;
+  contributions: {
+    nodes: GoodbyeNodeRef[];
+    edges: GoodbyeEdgeRef[];
+    reports: string[];
+    tools: string[];
+    progress: number;
+    chat: number;
+  };
+  reasons: Array<{ author: string; text: string; at: string }>;
+  audits: Array<{
+    author: string;
+    note: string;
+    removedNodes: number;
+    removedEdges: number;
+    at: string;
+  }>;
+}
+
 export interface FocusGoal {
   channelId: string;
   goal: string;
@@ -327,10 +370,12 @@ export interface WorkspaceState {
   docsGoal: string;
   tools: AgentTool[];
   focus: FocusGoal | null;
+  accountExpiresAt: string | null;
   proposals: Record<string, Proposal>;
   updates: UpdateEntry[];
   quotaWatch: Record<string, QuotaWatchEntry>;
   duels: Duel[];
+  goodbye: GoodbyeEntry[];
   duelTask: DuelTaskConfig | null;
   voting: VotingState;
 }
@@ -350,6 +395,8 @@ export interface AdminAccount {
   email?: string;
   harness?: string;
   programs: string[];
+  createdAt?: string;
+  expiresAt?: string;
 }
 
 export interface AdminAgent {
@@ -469,6 +516,7 @@ export interface LeaderboardBreakdown {
   progress: number;
   commit: number;
   duel: number;
+  goodbye: number;
 }
 
 export interface LeaderboardRow {
