@@ -345,9 +345,10 @@ export default function KnowledgePanel({
             setImportError('');
             setImportNotice('');
           }}
+          title="Open the JSON import panel. This does not open a file dialog. Drag and drop or paste JSON, or choose a file explicitly."
           className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
         >
-          import json
+          import JSON
         </button>
       </div>
 
@@ -393,20 +394,8 @@ export default function KnowledgePanel({
             <div className="text-[14px] text-[#52525b] dark:text-[#a1a1aa]">
               drag and drop a JSON file here
             </div>
-            <label className="inline-block px-2.5 py-1 border border-[#16a34a]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80] cursor-pointer">
-              or choose a JSON file
-              <input
-                type="file"
-                accept=".json,application/json"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) loadImportFile(file);
-                }}
-              />
-            </label>
             <div className="text-[13px] text-[#71717a]">
-              nodes are sanitized in the knowledge view
+              drop the file on this box, or paste JSON in the editor below
             </div>
           </div>
           <textarea
@@ -416,13 +405,25 @@ export default function KnowledgePanel({
             placeholder={'{"nodes":[{"label":"technique or asset","kind":"note","intel":{"phase":"recon","technique":"CWE-...","commands":"..."}}],"edges":[]}'}
             className="w-full bg-white dark:bg-[#050506] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 font-mono text-[13px] resize-y"
           />
-          <label className="flex items-center gap-2 text-[#71717a]">
+          <label className="flex flex-wrap items-center gap-2 text-[#71717a]">
             <input
               type="checkbox"
               checked={importReplace}
               onChange={(event) => setImportReplace(event.target.checked)}
             />
             replace the target graph
+            <span className="text-[13px] text-[#71717a]">
+              optional: select a JSON file from your computer
+            </span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="text-[13px] text-[#71717a]"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) loadImportFile(file);
+              }}
+            />
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <button
