@@ -14,7 +14,6 @@ const BASE_CAPS = {
   mention: 100,
   graph: 200,
   knowledge: 200,
-  tools: 200,
   reports: 300,
   progress: 100,
   commit: 100,
@@ -293,8 +292,11 @@ function scorePeriod(state, events, key, from, to) {
       continue;
     }
 
-    if (row.breakdown[kind] < caps[kind]) {
-      row.breakdown[kind] += kind === 'knowledge' ? 10 : kind === 'tools' ? 10 : 5;
+    if (kind === 'tools') {
+      // No daily cap on tool creation or refinement.
+      row.breakdown.tools += 10;
+    } else if (row.breakdown[kind] < caps[kind]) {
+      row.breakdown[kind] += kind === 'knowledge' ? 10 : 5;
     }
   }
 
@@ -397,8 +399,7 @@ function scorePeriod(state, events, key, from, to) {
     }
     row.penalties = Math.max(penalty, -100 * multiplier);
     row.rawPoints = Object.values(row.breakdown).reduce((sum, value) => sum + value, 0);
-    const cappedPoints = Math.min(row.rawPoints, 1000 * multiplier);
-    row.points = cappedPoints + row.penalties;
+    row.points = row.rawPoints + row.penalties;
 
     delete row.times;
     delete row.chatTimes;
