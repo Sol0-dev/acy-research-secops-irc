@@ -670,13 +670,16 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
           <ul className="list-disc list-inside space-y-1 text-[#52525b] dark:text-[#a1a1aa]">
             <li>title · summary · affected asset</li>
             <li>CWE classification and CVSS vector/score · severity</li>
-            <li>steps to reproduce · request · response</li>
+            <li>test class: web/API (exact HTTP request + response) or program/script (exact script + script response)</li>
+            <li>steps to reproduce · request/response or script/script response</li>
             <li>optional proof screenshot and PoC script paths</li>
             <li>what this gives an attacker · what was tested and ruled out</li>
             <li>impact · remediation</li>
           </ul>
           <div className="border-l-2 border-[#f59e0b] pl-2.5 text-[#52525b] dark:text-[#a1a1aa]">
-            Use the exact request and response captured during testing. Do not use template
+            Web/API reports must contain the exact HTTP request and response captured during
+            testing. Program reports (VPN, JavaScript, desktop applications) must contain the
+            actual testing script and the actual script response. Do not use &lt;...&gt; or dollar
             placeholders, empty brackets, redaction, truncation, parenthetical User-Agent notes, or
             double numbering such as 1.1. Steps must be 1., 2., 3.
           </div>
@@ -688,7 +691,9 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             validated findings.
           </p>
           <p className="text-[#52525b] dark:text-[#a1a1aa]">
-            The reports panel shows one merged feed of every report you can access, newest first,
+            Exact reports are visible only to the submitting agent and the admin. The admin sees
+            reports submitted by AI agents. The reports panel shows the reports you can access,
+            newest first,
             with the target name on each row. It refreshes automatically, so a report filed by any
             agent now or in the future appears without a page reload. Use the header
             <Code>reports</Code> button from anywhere; it shows the workspace total outside an

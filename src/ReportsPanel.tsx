@@ -7,7 +7,7 @@
  * ---------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from 'react';
-import type { AgentProfile, Duel, ReportStatus, VulnReport, VulnSeverity } from './types';
+import type { AgentProfile, Duel, ReportStatus, ReportTestClass, VulnReport, VulnSeverity } from './types';
 
 const SEVERITIES: VulnSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
@@ -45,6 +45,9 @@ export interface ReportDraft {
   steps: string;
   request: string;
   response: string;
+  testClass: ReportTestClass;
+  script: string;
+  scriptResponse: string;
   proof: string;
   pocScript: string;
   attackerValue: string;
@@ -111,6 +114,9 @@ const EMPTY_DRAFT: ReportDraft = {
   steps: '',
   request: '',
   response: '',
+  testClass: 'web',
+  script: '',
+  scriptResponse: '',
   proof: '',
   pocScript: '',
   attackerValue: '',
@@ -487,9 +493,10 @@ export default function ReportsPanel({
             the header to report against a different engagement.
           </div>
           <div className="border-l-2 border-[#f59e0b] pl-2.5 text-[14px] text-[#b45309] dark:text-[#fbbf24] leading-relaxed">
-            Use the exact request and response captured during testing. No placeholders, empty
-            brackets, redaction, truncation, User-Agent notes, or 1.1 numbering. Steps must be 1., 2.,
-            3.
+            Web/API reports must show the exact HTTP request and response captured during testing.
+            Program/script reports must show the actual testing script and the actual script
+            response. No &lt;...&gt; placeholders, &#36;&#123;...&#125;, empty [], redaction, truncation,
+            User-Agent notes, or 1.1 numbering. Steps must be 1., 2., 3.
           </div>
 
           <label className="block space-y-1">
@@ -541,6 +548,20 @@ export default function ReportsPanel({
             </label>
           </div>
 
+          <label className="block space-y-1">
+            {label('test class')}
+            <select
+              className={inputClass}
+              value={draft.testClass}
+              onChange={(event) =>
+                setField('testClass', event.target.value as ReportTestClass)
+              }
+            >
+              <option value="web">web / API · exact HTTP request + response</option>
+              <option value="program">program / script · exact script + script output</option>
+            </select>
+          </label>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
             <label className="block space-y-1">
               {label('classification / CWE (one per line)')}
@@ -576,28 +597,56 @@ export default function ReportsPanel({
             />
           </label>
 
-          <label className="block space-y-1">
-            {label('request')}
-            <textarea
-              className={`${areaClass} font-mono`}
-              rows={4}
-              value={draft.request}
-              onChange={(event) => setField('request', event.target.value)}
-              placeholder={'GET /actuator HTTP/1.1\nHost: api.example.com\nAccept: application/json'}
-              required
-            />
-          </label>
-
-          <label className="block space-y-1">
-            {label('response')}
-            <textarea
-              className={`${areaClass} font-mono`}
-              rows={5}
-              value={draft.response}
-              onChange={(event) => setField('response', event.target.value)}
-              required
-            />
-          </label>
+          {draft.testClass === 'program' ? (
+            <>
+              <label className="block space-y-1">
+                {label('actual testing script')}
+                <textarea
+                  className={`${areaClass} font-mono`}
+                  rows={8}
+                  value={draft.script}
+                  onChange={(event) => setField('script', event.target.value)}
+                  placeholder={'#!/usr/bin/env node\n// exact script used during testing\nconsole.log(process.version)'}
+                  required
+                />
+              </label>
+              <label className="block space-y-1">
+                {label('actual script response')}
+                <textarea
+                  className={`${areaClass} font-mono`}
+                  rows={8}
+                  value={draft.scriptResponse}
+                  onChange={(event) => setField('scriptResponse', event.target.value)}
+                  placeholder={'# exact output captured from running the script'}
+                  required
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className="block space-y-1">
+                {label('request')}
+                <textarea
+                  className={`${areaClass} font-mono`}
+                  rows={4}
+                  value={draft.request}
+                  onChange={(event) => setField('request', event.target.value)}
+                  placeholder={'GET /actuator HTTP/1.1\nHost: api.example.com\nAccept: application/json'}
+                  required
+                />
+              </label>
+              <label className="block space-y-1">
+                {label('response')}
+                <textarea
+                  className={`${areaClass} font-mono`}
+                  rows={5}
+                  value={draft.response}
+                  onChange={(event) => setField('response', event.target.value)}
+                  required
+                />
+              </label>
+            </>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
             <label className="block space-y-1">
@@ -914,19 +963,49 @@ export default function ReportsPanel({
                   </ol>
                 </section>
 
-                <section className="space-y-1">
-                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">Request</h2>
-                  <pre className="p-2.5 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap">
-                    {selected.request}
-                  </pre>
-                </section>
+                {selected.request && (
+                  <section className="space-y-1">
+                    <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                      {selected.testClass === 'program' ? 'Testing script' : 'Request'}
+                    </h2>
+                    <pre className="p-2.5 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap">
+                      {selected.request}
+                    </pre>
+                  </section>
+                )}
 
-                <section className="space-y-1">
-                  <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">Response</h2>
-                  <pre className="p-2.5 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap">
-                    {selected.response}
-                  </pre>
-                </section>
+                {selected.response && (
+                  <section className="space-y-1">
+                    <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                      {selected.testClass === 'program' ? 'Script response' : 'Response'}
+                    </h2>
+                    <pre className="p-2.5 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap">
+                      {selected.response}
+                    </pre>
+                  </section>
+                )}
+
+                {selected.script && (
+                  <section className="space-y-1">
+                    <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                      Testing script
+                    </h2>
+                    <pre className="p-2.5 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap">
+                      {selected.script}
+                    </pre>
+                  </section>
+                )}
+
+                {selected.scriptResponse && (
+                  <section className="space-y-1">
+                    <h2 className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                      Script response
+                    </h2>
+                    <pre className="p-2.5 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#f4f4f5]/50 dark:bg-[#111114] overflow-x-auto whitespace-pre-wrap">
+                      {selected.scriptResponse}
+                    </pre>
+                  </section>
+                )}
 
                 {selected.proof && (
                   <section className="space-y-1">

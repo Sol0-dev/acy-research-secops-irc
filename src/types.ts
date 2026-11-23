@@ -220,6 +220,8 @@ export type ReportStatus = 'draft' | 'final';
 
 export type ReportReview = 'triage' | 'pending' | 'valid' | 'invalid' | 'duplicate';
 
+export type ReportTestClass = 'web' | 'program';
+
 export interface VulnReport {
   id: string;
   channelId: string;
@@ -229,9 +231,12 @@ export interface VulnReport {
   cwe: string[];
   cvss: string;
   severity: VulnSeverity;
+  testClass?: ReportTestClass;
   steps: string[];
   request: string;
   response: string;
+  script?: string;
+  scriptResponse?: string;
   proof?: string;
   pocScript?: string;
   attackerValue: string;

@@ -299,8 +299,18 @@ function assertCleanReportText(value, field, options = {}) {
   if (/<\s*(redacted|truncated|placeholder|insert)[^>]*>/i.test(text)) {
     throw new ApiError(400, `${field} must not contain a redaction or truncation marker`);
   }
+  if (
+    /<\s*(target|host|hostname|url|uri|domain|ip|email|token|secret|password|passwd|user|username|credential|path|file|endpoint|payload|value|id|uuid|key|api[_-]?key|cookie|session|jwt|hash|port|scheme|method)\s*>/i.test(
+      text
+    )
+  ) {
+    throw new ApiError(400, `${field} must use actual values, not <...> placeholders`);
+  }
   if (/\b(redacted|truncated)\b/i.test(text)) {
     throw new ApiError(400, `${field} must not contain a redaction or truncation marker`);
+  }
+  if (text.includes('…') || /(^|\s)\.{3,}\s*$/m.test(text)) {
+    throw new ApiError(400, `${field} must not be truncated with an ellipsis`);
   }
   if (options.requestLike) {
     for (const line of text.split(/\r?\n/)) {
@@ -310,9 +320,6 @@ function assertCleanReportText(value, field, options = {}) {
           'User-Agent must be the exact value sent during testing; remove parenthetical notes'
         );
       }
-    }
-    if (text.includes('…') || /\.{3,}/.test(text)) {
-      throw new ApiError(400, `${field} must not be truncated with an ellipsis`);
     }
   }
   if (options.steps) {
@@ -2574,6 +2581,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const author = normalizeHandle(actor);
       requireEnrolled(state, author, channel);
+      assertDuelWriteAccess(state, channel, author);
 
       const title = limitText(payload.title, 300, 'report title').trim();
       const summary = limitText(payload.summary, 8000, 'report summary').trim();
@@ -2582,9 +2590,26 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const cvss = limitText(payload.cvss, 300, 'CVSS vector').trim();
       const severity = String(payload.severity ?? 'medium').trim().toLowerCase();
       const steps = parseLines(payload.steps);
+      const testClass =
+        String(payload.testClass ?? 'web').toLowerCase() === 'program'
+          ? 'program'
+          : 'web';
       const request = limitText(payload.request, 16000, 'request').trim();
       const response = limitText(payload.response, 16000, 'response').trim();
-      if (request.length < 20 || response.length < 20) {
+      const script = limitText(payload.script, 50000, 'testing script').trim();
+      const scriptResponse = limitText(
+        payload.scriptResponse,
+        50000,
+        'script response'
+      ).trim();
+      if (testClass === 'program') {
+        if (script.length < 20 || scriptResponse.length < 20) {
+          throw new ApiError(
+            400,
+            'program/script reports require the actual testing script and actual script response (minimum 20 characters each)'
+          );
+        }
+      } else if (request.length < 20 || response.length < 20) {
         throw new ApiError(400, 'full request and response are required (minimum 20 characters each)');
       }
       const proof = limitText(payload.proof, 500, 'proof path').trim();
@@ -2606,8 +2631,13 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         throw new ApiError(400, `invalid severity: ${severity}`);
       }
       if (steps.length === 0) throw new ApiError(400, 'steps to reproduce required');
-      if (!request) throw new ApiError(400, 'request required');
-      if (!response) throw new ApiError(400, 'response required');
+      if (testClass === 'web') {
+        if (!request) throw new ApiError(400, 'request required');
+        if (!response) throw new ApiError(400, 'response required');
+      } else {
+        if (!script) throw new ApiError(400, 'actual testing script required');
+        if (!scriptResponse) throw new ApiError(400, 'actual script response required');
+      }
       if (!attackerValue) throw new ApiError(400, 'attacker value section required');
       if (!impact) throw new ApiError(400, 'impact section required');
       if (remediation.length === 0) throw new ApiError(400, 'at least one remediation step required');
@@ -2615,8 +2645,13 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       assertCleanReportText(summary, 'report summary');
       assertCleanReportText(affectedAsset, 'affected asset');
       assertCleanReportText(String(payload.steps ?? ''), 'steps to reproduce', { steps: true });
-      assertCleanReportText(request, 'request', { requestLike: true });
-      assertCleanReportText(response, 'response', { requestLike: true });
+      if (testClass === 'web') {
+        assertCleanReportText(request, 'request', { requestLike: true });
+        assertCleanReportText(response, 'response', { requestLike: true });
+      } else {
+        assertCleanReportText(script, 'testing script', { requestLike: true });
+        assertCleanReportText(scriptResponse, 'script response', { requestLike: true });
+      }
       assertCleanReportText(attackerValue, 'attacker value');
       assertCleanReportText(String(payload.testedRuledOut ?? ''), 'tested and ruled out', {
         steps: true,
@@ -2646,9 +2681,10 @@ export function applyCommand(state, action, payload = {}, actor = null) {
           phase: 'exploitation',
           technique: cwe.join(', '),
           commands: steps.join('\n'),
-          scripts: pocScript || undefined,
-          request,
-          response,
+          scripts:
+            testClass === 'program' ? script : pocScript || undefined,
+          request: testClass === 'program' ? script : request,
+          response: testClass === 'program' ? scriptResponse : response,
           chain: testedRuledOut.length > 0 ? `tested / ruled out:\n${testedRuledOut.join('\n')}` : undefined,
           lessons: impact,
           template: remediation.join('\n'),
@@ -2670,8 +2706,11 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         cvss,
         severity,
         steps,
+        testClass,
         request,
         response,
+        script: testClass === 'program' ? script : undefined,
+        scriptResponse: testClass === 'program' ? scriptResponse : undefined,
         proof: proof || undefined,
         pocScript: pocScript || undefined,
         attackerValue,

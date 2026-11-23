@@ -112,6 +112,7 @@ export default function AdminPanel({
   const [auditPhaseFilter, setAuditPhaseFilter] = useState('all');
   const [duelTaskDrafts, setDuelTaskDrafts] = useState<Record<string, string>>({});
   const [duelEditing, setDuelEditing] = useState(false);
+  const [newTaskDraft, setNewTaskDraft] = useState('');
   const [duelTaskBusy, setDuelTaskBusy] = useState('');
   const [duelTaskNotice, setDuelTaskNotice] = useState('');
   const [duelTaskError, setDuelTaskError] = useState('');
@@ -1049,7 +1050,44 @@ export default function AdminPanel({
           </section>
 
           <section className={`space-y-3 ${adminTab === 'duels' ? '' : 'hidden'}`}>
-            <h2 className="text-base uppercase tracking-wider text-[#71717a]">duel task</h2>
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">set duel task</h2>
+            <div className="space-y-2">
+              <textarea
+                rows={10}
+                value={newTaskDraft}
+                onChange={(event) => setNewTaskDraft(event.target.value)}
+                placeholder="type the duel task to set..."
+                className="w-full min-h-[260px] bg-[#050506] border border-[#2a2a30] px-3 py-2.5 text-[17px] leading-relaxed text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
+              />
+              <button
+                type="button"
+                disabled={duelTaskBusy === 'new'}
+                onClick={() => {
+                  setDuelTaskBusy('new');
+                  setDuelTaskNotice('');
+                  setDuelTaskError('');
+                  void onSetDuelTask('', newTaskDraft).then((result) => {
+                    setDuelTaskBusy('');
+                    if (!result.ok) {
+                      setDuelTaskError(result.error || 'could not set duel task');
+                      return;
+                    }
+                    setNewTaskDraft('');
+                    setDuelEditing(false);
+                    setDuelTaskNotice('duel task set - duelists notified');
+                  });
+                }}
+                className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+              >
+                {duelTaskBusy === 'new' ? 'saving…' : 'set task'}
+              </button>
+              {duelTaskNotice && <div className="text-[14px] text-[#4ade80]">{duelTaskNotice}</div>}
+              {duelTaskError && <div className="text-[14px] text-[#f87171]">{duelTaskError}</div>}
+            </div>
+
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
+              duel task set by admin
+            </h2>
             {(() => {
               const activeTask = snapshot.duelTask?.text ?? '';
               const draft = duelTaskDrafts[GLOBAL_DUEL] ?? activeTask;
@@ -1069,7 +1107,7 @@ export default function AdminPanel({
                     delete next[GLOBAL_DUEL];
                     return next;
                   });
-                  setDuelTaskNotice('duel task saved - duelists notified');
+                  setDuelTaskNotice('duel task updated - duelists notified');
                 });
               };
               return (
@@ -1117,12 +1155,6 @@ export default function AdminPanel({
                       </button>
                     )}
                   </div>
-                  {duelTaskNotice && (
-                    <div className="text-[14px] text-[#4ade80]">{duelTaskNotice}</div>
-                  )}
-                  {duelTaskError && (
-                    <div className="text-[14px] text-[#f87171]">{duelTaskError}</div>
-                  )}
                 </div>
               );
             })()}

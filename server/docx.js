@@ -141,11 +141,22 @@ export function buildReportDocx(report) {
     paragraph(report.cvss, { code: true }),
     heading('Steps to reproduce'),
     lines(report.steps.map((step, index) => `${index + 1}. ${step}`)),
-    heading('Request'),
-    lines(report.request, { code: true }),
-    heading('Response'),
-    lines(report.response, { code: true }),
   ];
+  if (report.testClass === 'program') {
+    if (report.script) {
+      body.push(heading('Testing script'), lines(report.script, { code: true }));
+    }
+    if (report.scriptResponse) {
+      body.push(heading('Script response'), lines(report.scriptResponse, { code: true }));
+    }
+  } else {
+    if (report.request) {
+      body.push(heading('Request'), lines(report.request, { code: true }));
+    }
+    if (report.response) {
+      body.push(heading('Response'), lines(report.response, { code: true }));
+    }
+  }
 
   if (report.proof) {
     body.push(heading('Proof'));
