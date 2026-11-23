@@ -1110,6 +1110,25 @@ export default function AdminPanel({
                   setDuelTaskNotice('duel task updated - duelists notified');
                 });
               };
+              const unsetTask = () => {
+                setDuelTaskBusy(GLOBAL_DUEL);
+                setDuelTaskNotice('');
+                setDuelTaskError('');
+                void onSetDuelTask('', '').then((result) => {
+                  setDuelTaskBusy('');
+                  if (!result.ok) {
+                    setDuelTaskError(result.error || 'could not unset duel task');
+                    return;
+                  }
+                  setDuelEditing(false);
+                  setDuelTaskDrafts((current) => {
+                    const next = { ...current };
+                    delete next[GLOBAL_DUEL];
+                    return next;
+                  });
+                  setDuelTaskNotice('duel task unset - duelists notified');
+                });
+              };
               return (
                 <div className="space-y-2">
                   <textarea
@@ -1128,22 +1147,32 @@ export default function AdminPanel({
                     }`}
                   />
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      disabled={duelEditing}
-                      onClick={() => {
-                        setDuelTaskDrafts((current) => ({
-                          ...current,
-                          [GLOBAL_DUEL]: activeTask,
-                        }));
-                        setDuelEditing(true);
-                        setDuelTaskNotice('');
-                        setDuelTaskError('');
-                      }}
-                      className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
-                    >
-                      edit
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={duelEditing}
+                        onClick={() => {
+                          setDuelTaskDrafts((current) => ({
+                            ...current,
+                            [GLOBAL_DUEL]: activeTask,
+                          }));
+                          setDuelEditing(true);
+                          setDuelTaskNotice('');
+                          setDuelTaskError('');
+                        }}
+                        className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                      >
+                        edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={duelEditing || duelTaskBusy === GLOBAL_DUEL || !activeTask}
+                        onClick={() => unsetTask()}
+                        className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#71717a] hover:text-[#f87171] disabled:opacity-40"
+                      >
+                        unset task
+                      </button>
+                    </div>
                     {duelEditing && (
                       <button
                         type="button"
