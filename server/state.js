@@ -983,6 +983,28 @@ function validateHandle(nick) {
 // Commands: UI -> API -> this function -> central DB -> API -> UI
 // ============================================================================
 
+function activeFocusChannel(state) {
+  if (!state.focus?.channelId) return null;
+  if (new Date(state.focus.endsAt).getTime() <= Date.now()) return null;
+  return state.focus.channelId;
+}
+
+// While a focus is active, agents must do engagement work in that focus group.
+// Chat in #lobby remains available; admin and the focus channel are exempt.
+function assertFocusWork(state, channel, nick) {
+  const focusId = activeFocusChannel(state);
+  if (!focusId) return;
+  const handle = normalizeHandle(nick);
+  if (handle === 'admin') return;
+  if (channel.id === focusId || channel.id === '#lobby') return;
+  throw new ApiError(
+    403,
+    `focus is mandatory - work ${focusId} until ${new Date(state.focus.endsAt)
+      .toISOString()
+      .slice(0, 10)}`
+  );
+}
+
 function setActiveBuffer(state, actor, buffer) {
   const viewer = actor ? normalizeHandle(actor) : null;
   if (viewer) {
@@ -1866,6 +1888,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
       assertDuelWriteAccess(state, channel, contributor);
+      assertFocusWork(state, channel, contributor);
       const intel = parseIntel(payload.intel);
       requireNodeIntel(intel, 'create');
       const graph =
@@ -1910,6 +1933,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
       assertDuelWriteAccess(state, channel, contributor);
+      assertFocusWork(state, channel, contributor);
       const graph =
         state.graphs[channel.id] ||
         (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
@@ -1968,6 +1992,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
       assertDuelWriteAccess(state, channel, contributor);
+      assertFocusWork(state, channel, contributor);
       assertDuelOwnership(state, channel, contributor, node.createdBy);
       const before = JSON.stringify({
         label: node.label,
@@ -2037,6 +2062,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      assertFocusWork(state, channel, contributor);
       assertDuelOwnership(
         state,
         channel,
@@ -2106,6 +2132,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const remover = normalizeHandle(actor);
       requireAgent(state, remover);
       assertDuelWriteAccess(state, channel, remover);
+      assertFocusWork(state, channel, remover);
       assertDuelOwnership(state, channel, remover, node.createdBy);
       appendChannelMessage(state, channel.id, {
         type: 'sys',
@@ -2374,6 +2401,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const author = normalizeHandle(actor);
       requireEnrolled(state, author, channel);
       assertDuelWriteAccess(state, channel, author);
+      assertFocusWork(state, channel, author);
       const text = limitText(payload.text, 4000, 'progress text').trim();
       if (!text) throw new ApiError(400, 'progress text required');
       if (text.length < 20) {
@@ -2413,6 +2441,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const viewer = normalizeHandle(actor);
       const viewerAgent = requireEnrolled(state, viewer, channel);
       assertDuelWriteAccess(state, channel, viewer);
+      assertFocusWork(state, channel, viewer);
       const health = auditProgressLog(state, channel.id, viewerAgent.nick);
       const passed = health.checks.filter((check) => check.ok).length;
       const entry = appendProgressEntry(state, channel.id, {
@@ -2430,6 +2459,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const author = normalizeHandle(actor);
       requireEnrolled(state, author, channel);
       assertDuelWriteAccess(state, channel, author);
+      assertFocusWork(state, channel, author);
       const message = String(payload.message ?? '').trim();
       if (!message) throw new ApiError(400, 'commit message required');
       if (message.length < 10) {
@@ -2475,6 +2505,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const viewer = normalizeHandle(actor);
       const viewerAgent = requireEnrolled(state, viewer, channel);
       assertDuelWriteAccess(state, channel, viewer);
+      assertFocusWork(state, channel, viewer);
 
       // Session protocol: check the working IRC chat, read recent progress
       // notes/commits, then run the health/smoke check before new work.

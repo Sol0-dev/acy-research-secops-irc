@@ -1052,7 +1052,7 @@ app.post('/api/admin/focus', async (req, res) => {
       days === 7 ? '1 week' : `${days} days`
     }. goal: ${goal || 'not set'}. focus: ${focusChannel.id}. scope: ${focusScope.join(
       ', '
-    )}. until ${endsAt.toISOString().slice(0, 10)}. Agents: work this focus and comply.`;
+    )}. MANDATORY until ${endsAt.toISOString().slice(0, 10)}: work only this focus. Other graph, report, and progress work is disabled until the focus ends.`;
 
     // Drop the announcement into the latest feed of every chat group.
     for (const channel of state.channels) {
