@@ -170,47 +170,81 @@ export default function GraphView({
     return () => observer.disconnect();
   }, []);
 
-  // Obsidian-style force graph. Nodes spawn at the centre, repel each other,
-  // link along their edges, and settle into a slowly breathing cloud.
+  // Obsidian-style force graph. Nodes spawn at the centre, repel nearby
+  // neighbours in a spatial grid, link along their edges, and settle into a
+  // slowly breathing cloud. Simulation and rendering are throttled so large
+  // graphs cannot saturate the host.
   useEffect(() => {
     let frame = 0;
     let time = 0;
-    let frameCount = 0;
-    const animate = () => {
-      time += 16;
-      frameCount += 1;
+    let lastSim = 0;
+    let lastRender = 0;
+
+    const animate = (timestamp: number) => {
+      frame = requestAnimationFrame(animate);
+      if (document.hidden) return;
+
       const bodies = bodiesRef.current;
       const list = nodes
         .map((node) => ({ node, body: bodies.get(node.id) }))
         .filter((entry): entry is { node: GraphNode; body: Body } => Boolean(entry.body));
+      if (list.length === 0) return;
+
+      const density = list.length;
+      const simInterval = density > 400 ? 100 : density > 200 ? 50 : 33;
+      const renderInterval = density > 400 ? 200 : density > 200 ? 100 : 50;
+      if (timestamp - lastSim < simInterval) return;
+      time += simInterval;
+      lastSim = timestamp;
+
+      // Spatial grid: only nodes in the same or adjacent cell repel. This keeps
+      // the per-frame work near linear instead of comparing every pair.
+      const cellSize = 180;
+      const grid = new Map<string, number[]>();
+      for (let index = 0; index < list.length; index += 1) {
+        const body = list[index].body;
+        const cell = `${Math.floor(body.x / cellSize)},${Math.floor(body.y / cellSize)}`;
+        const bucket = grid.get(cell);
+        if (bucket) bucket.push(index);
+        else grid.set(cell, [index]);
+      }
 
       for (let i = 0; i < list.length; i += 1) {
-        for (let j = i + 1; j < list.length; j += 1) {
-          const a = list[i].body;
-          const b = list[j].body;
-          let dx = b.x - a.x;
-          let dy = b.y - a.y;
-          let d2 = dx * dx + dy * dy;
-          if (d2 < 0.01) {
-            dx = Math.sin(hashString(list[i].node.id) + j) * 2;
-            dy = Math.cos(hashString(list[j].node.id) + i) * 2;
-            d2 = dx * dx + dy * dy;
-          }
-          const d = Math.sqrt(d2) || 1;
-          const repel = Math.min(18, 5200 / Math.max(d2, 30));
-          const fx = (dx / d) * repel;
-          const fy = (dy / d) * repel;
-          a.vx -= fx;
-          a.vy -= fy;
-          b.vx += fx;
-          b.vy += fy;
-          const minD = RADIUS * 2 + 14;
-          if (d < minD) {
-            const push = (minD - d) * 0.06;
-            a.vx -= (dx / d) * push;
-            a.vy -= (dy / d) * push;
-            b.vx += (dx / d) * push;
-            b.vy += (dy / d) * push;
+        const a = list[i].body;
+        const gx = Math.floor(a.x / cellSize);
+        const gy = Math.floor(a.y / cellSize);
+        for (let ox = -1; ox <= 1; ox += 1) {
+          for (let oy = -1; oy <= 1; oy += 1) {
+            const bucket = grid.get(`${gx + ox},${gy + oy}`);
+            if (!bucket) continue;
+            for (const j of bucket) {
+              if (j <= i) continue;
+              const b = list[j].body;
+              let dx = b.x - a.x;
+              let dy = b.y - a.y;
+              let d2 = dx * dx + dy * dy;
+              if (d2 < 0.01) {
+                dx = Math.sin(hashString(list[i].node.id) + j) * 2;
+                dy = Math.cos(hashString(list[j].node.id) + i) * 2;
+                d2 = dx * dx + dy * dy;
+              }
+              const d = Math.sqrt(d2) || 1;
+              const repel = Math.min(18, 5200 / Math.max(d2, 30));
+              const fx = (dx / d) * repel;
+              const fy = (dy / d) * repel;
+              a.vx -= fx;
+              a.vy -= fy;
+              b.vx += fx;
+              b.vy += fy;
+              const minD = RADIUS * 2 + 14;
+              if (d < minD) {
+                const push = (minD - d) * 0.06;
+                a.vx -= (dx / d) * push;
+                a.vy -= (dy / d) * push;
+                b.vx += (dx / d) * push;
+                b.vy += (dy / d) * push;
+              }
+            }
           }
         }
       }
@@ -250,9 +284,12 @@ export default function GraphView({
         body.alpha = Math.min(1, body.alpha + 0.035);
       }
 
-      if (frameCount % 2 === 0) setTick((value) => value + 1);
-      frame = requestAnimationFrame(animate);
+      if (timestamp - lastRender >= renderInterval) {
+        lastRender = timestamp;
+        setTick((value) => value + 1);
+      }
     };
+
     frame = requestAnimationFrame(animate);
     return () => {
       if (frame) cancelAnimationFrame(frame);
