@@ -135,6 +135,19 @@ export const api = {
       }
     );
   },
+  adminCompleteGoal(
+    token: string,
+    note?: string
+  ): Promise<{ ok: boolean; goal: string; version: number }> {
+    return request<{ ok: boolean; goal: string; version: number }>(
+      '/api/admin/goal/complete',
+      {
+        method: 'POST',
+        headers: { 'x-secops-admin': token },
+        body: JSON.stringify({ note }),
+      }
+    );
+  },
   adminSetDuelTask(
     token: string,
     input: { duelId: string; task: string }

@@ -454,6 +454,8 @@ export interface GoalHistoryEntry {
   paused?: boolean;
   remainingMs?: number;
   pausedAt?: string;
+  completedAt?: string;
+  completionNote?: string;
   createdAt?: string;
   createdBy?: string;
 }

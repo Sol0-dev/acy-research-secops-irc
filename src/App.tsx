@@ -660,6 +660,25 @@ export default function App() {
     }
   };
 
+  const completeAdminGoal = async (note?: string) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminCompleteGoal(adminToken, note);
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not complete goal',
+      };
+    }
+  };
+
   const setAdminDuelTask = async (duelId: string, task: string) => {
     if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
@@ -4096,6 +4115,7 @@ export default function App() {
         onSetFocus={setAdminFocus}
         onSetDuelTask={setAdminDuelTask}
         onContinueGoal={continueAdminGoal}
+        onCompleteGoal={completeAdminGoal}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}

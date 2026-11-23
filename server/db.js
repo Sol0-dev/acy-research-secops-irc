@@ -96,7 +96,7 @@ export async function initDb() {
     ? state.goalHistory.length
     : 0;
   ensureGoalHistory(state);
-  if (state.goalHistory.length > historyBefore) {
+  if (state.goalHistory.length !== historyBefore) {
     const nextVersion = version + 1;
     await pool.query(
       'UPDATE irc_workspace SET state = ?, version = ? WHERE id = 1',

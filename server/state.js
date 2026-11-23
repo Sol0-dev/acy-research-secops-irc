@@ -389,7 +389,7 @@ const KNOWLEDGE_AUTH_RE = /\bAuthorization\s*:\s*(Bearer\s+)?[^\s,;"']+/gi;
 const KNOWLEDGE_CREDENTIAL_RE =
   /\b(password|passwd|pwd|token|api[_-]?key|apikey|secret)\b(\s*[:=]\s*)([^\s,;"']+)/gi;
 
-function redactGoalSecrets(value) {
+export function redactGoalSecrets(value) {
   let text = String(value ?? '');
   text = text.replace(
     /\b(password|passphrase|passwd|pwd|pass|secret|token|api[_-]?key|apikey|authorization)\b\s*[:=]\s*[^\s,;]+/gi,
@@ -1115,6 +1115,37 @@ export function ensureGoalHistory(state) {
         entry.goal === state.focus.goal
     );
   }
+  // Keep one entry per group and goal text. Repeated saves of the same goal
+  // must not stack duplicate timer cards; the newest active or completed entry
+  // wins, otherwise the newest stopped entry is kept.
+  const rank = (entry) => (entry.active ? 3 : entry.completedAt ? 2 : 1);
+  const latest = (left, right) =>
+    new Date(
+      right.completedAt ?? right.endsAt ?? right.createdAt ?? 0
+    ).getTime() -
+    new Date(left.completedAt ?? left.endsAt ?? left.createdAt ?? 0).getTime();
+  const byGoal = new Map();
+  for (const entry of state.goalHistory) {
+    const key = `${entry.channelId ?? ''}::${String(entry.goal ?? '').trim()}`;
+    const current = byGoal.get(key);
+    if (!current) {
+      byGoal.set(key, entry);
+      continue;
+    }
+    const currentRank = rank(current);
+    const entryRank = rank(entry);
+    if (
+      entryRank > currentRank ||
+      (entryRank === currentRank && latest(current, entry) > 0)
+    ) {
+      byGoal.set(key, entry);
+    }
+  }
+  state.goalHistory = [...byGoal.values()].sort(
+    (left, right) =>
+      new Date(left.startsAt ?? left.createdAt ?? 0).getTime() -
+      new Date(right.startsAt ?? right.createdAt ?? 0).getTime()
+  );
   return state.goalHistory;
 }
 

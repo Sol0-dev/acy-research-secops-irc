@@ -27,6 +27,7 @@ interface AdminPanelProps {
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetDuelTask: (duelId: string, task: string) => Promise<{ ok: boolean; error?: string }>;
   onContinueGoal: (goalId: string) => Promise<{ ok: boolean; error?: string }>;
+  onCompleteGoal: (note?: string) => Promise<{ ok: boolean; error?: string }>;
   onOpenAgentPortal: () => void;
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
@@ -78,6 +79,7 @@ export default function AdminPanel({
   onSetFocus,
   onSetDuelTask,
   onContinueGoal,
+  onCompleteGoal,
   onOpenAgentPortal,
   onDeleteGraph,
   onDeleteChannel,
@@ -95,6 +97,10 @@ export default function AdminPanel({
   const [goalContinueBusy, setGoalContinueBusy] = useState('');
   const [goalContinueNotice, setGoalContinueNotice] = useState('');
   const [goalContinueError, setGoalContinueError] = useState('');
+  const [goalCompleteNote, setGoalCompleteNote] = useState('');
+  const [goalCompleteBusy, setGoalCompleteBusy] = useState(false);
+  const [goalCompleteNotice, setGoalCompleteNotice] = useState('');
+  const [goalCompleteError, setGoalCompleteError] = useState('');
   const [goalBusy, setGoalBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState('');
   const [confirmAccountDelete, setConfirmAccountDelete] = useState<string | null>(null);
@@ -307,6 +313,121 @@ export default function AdminPanel({
         })
     : [];
 
+  const goalEntries = snapshot?.goalHistory ?? [];
+  const activeGoals = goalEntries.filter((entry) => entry.active);
+  const completedGoals = goalEntries
+    .filter((entry) => entry.completedAt)
+    .sort(
+      (left, right) =>
+        new Date(right.completedAt ?? 0).getTime() -
+        new Date(left.completedAt ?? 0).getTime()
+    );
+  const primaryGoals = [...activeGoals, ...completedGoals.slice(0, 1)];
+  const primaryIds = new Set(primaryGoals.map((entry) => entry.id));
+  const olderGoals = goalEntries
+    .filter((entry) => !primaryIds.has(entry.id))
+    .sort(
+      (left, right) =>
+        new Date(right.startsAt ?? right.createdAt ?? 0).getTime() -
+        new Date(left.startsAt ?? left.createdAt ?? 0).getTime()
+    );
+
+  const renderGoalEntry = (entry: (typeof goalEntries)[number]) => (
+    <div
+      key={entry.id}
+      className="border border-[#2a2a30] bg-[#09090b] p-2.5 space-y-1.5"
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px]">
+        <span
+          className={`uppercase tracking-wider ${
+            entry.completedAt
+              ? 'text-[#a1a1aa]'
+              : entry.active
+                ? 'text-[#4ade80]'
+                : 'text-[#71717a]'
+          }`}
+        >
+          {entry.completedAt
+            ? 'completed'
+            : entry.active
+              ? 'active'
+              : 'inactive'}
+        </span>
+        <span className="text-[#d4d4d8]">
+          {entry.channelId || 'no focus group'}
+        </span>
+        {entry.completedAt ? (
+          <span className="text-[#71717a]">
+            completed {new Date(entry.completedAt).toLocaleString()}
+          </span>
+        ) : entry.active ? (
+          <>
+            <span className="text-[#71717a]">
+              timer <Countdown endsAt={entry.endsAt} />
+            </span>
+            <span className="text-[#71717a]">
+              ends {new Date(entry.endsAt).toLocaleString()}
+            </span>
+          </>
+        ) : (
+          <span className="text-[#71717a]">
+            timer stopped · not enforcing
+          </span>
+        )}
+      </div>
+      <div className="text-[14px] text-[#a1a1aa] whitespace-pre-wrap break-words">
+        {entry.goal}
+      </div>
+      {entry.completionNote && (
+        <div className="text-[13px] text-[#71717a] whitespace-pre-wrap break-words">
+          completion note: {entry.completionNote}
+        </div>
+      )}
+      {!entry.active && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={goalContinueBusy === entry.id}
+            onClick={() => {
+              setGoalContinueBusy(entry.id);
+              setGoalContinueNotice('');
+              setGoalContinueError('');
+              void onContinueGoal(entry.id).then((result) => {
+                setGoalContinueBusy('');
+                if (!result.ok) {
+                  setGoalContinueError(
+                    result.error || 'could not continue goal'
+                  );
+                  return;
+                }
+                setGoalContinueNotice(
+                  `7-day timer restored for ${entry.channelId}`
+                );
+              });
+            }}
+            className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+          >
+            {goalContinueBusy === entry.id
+              ? 'restoring…'
+              : entry.completedAt
+                ? 'restart 7-day goal'
+                : 'bring back 7-day timer'}
+          </button>
+          {goalContinueNotice && (
+            <span className="text-[13px] text-[#4ade80]">
+              {goalContinueNotice}
+            </span>
+          )}
+          {goalContinueError && (
+            <span className="text-[13px] text-[#f87171]">
+              {goalContinueError}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[60] bg-[#050506] text-[#f4f4f5] font-mono text-lg flex flex-col">
       <header className="border-b border-[#2a2a30] px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shrink-0">
@@ -469,6 +590,13 @@ export default function AdminPanel({
                 'no focus set'
               )}
             </div>
+            <input
+              type="text"
+              value={goalCompleteNote}
+              onChange={(event) => setGoalCompleteNote(event.target.value)}
+              placeholder="optional completion note for the agents"
+              className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[15px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
+            />
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={focusChannelId}
@@ -543,8 +671,51 @@ export default function AdminPanel({
               >
                 unset focus
               </button>
+              <button
+                type="button"
+                disabled={
+                  focusBusy ||
+                  goalCompleteBusy ||
+                  (!snapshot.focus && !snapshot.goal.trim())
+                }
+                onClick={() => {
+                  const goal = snapshot.focus?.goal || snapshot.goal || 'the active goal';
+                  if (
+                    !window.confirm(
+                      `Mark this goal completed and stop the focus timer?\n\n${goal}`
+                    )
+                  ) {
+                    return;
+                  }
+                  setGoalCompleteBusy(true);
+                  setGoalCompleteNotice('');
+                  setGoalCompleteError('');
+                  void onCompleteGoal(goalCompleteNote.trim()).then((result) => {
+                    setGoalCompleteBusy(false);
+                    if (!result.ok) {
+                      setGoalCompleteError(
+                        result.error || 'could not complete the goal'
+                      );
+                      return;
+                    }
+                    setGoalCompleteNote('');
+                    setGoalCompleteNotice(
+                      'goal completed · focus timer stopped · all agents notified'
+                    );
+                  });
+                }}
+                className="px-3 py-1.5 border border-[#4ade80]/50 text-base text-[#4ade80] hover:bg-[#4ade80]/10 disabled:opacity-40"
+              >
+                {goalCompleteBusy ? 'completing…' : 'complete goal'}
+              </button>
               {focusNotice && <span className="text-base text-[#4ade80]">{focusNotice}</span>}
               {focusError && <span className="text-base text-[#f87171]">{focusError}</span>}
+              {goalCompleteNotice && (
+                <span className="text-base text-[#4ade80]">{goalCompleteNotice}</span>
+              )}
+              {goalCompleteError && (
+                <span className="text-base text-[#f87171]">{goalCompleteError}</span>
+              )}
             </div>
             <div className="text-[15px] text-[#52525b]">
               create new focus group uses links in the goal as the scope and a short part of the
@@ -556,80 +727,25 @@ export default function AdminPanel({
             <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               goal timers - server side 7 days per goal
             </h2>
-            {(snapshot.goalHistory ?? []).length === 0 ? (
-              <div className="text-[15px] text-[#71717a]">no goals recorded yet</div>
+            {primaryGoals.length === 0 ? (
+              <div className="text-[15px] text-[#71717a]">
+                no active goal · the previous goal is not enforcing a timer
+              </div>
             ) : (
               <div className="space-y-2">
-                {(snapshot.goalHistory ?? [])
-                  .slice()
-                  .reverse()
-                  .map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="border border-[#2a2a30] bg-[#09090b] p-2.5 space-y-1.5"
-                    >
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px]">
-                        <span
-                          className={`uppercase tracking-wider ${
-                            entry.active ? 'text-[#4ade80]' : 'text-[#71717a]'
-                          }`}
-                        >
-                          {entry.active ? 'active' : 'inactive'}
-                        </span>
-                        <span className="text-[#d4d4d8]">{entry.channelId}</span>
-                        <span className="text-[#71717a]">
-                          timer <Countdown
-                            endsAt={entry.endsAt}
-                          />
-                        </span>
-                        <span className="text-[#71717a]">
-                          ends {new Date(entry.endsAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="text-[14px] text-[#a1a1aa] whitespace-pre-wrap break-words">
-                        {entry.goal}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={goalContinueBusy === entry.id}
-                          onClick={() => {
-                            setGoalContinueBusy(entry.id);
-                            setGoalContinueNotice('');
-                            setGoalContinueError('');
-                            void onContinueGoal(entry.id).then((result) => {
-                              setGoalContinueBusy('');
-                              if (!result.ok) {
-                                setGoalContinueError(
-                                  result.error || 'could not continue goal'
-                                );
-                                return;
-                              }
-                              setGoalContinueNotice(
-                                `7-day timer restored for ${entry.channelId}`
-                              );
-                            });
-                          }}
-                          className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
-                        >
-                          {goalContinueBusy === entry.id
-                            ? 'restoring…'
-                            : 'bring back 7-day timer'}
-                        </button>
-                        {goalContinueNotice && (
-                          <span className="text-[13px] text-[#4ade80]">
-                            {goalContinueNotice}
-                          </span>
-                        )}
-                        {goalContinueError && (
-                          <span className="text-[13px] text-[#f87171]">
-                            {goalContinueError}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                {primaryGoals.map((entry) => renderGoalEntry(entry))}
               </div>
+            )}
+            {olderGoals.length > 0 && (
+              <details className="border border-[#2a2a30] bg-[#09090b]">
+                <summary className="cursor-pointer px-2.5 py-2 text-[14px] text-[#71717a] hover:text-[#d4d4d8]">
+                  older goal history ({olderGoals.length}) · stopped timers, not
+                  enforcing
+                </summary>
+                <div className="space-y-2 px-2.5 pb-2.5">
+                  {olderGoals.map((entry) => renderGoalEntry(entry))}
+                </div>
+              </details>
             )}
           </section>
 

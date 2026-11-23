@@ -19,6 +19,7 @@ import {
   applyCommand,
   ensureGoalHistory,
   normalizeHandle,
+  redactGoalSecrets,
   reportContributors,
   toPublicState,
   ApiError,
@@ -495,6 +496,15 @@ function recordGoal(state, { goal, focusResult }) {
   entry.endsAt = focusResult.focus.endsAt;
   entry.days = focusResult.focus.days;
   entry.active = true;
+  if (entry.completedAt) delete entry.completedAt;
+  if (entry.completionNote) delete entry.completionNote;
+  // Reopening a goal reuses its entry instead of creating a second timer card.
+  state.goalHistory = state.goalHistory.filter(
+    (item) =>
+      item === entry ||
+      item.channelId !== entry.channelId ||
+      String(item.goal ?? '').trim() !== String(entry.goal ?? '').trim()
+  );
   state.goalHistory = state.goalHistory.slice(-50);
   return entry;
 }
@@ -569,6 +579,95 @@ app.post('/api/admin/goal/continue', async (req, res) => {
       channelId: focusResult.channelId,
       version,
     });
+  } catch (error) {
+    return res.status(error.status ?? 500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/goal/complete', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const note = String(req.body?.note ?? '').trim();
+  try {
+    const state = structuredClone(getState());
+    const focus = state.focus;
+    const goal = focus?.goal || state.docsGoal || '';
+    const focusChannelId = focus?.channelId ?? '';
+    if (!goal && !focusChannelId) {
+      return res.status(400).json({ error: 'no active goal to complete' });
+    }
+    const completedAt = new Date().toISOString();
+    state.focus = null;
+    state.docsGoal = '';
+    const history = Array.isArray(state.goalHistory) ? state.goalHistory : [];
+    for (const item of history) item.active = false;
+    const exactMatches = history.filter(
+      (item) =>
+        goal &&
+        item.goal === goal &&
+        (!focusChannelId || item.channelId === focusChannelId)
+    );
+    const goalMatches = history.filter((item) => goal && item.goal === goal);
+    const channelMatches = history.filter(
+      (item) => focusChannelId && item.channelId === focusChannelId
+    );
+    let entry =
+      exactMatches[exactMatches.length - 1] ??
+      goalMatches[goalMatches.length - 1] ??
+      channelMatches[channelMatches.length - 1] ??
+      null;
+    if (!entry && goal) {
+      entry = {
+        id: `gl-${crypto.randomBytes(6).toString('hex')}`,
+        goal,
+        channelId: focusChannelId,
+        startsAt: focus?.startsAt ?? completedAt,
+        endsAt: focus?.endsAt ?? completedAt,
+        days: focus?.days ?? 7,
+        active: false,
+        createdAt: focus?.startsAt ?? completedAt,
+        createdBy: 'admin',
+      };
+      history.push(entry);
+      state.goalHistory = history.slice(-50);
+    }
+    if (entry) {
+      entry.active = false;
+      entry.completedAt = completedAt;
+      entry.completionNote = note || undefined;
+    }
+    const mentions = Object.values(state.agents)
+      .filter((agent) => agent.nick !== 'admin')
+      .map((agent) => `@${agent.nick}`)
+      .join(' ');
+    const time = new Date().toTimeString().slice(0, 5);
+    const publicGoal = redactGoalSecrets(goal || 'the active goal');
+    const publicNote = note ? redactGoalSecrets(note) : '';
+    const text = `${mentions}${mentions ? ' ' : ''}admin marked the goal completed: ${publicGoal}. Thank you for the work. The focus requirement and goal timer are stopped. Graphs, knowledge, tools, progress, accounts, and reports are kept.${
+      publicNote ? ` note: ${publicNote}` : ''
+    }`;
+    for (const channel of state.channels) {
+      const kept = (channel.messages ?? []).filter(
+        (message) => !message.goalCompleteNotice
+      );
+      channel.messages = [
+        ...kept.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text,
+          goalCompleteNotice: true,
+        },
+      ];
+      channel.unread = true;
+    }
+    const version = await persistState(state, 'admin.goal.complete', 'admin', {
+      goal,
+      note,
+    });
+    return res.json({ ok: true, goal, completedAt, version });
   } catch (error) {
     return res.status(error.status ?? 500).json({ error: error.message });
   }
