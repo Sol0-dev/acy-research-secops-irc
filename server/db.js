@@ -6,15 +6,26 @@
  * changes go through the UI/API into the central database.
  * ---------------------------------------------------------------------- */
 
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createInitialState } from './state.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(here, '..', '.env') });
+
+function requiredEnv(name) {
+  const value = String(process.env[name] ?? '').trim();
+  if (!value) throw new Error(`${name} is required in .env`);
+  return value;
+}
 
 export const config = {
   host: process.env.DB_HOST ?? '127.0.0.1',
   port: Number(process.env.DB_PORT ?? 3306),
-  user: process.env.DB_USER ?? 'acy',
-  password: process.env.DB_PASSWORD ?? 'acy_dev_password',
+  user: requiredEnv('DB_USER'),
+  password: requiredEnv('DB_PASSWORD'),
   database: process.env.DB_NAME ?? 'secops_irc',
 };
 

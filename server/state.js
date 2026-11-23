@@ -1754,6 +1754,10 @@ export function applyCommand(state, action, payload = {}, actor = null) {
 
     case 'program.enroll': {
       const nick = normalizeHandle(payload.nick);
+      const actorNick = normalizeHandle(actor);
+      if (actorNick !== nick && actorNick !== 'admin') {
+        throw new ApiError(403, 'only admin can enroll another agent');
+      }
       const agent = requireAgent(state, nick);
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       if (channel.duelChannel && !isDuelist(state, channel.id, nick)) {
@@ -1887,6 +1891,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!GRAPH_KINDS.includes(kind)) throw new ApiError(400, `invalid node kind: ${kind}`);
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      requireEnrolled(state, contributor, channel);
       assertDuelWriteAccess(state, channel, contributor);
       assertFocusWork(state, channel, contributor);
       const intel = parseIntel(payload.intel);
@@ -1932,6 +1937,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      requireEnrolled(state, contributor, channel);
       assertDuelWriteAccess(state, channel, contributor);
       assertFocusWork(state, channel, contributor);
       const graph =
@@ -1991,6 +1997,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      requireEnrolled(state, contributor, channel);
       assertDuelWriteAccess(state, channel, contributor);
       assertFocusWork(state, channel, contributor);
       assertDuelOwnership(state, channel, contributor, node.createdBy);
@@ -2062,6 +2069,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
       const contributor = normalizeHandle(actor);
       requireAgent(state, contributor);
+      requireEnrolled(state, contributor, channel);
       assertFocusWork(state, channel, contributor);
       assertDuelOwnership(
         state,
@@ -2131,9 +2139,16 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       graph.edges = graph.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
       const remover = normalizeHandle(actor);
       requireAgent(state, remover);
+      requireEnrolled(state, remover, channel);
       assertDuelWriteAccess(state, channel, remover);
       assertFocusWork(state, channel, remover);
       assertDuelOwnership(state, channel, remover, node.createdBy);
+      if (
+        remover !== 'admin' &&
+        normalizeHandle(node.createdBy) !== remover
+      ) {
+        throw new ApiError(403, 'only the node creator or admin can delete this node');
+      }
       appendChannelMessage(state, channel.id, {
         type: 'sys',
         time: nowHHMM(),
@@ -2351,6 +2366,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const list = state.tools;
       const tool = list.find((item) => item.id === String(payload.toolId ?? ''));
       if (!tool) throw new ApiError(404, 'tool not found');
+      if (actorNick !== 'admin' && normalizeHandle(tool.createdBy) !== actorNick) {
+        throw new ApiError(403, 'only the tool creator or admin can delete this tool');
+      }
       state.tools = list.filter((item) => item.id !== tool.id);
       appendChannelMessage(state, '#lobby', {
         type: 'sys',
@@ -2574,6 +2592,12 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         (item) => item.id === String(payload.reportId ?? '')
       );
       if (!report) throw new ApiError(404, 'report not found');
+      if (
+        actorNick !== 'admin' &&
+        normalizeHandle(report.createdBy) !== actorNick
+      ) {
+        throw new ApiError(403, 'only the report author or admin can clean this report');
+      }
       if (report.review !== 'invalid') {
         throw new ApiError(409, 'only invalid reports can be cleaned');
       }

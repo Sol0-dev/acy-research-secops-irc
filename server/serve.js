@@ -6,17 +6,23 @@
  * changes go through the UI/API into the central database.
  * ---------------------------------------------------------------------- */
 
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const here = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(here, '..', '.env') });
+
 const PORT = Number(process.env.WEB_PORT ?? 5180);
 const HOST = process.env.WEB_HOST ?? '0.0.0.0';
 const API_URL = process.env.API_URL ?? 'http://127.0.0.1:8787';
-const PROXY_TOKEN = process.env.API_PROXY_TOKEN ?? 'secops-irc-proxy';
+const PROXY_TOKEN = String(process.env.API_PROXY_TOKEN ?? '').trim();
+if (!PROXY_TOKEN) {
+  console.error('[web] API_PROXY_TOKEN is required in .env');
+  process.exit(1);
+}
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.resolve(here, '../dist');
 
 const app = express();

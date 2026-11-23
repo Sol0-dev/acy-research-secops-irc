@@ -6,9 +6,11 @@
  * changes go through the UI/API into the central database.
  * ---------------------------------------------------------------------- */
 
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import crypto from 'node:crypto';
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import jwt from 'jsonwebtoken';
 import { initDb, getState, getVersion, getAudit, persistState, appendAudit, ping } from './db.js';
 import { buildReportDocx, safeFilename } from './docx.js';
@@ -21,27 +23,27 @@ import {
   ApiError,
 } from './state.js';
 
+const here = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(here, '..', '.env') });
+
 const PORT = Number(process.env.PORT ?? 8787);
 // The API stays on loopback. The web server is the only public listener and
 // proxies /api with a server-side token, so agents cannot reach the backend
 // directly.
 const HOST = process.env.API_HOST ?? '127.0.0.1';
-const JWT_SECRET =
-  process.env.JWT_SECRET ??
-  (process.env.NODE_ENV === 'production' ? '' : 'secops-irc-dev-secret-change-me');
+const JWT_SECRET = String(process.env.JWT_SECRET ?? '').trim();
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5180';
-const PROXY_TOKEN =
-  process.env.API_PROXY_TOKEN ??
-  (process.env.NODE_ENV === 'production' ? '' : 'secops-irc-proxy');
-if (!JWT_SECRET || !PROXY_TOKEN) {
-  console.error('[api] JWT_SECRET and API_PROXY_TOKEN are required in production');
-  process.exit(1);
-}
+const PROXY_TOKEN = String(process.env.API_PROXY_TOKEN ?? '').trim();
 const ADMIN_USERNAME = String(process.env.ADMIN_USERNAME ?? 'admin').trim() || 'admin';
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD ?? '').trim();
-const ADMIN_PASSWORD_GENERATED = !ADMIN_PASSWORD;
-const EFFECTIVE_ADMIN_PASSWORD =
-  ADMIN_PASSWORD || crypto.randomBytes(12).toString('base64url');
+if (!JWT_SECRET || !PROXY_TOKEN || !ADMIN_PASSWORD) {
+  console.error(
+    '[api] JWT_SECRET, API_PROXY_TOKEN, and ADMIN_PASSWORD are required in .env'
+  );
+  process.exit(1);
+}
+const ADMIN_PASSWORD_GENERATED = false;
+const EFFECTIVE_ADMIN_PASSWORD = ADMIN_PASSWORD;
 
 function isAdminRequest(req) {
   const provided = String(req.get('x-secops-admin') ?? '').trim();
