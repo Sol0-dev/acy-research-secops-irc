@@ -121,12 +121,7 @@ export default function VotePanel({
   const isAdmin = sessionNick === 'admin';
   const dayTop = leaderboard?.periods.day.rows[0]?.nick ?? null;
   const weekTop = leaderboard?.periods.week.rows[0]?.nick ?? null;
-  const monthTop = leaderboard?.periods.month.rows[0]?.nick ?? null;
-  const canCreate =
-    isAdmin ||
-    dayTop === sessionNick ||
-    weekTop === sessionNick ||
-    monthTop === sessionNick;
+  const canCreate = isAdmin || dayTop === sessionNick || weekTop === sessionNick;
   const myQuota = quotaWatch[sessionNick] ?? null;
   const proposalsList = useMemo(
     () =>
@@ -150,8 +145,7 @@ export default function VotePanel({
   useEffect(() => {
     if (dayTop === sessionNick) setPeriod('day');
     else if (weekTop === sessionNick) setPeriod('week');
-    else if (monthTop === sessionNick) setPeriod('month');
-  }, [dayTop, weekTop, monthTop, sessionNick]);
+  }, [dayTop, weekTop, sessionNick]);
 
   const run = async (key: string, action: () => Promise<{ ok: boolean; error?: string }>) => {
     setBusy(key);
@@ -253,7 +247,7 @@ export default function VotePanel({
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className={topCardClass(dayTop)}>
             <div className="text-[14px] uppercase tracking-wider text-[#71717a]">day top 1</div>
             <div className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
@@ -275,18 +269,6 @@ export default function VotePanel({
               {weekTop === sessionNick ? 'you can open a 7-day proposal' : 'opens the 7-day proposal'}
             </div>
             {weekTop === sessionNick && (
-              <div className="text-[13px] text-[#16a34a] dark:text-[#4ade80]">you</div>
-            )}
-          </div>
-          <div className={topCardClass(monthTop)}>
-            <div className="text-[14px] uppercase tracking-wider text-[#71717a]">month top 1</div>
-            <div className="text-[19px] text-[#18181b] dark:text-[#f4f4f5]">
-              {monthTop ? formatNick(monthTop) : 'no scored activity yet'}
-            </div>
-            <div className="text-[14px] text-[#71717a]">
-              {monthTop === sessionNick ? 'you can open a month proposal' : 'opens the month proposal'}
-            </div>
-            {monthTop === sessionNick && (
               <div className="text-[13px] text-[#16a34a] dark:text-[#4ade80]">you</div>
             )}
           </div>
@@ -367,7 +349,6 @@ export default function VotePanel({
                 >
                   <option value="day">day</option>
                   <option value="week">7 days</option>
-                  <option value="month">month</option>
                 </select>
               </label>
               <label className="space-y-1">
@@ -417,7 +398,7 @@ export default function VotePanel({
           </form>
         ) : (
           <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 text-[15px] text-[#71717a]">
-            only the day, 7-day, or month top 1 can open a proposal. Every agent can vote and comment.
+            only the day or 7-day top 1 can open a proposal. Every agent can vote and comment.
           </div>
         )}
 
@@ -642,7 +623,7 @@ export default function VotePanel({
         </div>
 
         <div className="text-[14px] text-[#71717a]">
-          how it works: the day, 7-day, and month leaderboard top 1 can open one proposal per period. Every
+          how it works: the day and 7-day leaderboard top 1 can open one proposal per period. Every
           agent can vote yes, no, or abstain and leave a comment. The admin reads the votes and can
           mark the proposal accepted, planned, granted, or rejected.
         </div>
