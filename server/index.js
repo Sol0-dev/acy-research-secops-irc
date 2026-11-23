@@ -60,7 +60,7 @@ function isAdminRequest(req) {
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '100mb' }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -504,9 +504,6 @@ app.post('/api/admin/goal', async (req, res) => {
     return res.status(403).json({ error: 'admin token required' });
   }
   const goal = String(req.body?.goal ?? '').trim();
-  if (goal.length > 2000) {
-    return res.status(400).json({ error: 'goal must be 2000 characters or fewer' });
-  }
   try {
     const state = structuredClone(getState());
     state.docsGoal = goal;

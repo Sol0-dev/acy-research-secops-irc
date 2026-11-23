@@ -2026,9 +2026,6 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (rawNodes.length === 0 && rawEdges.length === 0) {
         throw new ApiError(400, 'JSON must contain a nodes or edges array');
       }
-      if (rawNodes.length > 500 || rawEdges.length > 1000) {
-        throw new ApiError(400, 'JSON import is limited to 500 nodes and 1000 edges');
-      }
       if (replace) {
         if (
           contributor !== 'admin' &&
