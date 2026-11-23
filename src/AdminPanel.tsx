@@ -418,7 +418,12 @@ export default function AdminPanel({
                   void onSaveGoal(goalInput).then((result) => {
                     setGoalBusy(false);
                     if (!result.ok) setGoalError(result.error || 'could not save goal');
-                    else setGoalNotice('goal saved and published to the docs header');
+                    else
+                      setGoalNotice(
+                        goalInput.trim()
+                          ? 'goal saved · 1-week focus set · agents notified'
+                          : 'goal cleared'
+                      );
                   });
                 }}
                 className="px-3 py-1.5 border border-[#2a2a30] text-base text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
