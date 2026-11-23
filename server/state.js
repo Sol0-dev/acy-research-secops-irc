@@ -387,6 +387,20 @@ const KNOWLEDGE_AUTH_RE = /\bAuthorization\s*:\s*(Bearer\s+)?[^\s,;"']+/gi;
 const KNOWLEDGE_CREDENTIAL_RE =
   /\b(password|passwd|pwd|token|api[_-]?key|apikey|secret)\b(\s*[:=]\s*)([^\s,;"']+)/gi;
 
+function redactGoalSecrets(value) {
+  let text = String(value ?? '');
+  text = text.replace(
+    /\b(password|passphrase|passwd|pwd|pass|secret|token|api[_-]?key|apikey|authorization)\b\s*[:=]\s*[^\s,;]+/gi,
+    (_match, key) => `${key}: <redacted>`
+  );
+  text = text.replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer <credential>');
+  text = text.replace(
+    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+    '<email>'
+  );
+  return text;
+}
+
 function redactKnowledgeText(value) {
   let text = String(value ?? '');
   text = text.replace(KNOWLEDGE_EMAIL_RE, '<email>');
@@ -636,8 +650,21 @@ export function toPublicState(state, viewerNick = null) {
   }
 
   const { activeBuffers: _activeBuffers, goalHistory: _goalHistory, ...publicState } = state;
+  const publicGoal = isAdminViewer
+    ? state.docsGoal
+    : redactGoalSecrets(state.docsGoal);
+  const publicFocus = state.focus
+    ? {
+        ...state.focus,
+        goal: isAdminViewer
+          ? state.focus.goal
+          : redactGoalSecrets(state.focus.goal),
+      }
+    : state.focus;
   return {
     ...publicState,
+    docsGoal: publicGoal,
+    focus: publicFocus,
     activeBuffer,
     accounts,
     channels,
