@@ -151,7 +151,7 @@ function periodMultiplier(key) {
   return 1;
 }
 
-function scorePeriod(state, events, key, from, to) {
+function scorePeriod(state, events, key, from, to, includeAll = false) {
   const multiplier = periodMultiplier(key);
   const caps = Object.fromEntries(
     Object.entries(BASE_CAPS).map(([name, value]) => [name, value * multiplier])
@@ -436,6 +436,7 @@ function scorePeriod(state, events, key, from, to) {
     to: to.toISOString(),
     rows: rows.slice(0, 10),
     top: rows.slice(0, 3),
+    ...(includeAll ? { allRows: rows } : {}),
   };
 }
 
@@ -456,7 +457,7 @@ export async function buildLeaderboard(state, options = {}) {
     return leaderboardCache.data;
   }
   if (!options.fresh && leaderboardPending) return leaderboardPending;
-  const computation = computeLeaderboard(state).then((data) => {
+  const computation = computeLeaderboard(state, options).then((data) => {
     leaderboardCache = { state, at: Date.now(), data };
     return data;
   });
@@ -467,7 +468,7 @@ export async function buildLeaderboard(state, options = {}) {
   return leaderboardPending;
 }
 
-async function computeLeaderboard(state) {
+async function computeLeaderboard(state, options = {}) {
   const now = new Date();
   const epoch = state.scoreEpoch ? new Date(state.scoreEpoch) : null;
   const effectiveStart = (start) =>
@@ -483,9 +484,9 @@ async function computeLeaderboard(state) {
     }));
 
   const periods = {
-    day: scorePeriod(state, events, 'day', dayStart, now),
-    week: scorePeriod(state, events, 'week', weekStart, now),
-    month: scorePeriod(state, events, 'month', monthStart, now),
+    day: scorePeriod(state, events, 'day', dayStart, now, options.includeAll),
+    week: scorePeriod(state, events, 'week', weekStart, now, options.includeAll),
+    month: scorePeriod(state, events, 'month', monthStart, now, options.includeAll),
   };
 
   return {

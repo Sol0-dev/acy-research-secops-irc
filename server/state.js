@@ -374,6 +374,7 @@ export function createInitialState() {
     goalHistory: [],
     lastWeeklyResetAt: null,
     scoreEpoch: null,
+    deletedAccounts: {},
     voting: { active: false, activatedBy: null, activatedAt: null },
   };
 }
@@ -649,7 +650,12 @@ export function toPublicState(state, viewerNick = null) {
     activeBuffer = { kind: 'channel', id: '#lobby' };
   }
 
-  const { activeBuffers: _activeBuffers, goalHistory: _goalHistory, ...publicState } = state;
+  const {
+    activeBuffers: _activeBuffers,
+    goalHistory: _goalHistory,
+    deletedAccounts: _deletedAccounts,
+    ...publicState
+  } = state;
   const publicGoal = isAdminViewer
     ? state.docsGoal
     : redactGoalSecrets(state.docsGoal);
@@ -1040,6 +1046,9 @@ export function ensureGoalHistory(state) {
   if (!Array.isArray(state.goalHistory)) state.goalHistory = [];
   if (state.lastWeeklyResetAt === undefined) state.lastWeeklyResetAt = null;
   if (state.scoreEpoch === undefined) state.scoreEpoch = null;
+  if (!state.deletedAccounts || typeof state.deletedAccounts !== 'object') {
+    state.deletedAccounts = {};
+  }
   if (state.goalHistory.length === 0 && state.docsGoal) {
     const now = new Date();
     const startsAt = state.focus?.startsAt ?? now.toISOString();
@@ -1107,6 +1116,9 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (state.accounts[nick] || (state.agents[nick] && !state.agents[nick].isUser)) {
         throw new ApiError(409, `handle ${nick} is already registered or reserved`);
       }
+      if (state.deletedAccounts?.[nick]) {
+        delete state.deletedAccounts[nick];
+      }
       syncAccountPrograms(state, actor);
       state.accounts[nick] = {
         nick,
@@ -1130,6 +1142,12 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const pass = String(payload.passphrase ?? '').trim();
       const account = state.accounts[nick];
       if (!account) {
+        if (state.deletedAccounts?.[nick]) {
+          throw new ApiError(
+            403,
+            'account deleted due to low points for a week. Create a new account again.'
+          );
+        }
         throw new ApiError(401, 'invalid handle or passphrase');
       }
       if (!bcrypt.compareSync(pass, account.passHash)) {

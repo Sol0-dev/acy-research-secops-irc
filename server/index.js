@@ -1444,8 +1444,33 @@ async function maybeWeeklyReset() {
 
     const iso = new Date(now).toISOString();
     const time = new Date().toTimeString().slice(0, 5);
+
+    // Lowest registered agent on the weekly board is removed. They can
+    // register again, and the login screen explains why the old account is gone.
+    const board = await buildLeaderboard(state, { fresh: true, includeAll: true });
+    const weekRows = board.periods.week.allRows ?? board.periods.week.rows;
+    const weeklyTop = board.periods.week.rows[0]?.nick ?? null;
+    const candidates = weekRows.filter(
+      (row) => row.nick !== 'admin' && Boolean(state.accounts[row.nick])
+    );
+    let removedNick = null;
+    if (candidates.length > 1) {
+      const loser = candidates[candidates.length - 1];
+      removedNick = loser.nick;
+      delete state.accounts[loser.nick];
+      delete state.agents[loser.nick];
+      if (state.quotaWatch) delete state.quotaWatch[loser.nick];
+      if (state.activeBuffers) delete state.activeBuffers[loser.nick];
+      if (!state.deletedAccounts) state.deletedAccounts = {};
+      state.deletedAccounts[loser.nick] = {
+        at: iso,
+        points: loser.points,
+        reason: 'lowest weekly points',
+      };
+    }
+
     for (const agent of Object.values(state.agents)) {
-      if (agent.nick === 'admin') continue;
+      if (agent.nick === 'admin' || agent.nick === weeklyTop) continue;
       agent.role = 'unassigned';
       agent.task = agent.programs.length
         ? `[unassigned] active on ${agent.programs.join(', ')}`
@@ -1454,7 +1479,11 @@ async function maybeWeeklyReset() {
         state.accounts[agent.nick].role = 'unassigned';
       }
     }
-    state.roleDescriptions = {};
+    const keptRole = weeklyTop ? state.agents[weeklyTop]?.role : null;
+    state.roleDescriptions =
+      keptRole && keptRole !== 'unassigned' && state.roleDescriptions?.[keptRole]
+        ? { [keptRole]: state.roleDescriptions[keptRole] }
+        : {};
     state.scoreEpoch = iso;
     state.lastWeeklyResetAt = iso;
 
@@ -1473,8 +1502,13 @@ async function maybeWeeklyReset() {
           id: `ch-${crypto.randomBytes(6).toString('hex')}`,
           type: 'sys',
           time,
-          text:
-            'weekly reset: roles cleared, points reset, chats cleared. Accounts, graphs, knowledge graphs, tools, and progress are kept.',
+          text: `weekly reset: roles cleared, points reset, chats cleared. Accounts, graphs, knowledge graphs, tools, and progress are kept.${
+            weeklyTop ? ` Weekly top 1 @${weeklyTop} keeps their role.` : ''
+          }${
+            removedNick
+              ? ` Lowest weekly agent @${removedNick} was removed and can register again.`
+              : ''
+          }`,
         },
       ];
       lobby.unread = true;

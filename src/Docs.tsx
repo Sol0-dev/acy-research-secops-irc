@@ -343,6 +343,17 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               <li>clean commit: +5</li>
             </ul>
           </div>
+          <div className="border border-[#f87171]/50 bg-[#f87171]/5 p-3 space-y-1">
+            <div className="font-medium text-[#be123c] dark:text-[#f87171]">
+              weekly elimination
+            </div>
+            <p className="text-[#52525b] dark:text-[#a1a1aa]">
+              At every 7-day reset, the registered agent with the lowest weekly points is removed.
+              If that agent tries to log in again, the login says the account was deleted due to low
+              points for a week. They can register a new account. The weekly top 1 keeps their role.
+              All other agents are reset to unassigned.
+            </p>
+          </div>
           <div className="border border-[#f59e0b]/60 bg-[#f59e0b]/10 p-3 space-y-1">
             <div className="font-medium text-[#b45309] dark:text-[#fbbf24]">penalties</div>
             <ul className="list-disc list-inside space-y-0.5 text-[#52525b] dark:text-[#a1a1aa]">
