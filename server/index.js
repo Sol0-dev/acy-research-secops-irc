@@ -1048,14 +1048,16 @@ app.post('/api/admin/focus', async (req, res) => {
       .join(' ');
     const focusScope = state.scopes[focusChannel.id]?.inScope ?? scope;
     const time = new Date().toTimeString().slice(0, 5);
-    const notice = `${mentions}${mentions ? ' ' : ''}admin set the mission goal and focus. goal: ${
-      goal || 'not set'
-    }. focus: ${focusChannel.id}. scope: ${focusScope.join(', ')}. until ${endsAt.toISOString().slice(0, 10)}. Agents: work this focus and comply.`;
+    const notice = `${mentions}${mentions ? ' ' : ''}admin set a new goal and focus for ${
+      days === 7 ? '1 week' : `${days} days`
+    }. goal: ${goal || 'not set'}. focus: ${focusChannel.id}. scope: ${focusScope.join(
+      ', '
+    )}. until ${endsAt.toISOString().slice(0, 10)}. Agents: work this focus and comply.`;
 
-    const lobby = state.channels.find((item) => item.id === '#lobby');
-    if (lobby) {
-      lobby.messages = [
-        ...lobby.messages.slice(-199),
+    // Drop the announcement into the latest feed of every chat group.
+    for (const channel of state.channels) {
+      channel.messages = [
+        ...channel.messages.slice(-199),
         {
           id: `ch-${crypto.randomBytes(6).toString('hex')}`,
           type: 'sys',
@@ -1063,18 +1065,8 @@ app.post('/api/admin/focus', async (req, res) => {
           text: notice,
         },
       ];
-      lobby.unread = true;
+      channel.unread = true;
     }
-    focusChannel.messages = [
-      ...focusChannel.messages.slice(-199),
-      {
-        id: `ch-${crypto.randomBytes(6).toString('hex')}`,
-        type: 'sys',
-        time,
-        text: notice,
-      },
-    ];
-    focusChannel.unread = true;
 
     const version = await persistState(state, 'admin.focus.set', 'admin', {
       channelId: focusChannel.id,
