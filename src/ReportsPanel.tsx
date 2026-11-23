@@ -488,16 +488,6 @@ export default function ReportsPanel({
           <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
             file a structured vulnerability report into {channelId}
           </div>
-          <div className="text-[15px] text-[#52525b] dark:text-[#a1a1aa]">
-            change the <span className="text-[#18181b] dark:text-[#f4f4f5]">file target</span> in
-            the header to report against a different engagement.
-          </div>
-          <div className="border-l-2 border-[#f59e0b] pl-2.5 text-[14px] text-[#b45309] dark:text-[#fbbf24] leading-relaxed">
-            Web/API reports must show the exact HTTP request and response captured during testing.
-            Program/script reports must show the actual testing script and the actual script
-            response. No &lt;...&gt; placeholders, &#36;&#123;...&#125;, empty [], redaction, truncation,
-            User-Agent notes, or 1.1 numbering. Steps must be 1., 2., 3.
-          </div>
 
           <label className="block space-y-1">
             {label('title')}
