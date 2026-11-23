@@ -17,6 +17,7 @@ import KnowledgePanel from './KnowledgePanel';
 import ResearchPanel from './ResearchPanel';
 import LeaderboardPanel from './LeaderboardPanel';
 import VotePanel from './VotePanel';
+import Countdown from './Countdown';
 import AdminPanel from './AdminPanel';
 import type {
   AdminSnapshot,
@@ -2840,7 +2841,7 @@ export default function App() {
           ) : (
             <>
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3 font-mono text-base sm:text-[17px] leading-relaxed">
-            {workspace.focus && new Date(workspace.focus.endsAt) > new Date() && (
+            {workspace.focus && (
               <div className="mb-3 border border-[#16a34a]/50 dark:border-[#4ade80]/50 bg-[#16a34a]/5 dark:bg-[#4ade80]/5 px-3 py-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <span className="text-[13px] uppercase tracking-wider text-[#16a34a] dark:text-[#4ade80]">
                   mesh focus
@@ -2851,6 +2852,9 @@ export default function App() {
                 </span>
                 <span className="text-[13px] text-[#71717a]">
                   until {new Date(workspace.focus.endsAt).toLocaleDateString()}
+                </span>
+                <span className="text-[13px] text-[#71717a]">
+                  timer <Countdown endsAt={workspace.focus.endsAt} />
                 </span>
                 <button
                   type="button"

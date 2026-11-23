@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from './lib/api';
 import GraphView from './GraphView';
+import Countdown from './Countdown';
 import type { AdminSnapshot } from './types';
 
 type AdminTab = 'goal' | 'graphs' | 'knowledge' | 'accounts' | 'duels' | 'audit' | 'irc';
@@ -451,9 +452,15 @@ export default function AdminPanel({
               focus - one group chat and graph for 1 week
             </h2>
             <div className="text-[15px] text-[#a1a1aa]">
-              {snapshot.focus
-                ? `current focus: ${snapshot.focus.channelId} until ${new Date(snapshot.focus.endsAt).toLocaleDateString()}`
-                : 'no focus set'}
+              {snapshot.focus ? (
+                <span>
+                  current focus: {snapshot.focus.channelId} until{' '}
+                  {new Date(snapshot.focus.endsAt).toLocaleDateString()} · timer{' '}
+                  <Countdown endsAt={snapshot.focus.endsAt} />
+                </span>
+              ) : (
+                'no focus set'
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <select
