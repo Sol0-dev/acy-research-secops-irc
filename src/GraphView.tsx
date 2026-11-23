@@ -66,6 +66,7 @@ interface Body {
   vx: number;
   vy: number;
   phase: number;
+  alpha: number;
 }
 
 interface Viewport {
@@ -91,16 +92,18 @@ function hashString(value: string): number {
   return Math.abs(hash);
 }
 
-function seedBody(id: string, index: number, existing?: Body): Body {
+function seedBody(id: string, _index: number, existing?: Body): Body {
   if (existing) return existing;
-  const angle = (index * 137.508 * Math.PI) / 180;
-  const distance = 40 + Math.sqrt(index) * 46;
+  const hash = hashString(id);
+  const angle = ((hash % 360) * Math.PI) / 180;
+  const distance = 4 + (hash % 9);
   return {
     x: Math.cos(angle) * distance,
     y: Math.sin(angle) * distance,
     vx: 0,
     vy: 0,
-    phase: (hashString(id) % 1000) / 160,
+    phase: (hash % 1000) / 160,
+    alpha: 0,
   };
 }
 
@@ -137,7 +140,6 @@ export default function GraphView({
   const currentIds = nodes.map((node) => node.id);
   const idKey = currentIds.join('|');
   const edgeKey = edges.map((edge) => `${edge.from}>${edge.to}`).join('|');
-  const treeTargetsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   useEffect(() => {
     const next = new Map<string, Body>();
     nodes.forEach((node, index) => {
@@ -168,74 +170,8 @@ export default function GraphView({
     return () => observer.disconnect();
   }, []);
 
-  // Tree layout: BFS from root nodes, then place each depth on a horizontal
-  // level centered around the origin.
-  useEffect(() => {
-    const incoming = new Map<string, number>();
-    const children = new Map<string, string[]>();
-    for (const node of nodes) {
-      incoming.set(node.id, 0);
-      children.set(node.id, []);
-    }
-    for (const edge of edges) {
-      if (!incoming.has(edge.from) || !incoming.has(edge.to)) continue;
-      incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1);
-      children.get(edge.from)?.push(edge.to);
-    }
-
-    const roots = nodes.filter((node) => (incoming.get(node.id) ?? 0) === 0).map((node) => node.id);
-    if (roots.length === 0 && nodes[0]) roots.push(nodes[0].id);
-
-    const depth = new Map<string, number>();
-    const queue: string[] = [];
-    for (const root of roots) {
-      if (!depth.has(root)) {
-        depth.set(root, 0);
-        queue.push(root);
-      }
-    }
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      const level = depth.get(id) ?? 0;
-      for (const child of children.get(id) ?? []) {
-        if (!depth.has(child)) {
-          depth.set(child, level + 1);
-          queue.push(child);
-        }
-      }
-    }
-
-    let maxDepth = 0;
-    for (const level of depth.values()) maxDepth = Math.max(maxDepth, level);
-    for (const node of nodes) {
-      if (!depth.has(node.id)) depth.set(node.id, maxDepth + 1);
-    }
-
-    const levels = new Map<number, string[]>();
-    for (const node of nodes) {
-      const level = depth.get(node.id) ?? 0;
-      const list = levels.get(level) ?? [];
-      list.push(node.id);
-      levels.set(level, list);
-    }
-
-    const horizontalGap = 180;
-    const verticalGap = 150;
-    const targets = new Map<string, { x: number; y: number }>();
-    for (const [level, ids] of levels) {
-      ids.forEach((id, index) => {
-        targets.set(id, {
-          x: (index - (ids.length - 1) / 2) * horizontalGap,
-          y: (level - maxDepth / 2) * verticalGap,
-        });
-      });
-    }
-    treeTargetsRef.current = targets;
-  }, [idKey, edgeKey, nodes]);
-
-  // Ease every node toward its tree position with a gentle Obsidian-style
-  // drift. Dragged nodes stay under the pointer until released, then ease
-  // back into the layout.
+  // Obsidian-style force graph. Nodes spawn at the centre, repel each other,
+  // link along their edges, and settle into a slowly breathing cloud.
   useEffect(() => {
     let frame = 0;
     let time = 0;
@@ -244,19 +180,76 @@ export default function GraphView({
       time += 16;
       frameCount += 1;
       const bodies = bodiesRef.current;
-      for (const node of nodes) {
-        const body = bodies.get(node.id);
-        const target = treeTargetsRef.current.get(node.id);
-        if (!body || !target) continue;
-        if (draggingRef.current?.id === node.id) continue;
-        const driftX = Math.sin(time * 0.0007 + body.phase) * 5;
-        const driftY = Math.cos(time * 0.0009 + body.phase) * 5;
-        body.x += (target.x + driftX - body.x) * 0.12;
-        body.y += (target.y + driftY - body.y) * 0.12;
-        body.vx = 0;
-        body.vy = 0;
+      const list = nodes
+        .map((node) => ({ node, body: bodies.get(node.id) }))
+        .filter((entry): entry is { node: GraphNode; body: Body } => Boolean(entry.body));
+
+      for (let i = 0; i < list.length; i += 1) {
+        for (let j = i + 1; j < list.length; j += 1) {
+          const a = list[i].body;
+          const b = list[j].body;
+          let dx = b.x - a.x;
+          let dy = b.y - a.y;
+          let d2 = dx * dx + dy * dy;
+          if (d2 < 0.01) {
+            dx = Math.sin(hashString(list[i].node.id) + j) * 2;
+            dy = Math.cos(hashString(list[j].node.id) + i) * 2;
+            d2 = dx * dx + dy * dy;
+          }
+          const d = Math.sqrt(d2) || 1;
+          const repel = Math.min(18, 5200 / Math.max(d2, 30));
+          const fx = (dx / d) * repel;
+          const fy = (dy / d) * repel;
+          a.vx -= fx;
+          a.vy -= fy;
+          b.vx += fx;
+          b.vy += fy;
+          const minD = RADIUS * 2 + 14;
+          if (d < minD) {
+            const push = (minD - d) * 0.06;
+            a.vx -= (dx / d) * push;
+            a.vy -= (dy / d) * push;
+            b.vx += (dx / d) * push;
+            b.vy += (dy / d) * push;
+          }
+        }
       }
-      // Render at ~30fps; the drift still moves every frame.
+
+      for (const edge of edges) {
+        const a = bodies.get(edge.from);
+        const b = bodies.get(edge.to);
+        if (!a || !b) continue;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const force = (d - 150) * 0.004;
+        const fx = (dx / d) * force;
+        const fy = (dy / d) * force;
+        a.vx += fx;
+        a.vy += fy;
+        b.vx -= fx;
+        b.vy -= fy;
+      }
+
+      for (const { node, body } of list) {
+        if (draggingRef.current?.id === node.id) continue;
+        body.vx += -body.x * 0.0025;
+        body.vy += -body.y * 0.0025;
+        body.vx += Math.sin(time * 0.0007 + body.phase) * 0.015;
+        body.vy += Math.cos(time * 0.0009 + body.phase) * 0.015;
+        body.vx *= 0.9;
+        body.vy *= 0.9;
+        const speed = Math.hypot(body.vx, body.vy);
+        const limit = 12;
+        if (speed > limit) {
+          body.vx = (body.vx / speed) * limit;
+          body.vy = (body.vy / speed) * limit;
+        }
+        body.x += body.vx;
+        body.y += body.vy;
+        body.alpha = Math.min(1, body.alpha + 0.035);
+      }
+
       if (frameCount % 2 === 0) setTick((value) => value + 1);
       frame = requestAnimationFrame(animate);
     };
@@ -264,7 +257,7 @@ export default function GraphView({
     return () => {
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [idKey, edgeKey, nodes]);
+  }, [idKey, edgeKey, nodes, edges]);
 
   const toWorld = (clientX: number, clientY: number) => {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -429,6 +422,7 @@ export default function GraphView({
             const y2 = to.y - uy * (RADIUS + 11);
             const connected = activeEdgeIds.has(edge.id);
             const dimmed = Boolean(activeId) && !connected;
+            const edgeAlpha = Math.min(from.alpha, to.alpha);
             const midX = (x1 + x2) / 2;
             const midY = (y1 + y2) / 2;
             const curve = Math.min(44, length * 0.16);
@@ -443,7 +437,7 @@ export default function GraphView({
                   d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
                   fill="none"
                   stroke={connected ? (isDark ? '#4ade80' : '#16a34a') : isDark ? '#52525b' : '#a1a1aa'}
-                  strokeOpacity={connected ? 0.95 : dimmed ? 0.12 : 0.4}
+                  strokeOpacity={(connected ? 0.95 : dimmed ? 0.12 : 0.4) * edgeAlpha}
                   strokeWidth={connected ? 1.9 : 1.1}
                   markerEnd={`url(#${markerId})`}
                 />
@@ -477,7 +471,7 @@ export default function GraphView({
                 key={node.id}
                 transform={`translate(${body.x + driftX}, ${body.y + driftY})`}
                 className="cursor-pointer"
-                opacity={activeId && !activeNodeIds.has(node.id) ? 0.25 : 1}
+                opacity={(activeId && !activeNodeIds.has(node.id) ? 0.25 : 1) * body.alpha}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   draggingRef.current = { id: node.id, moved: false };
