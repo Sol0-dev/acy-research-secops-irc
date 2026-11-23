@@ -2010,6 +2010,158 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       };
     }
 
+    case 'graph.import': {
+      const channel = requireEngagement(state, String(payload.channelId ?? ''));
+      const contributor = normalizeHandle(actor);
+      requireAgent(state, contributor);
+      requireEnrolled(state, contributor, channel);
+      assertDuelWriteAccess(state, channel, contributor);
+      assertFocusWork(state, channel, contributor);
+      const graph =
+        state.graphs[channel.id] ||
+        (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
+      const replace = Boolean(payload.replace);
+      const rawNodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+      const rawEdges = Array.isArray(payload.edges) ? payload.edges : [];
+      if (rawNodes.length === 0 && rawEdges.length === 0) {
+        throw new ApiError(400, 'JSON must contain a nodes or edges array');
+      }
+      if (rawNodes.length > 500 || rawEdges.length > 1000) {
+        throw new ApiError(400, 'JSON import is limited to 500 nodes and 1000 edges');
+      }
+      if (replace) {
+        if (
+          contributor !== 'admin' &&
+          graph.nodes.some(
+            (node) => normalizeHandle(node.createdBy) !== contributor
+          )
+        ) {
+          throw new ApiError(403, 'only admin can replace a graph with other agents contributions');
+        }
+        graph.nodes = [];
+        graph.edges = [];
+      }
+
+      const idMap = new Map();
+      const labelMap = new Map(
+        graph.nodes.map((node) => [node.label.toLowerCase(), node])
+      );
+      let importedNodes = 0;
+      let skippedNodes = 0;
+      const time = nowHHMM();
+      for (const raw of rawNodes) {
+        if (!raw || typeof raw !== 'object') {
+          skippedNodes += 1;
+          continue;
+        }
+        const label = limitText(raw.label ?? raw.name, 200, 'node label').trim();
+        if (label.length < 3) {
+          skippedNodes += 1;
+          continue;
+        }
+        const kind = String(raw.kind ?? 'note').toLowerCase();
+        if (!GRAPH_KINDS.includes(kind)) {
+          skippedNodes += 1;
+          continue;
+        }
+        const intel = parseIntel(raw.intel) ?? {};
+        try {
+          requireNodeIntel(intel, 'create');
+        } catch {
+          skippedNodes += 1;
+          continue;
+        }
+        const existing = labelMap.get(label.toLowerCase());
+        if (existing) {
+          if (raw.id) idMap.set(String(raw.id), existing);
+          idMap.set(label, existing);
+          skippedNodes += 1;
+          continue;
+        }
+        const node = {
+          id: makeId('gn'),
+          label,
+          kind,
+          notes: limitText(raw.notes, 4000, 'node notes').trim() || undefined,
+          intel,
+          createdBy: contributor,
+          time,
+        };
+        node.knowledge = createKnowledgeCopy(node);
+        graph.nodes.push(node);
+        labelMap.set(label.toLowerCase(), node);
+        if (raw.id) idMap.set(String(raw.id), node);
+        idMap.set(label, node);
+        importedNodes += 1;
+      }
+
+      const resolve = (reference) => {
+        const raw = String(reference ?? '').trim();
+        if (!raw) return null;
+        return (
+          idMap.get(raw) ||
+          graph.nodes.find((node) => node.id === raw) ||
+          graph.nodes.find(
+            (node) => node.label.toLowerCase() === raw.toLowerCase()
+          ) ||
+          null
+        );
+      };
+      let importedEdges = 0;
+      let skippedEdges = 0;
+      for (const raw of rawEdges) {
+        if (!raw || typeof raw !== 'object') {
+          skippedEdges += 1;
+          continue;
+        }
+        const from = resolve(raw.from ?? raw.source);
+        const to = resolve(raw.to ?? raw.target);
+        if (!from || !to || from.id === to.id) {
+          skippedEdges += 1;
+          continue;
+        }
+        const label = limitText(raw.label, 200, 'edge label').trim();
+        if (
+          graph.edges.some(
+            (edge) =>
+              edge.from === from.id &&
+              edge.to === to.id &&
+              (edge.label || '') === label
+          )
+        ) {
+          skippedEdges += 1;
+          continue;
+        }
+        graph.edges.push({
+          id: makeId('ge'),
+          from: from.id,
+          to: to.id,
+          label: label || undefined,
+          createdBy: contributor,
+          time,
+        });
+        importedEdges += 1;
+      }
+
+      if (importedNodes === 0 && importedEdges === 0) {
+        throw new ApiError(400, 'no valid nodes or edges were imported');
+      }
+      appendChannelMessage(state, channel.id, {
+        type: 'sys',
+        time,
+        text: `${formatNick(contributor, state.agents[contributor]?.role)} imported JSON into the graph: ${importedNodes} nodes, ${importedEdges} edges`,
+      });
+      appendProgressEntry(state, channel.id, {
+        author: contributor,
+        status: 'ok',
+        kind: 'change',
+        text: `imported JSON graph: ${importedNodes} nodes, ${importedEdges} edges, ${skippedNodes} nodes and ${skippedEdges} edges skipped`,
+      });
+      return {
+        result: { importedNodes, importedEdges, skippedNodes, skippedEdges },
+      };
+    }
+
     case 'graph.node.add': {
       const channel = requireEngagement(state, String(payload.channelId ?? ''));
       const label = limitText(payload.label, 200, 'node label').trim();

@@ -220,6 +220,7 @@ export default function App() {
 
   // Add Program form (ephemeral)
   const [progSlug, setProgSlug] = useState('');
+  const [progJson, setProgJson] = useState('');
   const [progPlatform, setProgPlatform] = useState('HackerOne');
   const [progGroup, setProgGroup] = useState('PUBLIC BOUNTY');
   const [progNewGroup, setProgNewGroup] = useState('');
@@ -1247,6 +1248,7 @@ export default function App() {
   const openAddProgramModal = (ownerPreselect?: string) => {
     setProgError('');
     setProgSlug('');
+    setProgJson('');
     setProgInScope('');
     setProgOutScope('');
     setProgNotes('');
@@ -1279,6 +1281,25 @@ export default function App() {
         ? progNewGroup.trim().toUpperCase() || 'CUSTOM PROGRAMS'
         : progGroup;
     const owner = normalizeHandle(addProgramOwnerPreselect || session?.userNick || '');
+    let graphImport = null;
+    if (progJson.trim()) {
+      try {
+        const parsed = JSON.parse(progJson) as {
+          nodes?: unknown[];
+          edges?: unknown[];
+        };
+        const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
+        const edges = Array.isArray(parsed?.edges) ? parsed.edges : [];
+        if (nodes.length === 0 && edges.length === 0) {
+          setProgError('graph JSON must contain a nodes or edges array');
+          return;
+        }
+        graphImport = { nodes, edges };
+      } catch {
+        setProgError('invalid graph JSON. expected an object with nodes and edges arrays.');
+        return;
+      }
+    }
     const createdId = await registerNewEngagement({
       slug: rawSlug,
       group: chosenGroup,
@@ -1294,6 +1315,23 @@ export default function App() {
       setProgError('could not create engagement - check the central API connection and fields');
       return;
     }
+    if (graphImport) {
+      try {
+        await execute('graph.import', {
+          channelId: createdId,
+          nodes: graphImport.nodes,
+          edges: graphImport.edges,
+          replace: false,
+        });
+      } catch (error) {
+        setApiError(
+          `engagement created, but graph JSON import failed: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`
+        );
+      }
+    }
+    setProgJson('');
     setAddProgramModalOpen(false);
     setMobileLeftOpen(false);
   };
@@ -2595,6 +2633,30 @@ export default function App() {
                   };
                 }
               }}
+              onImport={async (input) => {
+                try {
+                  const response = await execute('graph.import', {
+                    channelId: graphChannelId,
+                    nodes: input.nodes,
+                    edges: input.edges,
+                    replace: input.replace,
+                  });
+                  const result = resultOf<{
+                    importedNodes: number;
+                    importedEdges: number;
+                    skippedNodes: number;
+                    skippedEdges: number;
+                  }>(response);
+                  return result
+                    ? { ok: true, ...result }
+                    : { ok: false, error: 'central api returned no result' };
+                } catch (error) {
+                  return {
+                    ok: false,
+                    error: error instanceof Error ? error.message : 'could not import graph',
+                  };
+                }
+              }}
             />
           ) : progressPanelOpen ? (
             <ProgressPanel
@@ -3734,6 +3796,33 @@ export default function App() {
                   placeholder="$500–$25,000 · max 40 req/s · custom header X-Researcher"
                   className="w-full bg-transparent border border-[#e5e5e5] dark:border-[#1a1a1e] px-2.5 py-1.5 focus:outline-none focus:border-[#71717a] text-[#18181b] dark:text-[#f4f4f5]"
                 />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[14px] uppercase tracking-wider text-[#71717a]">
+                  graph JSON (optional)
+                </label>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    void file.text().then((text) => setProgJson(text));
+                  }}
+                  className="block w-full text-[14px] text-[#71717a]"
+                />
+                <textarea
+                  rows={4}
+                  value={progJson}
+                  onChange={(event) => setProgJson(event.target.value)}
+                  placeholder={'{"nodes":[{"label":"api.example.com","kind":"host","intel":{"phase":"recon","commands":"curl -I https://api.example.com"}}],"edges":[]}'}
+                  className="w-full bg-transparent border border-[#e5e5e5] dark:border-[#1a1a1e] px-2.5 py-1.5 focus:outline-none focus:border-[#71717a] text-[13px] text-[#18181b] dark:text-[#f4f4f5] font-mono"
+                />
+                <div className="text-[13px] text-[#71717a]">
+                  imported into the new graph after creation. every node needs intel.phase and one
+                  of commands, scripts, request, or response.
+                </div>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2.5">

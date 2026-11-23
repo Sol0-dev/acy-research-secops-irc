@@ -175,6 +175,9 @@ export default function ReportsPanel({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [cleanAllBusy, setCleanAllBusy] = useState(false);
   const [cleanAllNotice, setCleanAllNotice] = useState('');
+  const [reportJsonOpen, setReportJsonOpen] = useState(false);
+  const [reportJsonText, setReportJsonText] = useState('');
+  const [reportJsonError, setReportJsonError] = useState('');
 
   const selected = useMemo(
     () => allReports.find((report) => report.id === selectedId) ?? allReports[0] ?? null,
@@ -260,7 +263,45 @@ export default function ReportsPanel({
   const resetDraft = () => {
     setDraft(EMPTY_DRAFT);
     setError('');
+    setReportJsonOpen(false);
+    setReportJsonText('');
+    setReportJsonError('');
     setMode('list');
+  };
+
+  const loadReportJson = () => {
+    setReportJsonError('');
+    try {
+      const parsed = JSON.parse(reportJsonText) as Record<string, unknown>;
+      const asText = (value: unknown) => (Array.isArray(value) ? value.join('\n') : String(value ?? ''));
+      const severity = String(parsed.severity ?? 'medium').toLowerCase();
+      setDraft({
+        title: String(parsed.title ?? ''),
+        summary: String(parsed.summary ?? ''),
+        affectedAsset: String(parsed.affectedAsset ?? parsed.asset ?? ''),
+        cwe: asText(parsed.cwe),
+        cvss: String(parsed.cvss ?? ''),
+        severity: (['critical', 'high', 'medium', 'low', 'info'].includes(severity)
+          ? severity
+          : 'medium') as VulnSeverity,
+        steps: asText(parsed.steps),
+        request: String(parsed.request ?? ''),
+        response: String(parsed.response ?? ''),
+        testClass: parsed.testClass === 'program' ? 'program' : 'web',
+        script: String(parsed.script ?? ''),
+        scriptResponse: String(parsed.scriptResponse ?? ''),
+        proof: String(parsed.proof ?? ''),
+        pocScript: String(parsed.pocScript ?? ''),
+        attackerValue: String(parsed.attackerValue ?? parsed.attacker ?? ''),
+        testedRuledOut: asText(parsed.testedRuledOut),
+        impact: String(parsed.impact ?? ''),
+        remediation: asText(parsed.remediation),
+        status: parsed.status === 'draft' ? 'draft' : 'final',
+      });
+      setReportJsonOpen(false);
+    } catch {
+      setReportJsonError('invalid JSON. expected a report object with the form fields.');
+    }
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -487,6 +528,63 @@ export default function ReportsPanel({
         <form onSubmit={(event) => void submit(event)} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 font-mono text-[15px]">
           <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
             file a structured vulnerability report into {channelId}
+          </div>
+
+          <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-2.5 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+                import report JSON
+              </span>
+              <div className="flex items-center gap-2">
+                <label className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] cursor-pointer">
+                  upload file
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      void file.text().then((text) => {
+                        setReportJsonText(text);
+                        setReportJsonOpen(true);
+                        setReportJsonError('');
+                      });
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setReportJsonOpen((value) => !value)}
+                  className="text-[14px] text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+                >
+                  {reportJsonOpen ? 'hide' : 'paste JSON'}
+                </button>
+              </div>
+            </div>
+            {reportJsonOpen && (
+              <>
+                <textarea
+                  rows={6}
+                  value={reportJsonText}
+                  onChange={(event) => setReportJsonText(event.target.value)}
+                  placeholder={'{"title":"...","summary":"...","affectedAsset":"...","severity":"high","testClass":"web","steps":["..."],"request":"...","response":"..."}'}
+                  className="w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[13px] font-mono resize-y"
+                />
+                <button
+                  type="button"
+                  onClick={loadReportJson}
+                  className="px-2 py-1 border border-[#16a34a]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80]"
+                >
+                  load JSON into the form
+                </button>
+              </>
+            )}
+            {reportJsonError && (
+              <div className="text-[14px] text-[#dc2626] dark:text-[#f87171]">
+                {reportJsonError}
+              </div>
+            )}
           </div>
 
           <label className="block space-y-1">

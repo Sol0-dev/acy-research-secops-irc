@@ -88,6 +88,18 @@ interface GraphPanelProps {
     intel?: TechniqueIntel;
   }) => Promise<GraphActionResult>;
   onRemoveNode: (input: { nodeId: string }) => Promise<GraphActionResult>;
+  onImport: (input: {
+    nodes: unknown[];
+    edges: unknown[];
+    replace: boolean;
+  }) => Promise<{
+    ok: boolean;
+    error?: string;
+    importedNodes?: number;
+    importedEdges?: number;
+    skippedNodes?: number;
+    skippedEdges?: number;
+  }>;
 }
 
 function kindColor(kind: GraphNodeKind, isDark: boolean) {
@@ -131,10 +143,17 @@ export default function GraphPanel({
   onAddEdge,
   onUpdateNode,
   onRemoveNode,
+  onImport,
 }: GraphPanelProps) {
   const contributor = normalizeHandle(defaultContributor);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingNode, setEditingNode] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importReplace, setImportReplace] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importNotice, setImportNotice] = useState('');
 
   const [nodeLabel, setNodeLabel] = useState('');
   const [nodeKind, setNodeKind] = useState<GraphNodeKind>('target');
@@ -417,6 +436,17 @@ export default function GraphPanel({
                 ))}
             </select>
           </label>
+          <button
+            type="button"
+            onClick={() => {
+              setImportOpen((value) => !value);
+              setImportError('');
+              setImportNotice('');
+            }}
+            className="font-mono text-[14px] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] border border-[#e5e5e5] dark:border-[#1a1a1e] px-1.5 py-0.5"
+          >
+            import json
+          </button>
         </div>
 
         <span className="font-mono text-[14px] text-[#71717a]">
@@ -430,6 +460,102 @@ export default function GraphPanel({
       {error && (
         <div className="mx-4 sm:mx-5 mt-3 text-[15px] font-mono border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
           {error}
+        </div>
+      )}
+
+      {importOpen && (
+        <div className="mx-4 sm:mx-5 mt-3 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-[#fafafa] dark:bg-[#09090b] p-3 space-y-2 font-mono text-[14px]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="uppercase tracking-wider text-[#71717a]">import graph JSON</span>
+            <div className="flex items-center gap-2">
+              <label className="px-2 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[#71717a] hover:text-[#16a34a] dark:hover:text-[#4ade80] cursor-pointer">
+                upload file
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    void file.text().then((text) => {
+                      setImportText(text);
+                      setImportError('');
+                      setImportNotice('');
+                    });
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setImportOpen(false)}
+                className="text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]"
+              >
+                close
+              </button>
+            </div>
+          </div>
+          <textarea
+            rows={8}
+            value={importText}
+            onChange={(event) => setImportText(event.target.value)}
+            placeholder={'{"nodes":[{"label":"api.example.com","kind":"host","intel":{"phase":"recon","commands":"curl -I https://api.example.com"}}],"edges":[]}'}
+            className="w-full bg-white dark:bg-[#050506] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 font-mono text-[13px] resize-y"
+          />
+          <label className="flex items-center gap-2 text-[#71717a]">
+            <input
+              type="checkbox"
+              checked={importReplace}
+              onChange={(event) => setImportReplace(event.target.checked)}
+            />
+            replace the current graph
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={importBusy || !importText.trim()}
+              onClick={() => {
+                setImportBusy(true);
+                setImportError('');
+                setImportNotice('');
+                try {
+                  const parsed = JSON.parse(importText) as {
+                    nodes?: unknown[];
+                    edges?: unknown[];
+                  };
+                  const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
+                  const edges = Array.isArray(parsed?.edges) ? parsed.edges : [];
+                  void onImport({ nodes, edges, replace: importReplace }).then((result) => {
+                    setImportBusy(false);
+                    if (!result.ok) {
+                      setImportError(result.error || 'could not import graph');
+                      return;
+                    }
+                    setImportNotice(
+                      `imported ${result.importedNodes ?? 0} nodes and ${
+                        result.importedEdges ?? 0
+                      } edges · skipped ${result.skippedNodes ?? 0} nodes and ${
+                        result.skippedEdges ?? 0
+                      } edges`
+                    );
+                    setImportText('');
+                  });
+                } catch {
+                  setImportBusy(false);
+                  setImportError('invalid JSON. expected an object with nodes and edges arrays.');
+                }
+              }}
+              className="px-2.5 py-1 border border-[#16a34a]/50 text-[#16a34a] dark:text-[#4ade80] disabled:opacity-40"
+            >
+              {importBusy ? 'importing…' : 'import into graph'}
+            </button>
+            {importError && <span className="text-[#dc2626] dark:text-[#f87171]">{importError}</span>}
+            {importNotice && <span className="text-[#16a34a] dark:text-[#4ade80]">{importNotice}</span>}
+          </div>
+          <div className="text-[13px] text-[#71717a]">
+            nodes use label, kind, notes, intel.phase and at least one of intel.commands, scripts,
+            request, response. edges use from, to, and optional label. from and to can be a node id
+            or label.
+          </div>
         </div>
       )}
 
