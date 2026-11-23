@@ -636,6 +636,25 @@ export default function App() {
     }
   };
 
+  const pauseAdminGoal = async (goalId: string, paused: boolean) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminPauseGoal(adminToken, goalId, paused);
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not pause goal',
+      };
+    }
+  };
+
   const setAdminDuelTask = async (duelId: string, task: string) => {
     if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
@@ -2873,7 +2892,11 @@ export default function App() {
                   until {new Date(workspace.focus.endsAt).toLocaleDateString()}
                 </span>
                 <span className="text-[13px] text-[#71717a]">
-                  timer <Countdown endsAt={workspace.focus.endsAt} />
+                  timer <Countdown
+                    endsAt={workspace.focus.endsAt}
+                    paused={workspace.focus.paused}
+                    remainingMs={workspace.focus.remainingMs}
+                  />
                 </span>
                 <button
                   type="button"
@@ -3854,6 +3877,7 @@ export default function App() {
         onSetFocus={setAdminFocus}
         onSetDuelTask={setAdminDuelTask}
         onContinueGoal={continueAdminGoal}
+        onPauseGoal={pauseAdminGoal}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}

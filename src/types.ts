@@ -304,6 +304,9 @@ export interface FocusGoal {
   startsAt: string;
   endsAt: string;
   days: number;
+  paused?: boolean;
+  remainingMs?: number;
+  pausedAt?: string;
 }
 
 export interface WorkspaceState {
@@ -401,6 +404,9 @@ export interface GoalHistoryEntry {
   endsAt: string;
   days: number;
   active: boolean;
+  paused?: boolean;
+  remainingMs?: number;
+  pausedAt?: string;
   createdAt?: string;
   createdBy?: string;
 }

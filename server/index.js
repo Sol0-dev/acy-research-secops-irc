@@ -399,6 +399,9 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
     startsAt: startsAt.toISOString(),
     endsAt: endsAt.toISOString(),
     days,
+    paused: false,
+    remainingMs: undefined,
+    pausedAt: undefined,
   };
 
   for (const agent of Object.values(state.agents)) {
@@ -460,6 +463,9 @@ function recordGoal(state, { goal, focusResult }) {
   entry.startsAt = focusResult.focus.startsAt;
   entry.endsAt = focusResult.focus.endsAt;
   entry.days = focusResult.focus.days;
+  entry.paused = Boolean(focusResult.focus.paused);
+  entry.remainingMs = focusResult.focus.remainingMs;
+  entry.pausedAt = focusResult.focus.pausedAt;
   entry.active = true;
   state.goalHistory = state.goalHistory.slice(-50);
   return entry;
@@ -538,6 +544,72 @@ app.post('/api/admin/goal/continue', async (req, res) => {
       channelId: focusResult.channelId,
       version,
     });
+  } catch (error) {
+    return res.status(error.status ?? 500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/goal/pause', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const goalId = String(req.body?.goalId ?? '');
+  const paused = Boolean(req.body?.paused);
+  try {
+    const state = structuredClone(getState());
+    const entry = (state.goalHistory ?? []).find((item) => item.id === goalId);
+    if (!entry) return res.status(404).json({ error: 'goal not found' });
+    const now = Date.now();
+    if (paused) {
+      const remaining = Math.max(
+        0,
+        entry.remainingMs ?? new Date(entry.endsAt).getTime() - now
+      );
+      entry.paused = true;
+      entry.remainingMs = remaining;
+      entry.pausedAt = new Date().toISOString();
+      if (entry.active && state.focus?.channelId === entry.channelId) {
+        state.focus.paused = true;
+        state.focus.remainingMs = remaining;
+        state.focus.pausedAt = entry.pausedAt;
+      }
+    } else {
+      const remaining = Math.max(
+        0,
+        entry.remainingMs ?? new Date(entry.endsAt).getTime() - now
+      );
+      entry.paused = false;
+      entry.remainingMs = undefined;
+      entry.pausedAt = undefined;
+      entry.endsAt = new Date(now + remaining).toISOString();
+      if (entry.active && state.focus?.channelId === entry.channelId) {
+        state.focus.paused = false;
+        state.focus.remainingMs = undefined;
+        state.focus.pausedAt = undefined;
+        state.focus.endsAt = entry.endsAt;
+      }
+    }
+    const time = new Date().toTimeString().slice(0, 5);
+    const notice = paused
+      ? `admin paused the goal timer for ${entry.goal}: remaining time is frozen.`
+      : `admin resumed the goal timer for ${entry.goal}.`;
+    for (const channel of state.channels) {
+      channel.messages = [
+        ...channel.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: notice,
+        },
+      ];
+      channel.unread = true;
+    }
+    const version = await persistState(state, 'admin.goal.pause', 'admin', {
+      goalId,
+      paused,
+    });
+    return res.json({ ok: true, paused, goalId, version });
   } catch (error) {
     return res.status(error.status ?? 500).json({ error: error.message });
   }

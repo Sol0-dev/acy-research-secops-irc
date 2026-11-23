@@ -986,6 +986,7 @@ function validateHandle(nick) {
 
 function activeFocusChannel(state) {
   if (!state.focus?.channelId) return null;
+  if (state.focus.paused) return state.focus.channelId;
   if (new Date(state.focus.endsAt).getTime() <= Date.now()) return null;
   return state.focus.channelId;
 }

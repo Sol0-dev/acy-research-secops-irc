@@ -9,7 +9,15 @@ export function formatRemaining(ms: number) {
   return `${days}d ${hours}h ${minutes}m ${String(seconds).padStart(2, '0')}s`;
 }
 
-export default function Countdown({ endsAt }: { endsAt: string }) {
+export default function Countdown({
+  endsAt,
+  paused = false,
+  remainingMs,
+}: {
+  endsAt: string;
+  paused?: boolean;
+  remainingMs?: number;
+}) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -17,10 +25,13 @@ export default function Countdown({ endsAt }: { endsAt: string }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const remaining = new Date(endsAt).getTime() - now;
+  const remaining = paused
+    ? Math.max(0, remainingMs ?? new Date(endsAt).getTime() - now)
+    : new Date(endsAt).getTime() - now;
   return (
     <span className={remaining <= 0 ? 'text-[#dc2626] dark:text-[#f87171]' : undefined}>
       {formatRemaining(remaining)}
+      {paused ? ' (paused)' : ''}
     </span>
   );
 }

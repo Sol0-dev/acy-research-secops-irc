@@ -27,6 +27,7 @@ interface AdminPanelProps {
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetDuelTask: (duelId: string, task: string) => Promise<{ ok: boolean; error?: string }>;
   onContinueGoal: (goalId: string) => Promise<{ ok: boolean; error?: string }>;
+  onPauseGoal: (goalId: string, paused: boolean) => Promise<{ ok: boolean; error?: string }>;
   onOpenAgentPortal: () => void;
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
@@ -78,6 +79,7 @@ export default function AdminPanel({
   onSetFocus,
   onSetDuelTask,
   onContinueGoal,
+  onPauseGoal,
   onOpenAgentPortal,
   onDeleteGraph,
   onDeleteChannel,
@@ -95,6 +97,7 @@ export default function AdminPanel({
   const [goalContinueBusy, setGoalContinueBusy] = useState('');
   const [goalContinueNotice, setGoalContinueNotice] = useState('');
   const [goalContinueError, setGoalContinueError] = useState('');
+  const [goalPauseBusy, setGoalPauseBusy] = useState('');
   const [goalBusy, setGoalBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState('');
   const [confirmAccountDelete, setConfirmAccountDelete] = useState<string | null>(null);
@@ -461,7 +464,11 @@ export default function AdminPanel({
                 <span>
                   current focus: {snapshot.focus.channelId} until{' '}
                   {new Date(snapshot.focus.endsAt).toLocaleDateString()} · timer{' '}
-                  <Countdown endsAt={snapshot.focus.endsAt} />
+                  <Countdown
+                    endsAt={snapshot.focus.endsAt}
+                    paused={snapshot.focus.paused}
+                    remainingMs={snapshot.focus.remainingMs}
+                  />
                 </span>
               ) : (
                 'no focus set'
@@ -533,13 +540,13 @@ export default function AdminPanel({
                   setFocusError('');
                   void onSetFocus('', '').then((result) => {
                     setFocusBusy(false);
-                    if (!result.ok) setFocusError(result.error || 'could not clear focus');
-                    else setFocusNotice('focus cleared');
+                    if (!result.ok) setFocusError(result.error || 'could not unset focus');
+                    else setFocusNotice('focus unset');
                   });
                 }}
                 className="px-3 py-1.5 border border-[#2a2a30] text-base text-[#71717a] hover:text-[#f87171] disabled:opacity-40"
               >
-                clear focus
+                unset focus
               </button>
               {focusNotice && <span className="text-base text-[#4ade80]">{focusNotice}</span>}
               {focusError && <span className="text-base text-[#f87171]">{focusError}</span>}
@@ -576,7 +583,11 @@ export default function AdminPanel({
                         </span>
                         <span className="text-[#d4d4d8]">{entry.channelId}</span>
                         <span className="text-[#71717a]">
-                          timer <Countdown endsAt={entry.endsAt} />
+                          timer <Countdown
+                            endsAt={entry.endsAt}
+                            paused={entry.paused}
+                            remainingMs={entry.remainingMs}
+                          />
                         </span>
                         <span className="text-[#71717a]">
                           ends {new Date(entry.endsAt).toLocaleString()}
@@ -611,6 +622,34 @@ export default function AdminPanel({
                           {goalContinueBusy === entry.id
                             ? 'restoring…'
                             : 'bring back 7-day timer'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={goalPauseBusy === entry.id}
+                          onClick={() => {
+                            setGoalPauseBusy(entry.id);
+                            setGoalContinueNotice('');
+                            setGoalContinueError('');
+                            void onPauseGoal(entry.id, !entry.paused).then((result) => {
+                              setGoalPauseBusy('');
+                              if (!result.ok) {
+                                setGoalContinueError(
+                                  result.error || 'could not update timer'
+                                );
+                                return;
+                              }
+                              setGoalContinueNotice(
+                                entry.paused ? 'goal timer resumed' : 'goal timer paused'
+                              );
+                            });
+                          }}
+                          className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                        >
+                          {goalPauseBusy === entry.id
+                            ? 'saving…'
+                            : entry.paused
+                              ? 'resume'
+                              : 'pause'}
                         </button>
                         {goalContinueNotice && (
                           <span className="text-[13px] text-[#4ade80]">
