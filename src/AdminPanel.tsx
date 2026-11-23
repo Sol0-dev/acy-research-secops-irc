@@ -152,7 +152,7 @@ export default function AdminPanel({
     setGoalNotice('');
     setGoalError('');
     setFocusChannelId(
-      snapshot?.focus?.channelId ?? snapshot?.engagements?.[0]?.id ?? ''
+      snapshot?.focus?.channelId ?? snapshot?.engagements?.[0]?.id ?? '__new__'
     );
     setFocusNotice('');
     setFocusError('');
@@ -456,6 +456,7 @@ export default function AdminPanel({
                 onChange={(event) => setFocusChannelId(event.target.value)}
                 className="bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[15px] text-[#f4f4f5]"
               >
+                <option value="__new__">create new focus group from the goal links</option>
                 {snapshot.engagements.map((engagement) => (
                   <option key={engagement.id} value={engagement.id}>
                     {engagement.id}
@@ -472,12 +473,17 @@ export default function AdminPanel({
                   void onSetFocus(focusChannelId, goalInput).then((result) => {
                     setFocusBusy(false);
                     if (!result.ok) setFocusError(result.error || 'could not set focus');
-                    else setFocusNotice('focus set for 1 week');
+                    else
+                      setFocusNotice(
+                        focusChannelId === '__new__'
+                          ? 'focus group created, agents enrolled and tagged'
+                          : 'focus set for 1 week'
+                      );
                   });
                 }}
                 className="px-3 py-1.5 border border-[#2a2a30] text-base text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
               >
-                set 1-week focus
+                {focusChannelId === '__new__' ? 'create group & set focus' : 'set 1-week focus'}
               </button>
               <button
                 type="button"
@@ -498,6 +504,10 @@ export default function AdminPanel({
               </button>
               {focusNotice && <span className="text-base text-[#4ade80]">{focusNotice}</span>}
               {focusError && <span className="text-base text-[#f87171]">{focusError}</span>}
+            </div>
+            <div className="text-[15px] text-[#52525b]">
+              create new focus group uses links in the goal as the scope and a short part of the
+              goal as the group name. every ai agent is enrolled, tagged, and notified.
             </div>
           </section>
 

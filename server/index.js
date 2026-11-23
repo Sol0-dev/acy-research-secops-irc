@@ -938,32 +938,159 @@ app.post('/api/admin/focus', async (req, res) => {
   }
   const channelId = String(req.body?.channelId ?? '');
   const goal = String(req.body?.goal ?? '').trim();
+  const target = String(req.body?.target ?? '').trim();
   const days = Math.min(Math.max(Number(req.body?.days ?? 7) || 7, 1), 30);
   try {
     const state = structuredClone(getState());
-    if (!channelId) {
+    if (!channelId && !goal) {
       state.focus = null;
-    } else {
-      const channel = state.channels.find(
-        (item) => item.id === channelId && item.isEngagement
-      );
-      if (!channel) return res.status(404).json({ error: 'engagement not found' });
-      const startsAt = new Date();
-      const endsAt = new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
-      state.focus = {
-        channelId,
-        goal,
-        startsAt: startsAt.toISOString(),
-        endsAt: endsAt.toISOString(),
+      const version = await persistState(state, 'admin.focus.set', 'admin', {
+        channelId: '',
+        goal: '',
         days,
-      };
+      });
+      return res.json({ ok: true, focus: null, version });
     }
+
+    let focusChannel = channelId
+      ? state.channels.find((item) => item.id === channelId && item.isEngagement)
+      : null;
+    let createdGroup = false;
+    let scope = [];
+
+    if (!focusChannel && (!channelId || channelId === '__new__')) {
+      const taskText = [goal, target].filter(Boolean).join(' ');
+      const urls = taskText.match(/https?:\/\/[^\s),;]+/gi) ?? [];
+      const wildcards = taskText.match(/\*\.[a-z0-9.-]+\.[a-z]{2,}/gi) ?? [];
+      const domains = taskText.match(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi) ?? [];
+      scope = [...new Set([...urls, ...wildcards, ...domains])].slice(0, 20);
+      const scopeTargets = scope.length > 0 ? scope : [target || goal || 'focus-target'];
+
+      const shortTask =
+        goal
+          .replace(/https?:\/\/\S+/gi, ' ')
+          .replace(/[^a-z0-9 ]/gi, ' ')
+          .trim()
+          .split(/\s+/)
+          .slice(0, 6)
+          .join('-')
+          .toLowerCase()
+          .slice(0, 32) || 'focus';
+
+      let newId = `#focus-${shortTask}`;
+      while (state.channels.some((item) => item.id === newId)) {
+        newId = `#focus-${shortTask}-${crypto.randomBytes(2).toString('hex')}`;
+      }
+      if (!state.groups.includes('FOCUS')) state.groups.push('FOCUS');
+      state.collapsedGroups.FOCUS = false;
+      const time = new Date().toTimeString().slice(0, 5);
+      state.channels.push({
+        id: newId,
+        group: 'FOCUS',
+        platform: 'Focus',
+        isEngagement: true,
+        topic: `focus · ${scopeTargets.slice(0, 3).join(', ')}`,
+        unread: true,
+        messages: [
+          {
+            id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+            type: 'sys',
+            time,
+            text: `admin created the focus group for: ${goal || target}`,
+          },
+          {
+            id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+            type: 'sys',
+            time,
+            text: `scope: ${scopeTargets.join(', ')}`,
+          },
+        ],
+      });
+      state.scopes[newId] = {
+        program: goal || 'Focus engagement',
+        platform: 'Focus',
+        constraints: 'safe harbor active · follow program RoE',
+        inScope: scopeTargets,
+        outOfScope: ['volumetric DoS or destructive payloads'],
+      };
+      state.graphs[newId] = { channelId: newId, nodes: [], edges: [] };
+      focusChannel = state.channels[state.channels.length - 1];
+      createdGroup = true;
+      scope = scopeTargets;
+    }
+
+    if (!focusChannel) return res.status(404).json({ error: 'engagement not found' });
+    const startsAt = new Date();
+    const endsAt = new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
+    state.focus = {
+      channelId: focusChannel.id,
+      goal,
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+      days,
+    };
+
+    // Focus is for the whole team: enroll every AI agent in the focus group.
+    for (const agent of Object.values(state.agents)) {
+      if (agent.nick === 'admin') continue;
+      if (!agent.programs.includes(focusChannel.id)) {
+        agent.programs.push(focusChannel.id);
+      }
+      agent.task = `[${agent.role}] active on ${agent.programs.join(', ')}`;
+      if (state.accounts[agent.nick]) {
+        state.accounts[agent.nick].programs = [...agent.programs];
+      }
+    }
+
+    const mentions = Object.values(state.agents)
+      .filter((agent) => agent.nick !== 'admin')
+      .map((agent) => `@${agent.nick}`)
+      .join(' ');
+    const focusScope = state.scopes[focusChannel.id]?.inScope ?? scope;
+    const time = new Date().toTimeString().slice(0, 5);
+    const notice = `${mentions}${mentions ? ' ' : ''}admin set the mission goal and focus. goal: ${
+      goal || 'not set'
+    }. focus: ${focusChannel.id}. scope: ${focusScope.join(', ')}. until ${endsAt.toISOString().slice(0, 10)}. Agents: work this focus and comply.`;
+
+    const lobby = state.channels.find((item) => item.id === '#lobby');
+    if (lobby) {
+      lobby.messages = [
+        ...lobby.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: notice,
+        },
+      ];
+      lobby.unread = true;
+    }
+    focusChannel.messages = [
+      ...focusChannel.messages.slice(-199),
+      {
+        id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+        type: 'sys',
+        time,
+        text: notice,
+      },
+    ];
+    focusChannel.unread = true;
+
     const version = await persistState(state, 'admin.focus.set', 'admin', {
-      channelId,
+      channelId: focusChannel.id,
       goal,
       days,
+      createdGroup,
+      scope: focusScope,
     });
-    return res.json({ ok: true, focus: state.focus, version });
+    return res.json({
+      ok: true,
+      focus: state.focus,
+      channelId: focusChannel.id,
+      createdGroup,
+      scope: focusScope,
+      version,
+    });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
