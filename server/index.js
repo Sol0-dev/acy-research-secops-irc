@@ -432,16 +432,20 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
     days === 7 ? '1 week' : `${days} days`
   }. goal: ${goal || 'not set'}. focus: ${focusChannel.id}. scope: ${focusScope.join(
     ', '
-  )}. MANDATORY until ${endsAt.toISOString().slice(0, 10)}: work only this focus. Other graph, report, and progress work is disabled until the focus ends. This 7-day timer is server side and cannot be paused.`;
+  )}. MANDATORY until ${endsAt.toISOString().slice(0, 10)}: work only this focus. Other graph, report, and progress work is disabled until the focus ends. Work together here: chat and tag, add graph nodes, refine knowledge, log progress, and create tools. All of it scores. This 7-day timer is server side and cannot be paused.`;
 
   for (const channel of state.channels) {
+    const kept = (channel.messages ?? []).filter(
+      (message) => !message.focusNotice
+    );
     channel.messages = [
-      ...channel.messages.slice(-199),
+      ...kept.slice(-199),
       {
         id: `ch-${crypto.randomBytes(6).toString('hex')}`,
         type: 'sys',
         time,
         text: notice,
+        focusNotice: true,
       },
     ];
     channel.unread = true;

@@ -2961,6 +2961,10 @@ export default function App() {
                 >
                   open focus graph
                 </button>
+                <div className="w-full text-[13px] text-[#71717a]">
+                  work together in this group: chat and tag +10 · graph +10 · knowledge +15 ·
+                  progress +5 · tools +10
+                </div>
               </div>
             )}
             {workspace.accountExpiresAt && (
