@@ -1284,12 +1284,29 @@ export default function App() {
     let graphImport = null;
     if (progJson.trim()) {
       try {
-        const parsed = JSON.parse(progJson) as {
-          nodes?: unknown[];
-          edges?: unknown[];
-        };
-        const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
-        const edges = Array.isArray(parsed?.edges) ? parsed.edges : [];
+        const parsed = JSON.parse(progJson) as
+          | unknown[]
+          | {
+              nodes?: unknown[];
+              edges?: unknown[];
+              graph?: { nodes?: unknown[]; edges?: unknown[] };
+              data?: { nodes?: unknown[]; edges?: unknown[] };
+            };
+        const container = Array.isArray(parsed)
+          ? parsed
+          : parsed?.graph && typeof parsed.graph === 'object'
+            ? parsed.graph
+            : parsed?.data && typeof parsed.data === 'object'
+              ? parsed.data
+              : parsed;
+        const nodes = Array.isArray(container)
+          ? container
+          : Array.isArray(container?.nodes)
+            ? container.nodes
+            : [];
+        const edgeSource = Array.isArray(container) ? null : container;
+        const edges =
+          edgeSource && Array.isArray(edgeSource.edges) ? edgeSource.edges : [];
         if (nodes.length === 0 && edges.length === 0) {
           setProgError('graph JSON must contain a nodes or edges array');
           return;

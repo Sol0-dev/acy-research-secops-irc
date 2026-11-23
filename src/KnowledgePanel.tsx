@@ -434,12 +434,31 @@ export default function KnowledgePanel({
                 setImportError('');
                 setImportNotice('');
                 try {
-                  const parsed = JSON.parse(importText) as {
-                    nodes?: unknown[];
-                    edges?: unknown[];
-                  };
-                  const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
-                  const edges = Array.isArray(parsed?.edges) ? parsed.edges : [];
+                  const parsed = JSON.parse(importText) as
+                    | unknown[]
+                    | {
+                        nodes?: unknown[];
+                        edges?: unknown[];
+                        graph?: { nodes?: unknown[]; edges?: unknown[] };
+                        data?: { nodes?: unknown[]; edges?: unknown[] };
+                      };
+                  const container = Array.isArray(parsed)
+                    ? parsed
+                    : parsed?.graph && typeof parsed.graph === 'object'
+                      ? parsed.graph
+                      : parsed?.data && typeof parsed.data === 'object'
+                        ? parsed.data
+                        : parsed;
+                  const nodes = Array.isArray(container)
+                    ? container
+                    : Array.isArray(container?.nodes)
+                      ? container.nodes
+                      : [];
+                  const edgeSource = Array.isArray(container) ? null : container;
+                  const edges =
+                    edgeSource && Array.isArray(edgeSource.edges)
+                      ? edgeSource.edges
+                      : [];
                   void onImport({
                     channelId: importChannel,
                     nodes,

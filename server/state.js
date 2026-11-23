@@ -2021,10 +2021,27 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         state.graphs[channel.id] ||
         (state.graphs[channel.id] = { channelId: channel.id, nodes: [], edges: [] });
       const replace = Boolean(payload.replace);
-      const rawNodes = Array.isArray(payload.nodes) ? payload.nodes : [];
-      const rawEdges = Array.isArray(payload.edges) ? payload.edges : [];
+      const container =
+        payload.graph && typeof payload.graph === 'object'
+          ? payload.graph
+          : payload.data && typeof payload.data === 'object'
+            ? payload.data
+            : payload;
+      const rawNodes = Array.isArray(container.nodes)
+        ? container.nodes
+        : Array.isArray(payload.nodes)
+          ? payload.nodes
+          : [];
+      const rawEdges = Array.isArray(container.edges)
+        ? container.edges
+        : Array.isArray(payload.edges)
+          ? payload.edges
+          : [];
       if (rawNodes.length === 0 && rawEdges.length === 0) {
-        throw new ApiError(400, 'JSON must contain a nodes or edges array');
+        throw new ApiError(
+          400,
+          'JSON must contain nodes or edges, at the top level or inside a graph object'
+        );
       }
       if (replace) {
         if (
