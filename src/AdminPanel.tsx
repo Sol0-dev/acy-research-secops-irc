@@ -152,7 +152,7 @@ export default function AdminPanel({
     setGoalNotice('');
     setGoalError('');
     setFocusChannelId(
-      snapshot?.focus?.channelId ?? snapshot?.engagements?.[0]?.id ?? '__new__'
+      snapshot?.focus?.channelId ?? '__new__'
     );
     setFocusNotice('');
     setFocusError('');
