@@ -1022,10 +1022,17 @@ export function ensureGoalHistory(state) {
       startsAt,
       endsAt,
       days: state.focus?.days ?? 7,
-      active: true,
+      active: Boolean(state.focus?.channelId),
       createdAt: startsAt,
       createdBy: 'admin',
     });
+  }
+  for (const entry of state.goalHistory) {
+    entry.active = Boolean(
+      state.focus?.channelId &&
+        entry.channelId === state.focus.channelId &&
+        entry.goal === state.focus.goal
+    );
   }
   return state.goalHistory;
 }

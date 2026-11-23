@@ -314,7 +314,15 @@ app.get('/api/admin', async (req, res) => {
 
 function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } = {}) {
   if (!channelId && !goal) {
+    const focusedChannel = state.focus?.channelId;
     state.focus = null;
+    if (focusedChannel && Array.isArray(state.goalHistory)) {
+      for (const entry of state.goalHistory) {
+        if (entry.active && entry.channelId === focusedChannel) {
+          entry.active = false;
+        }
+      }
+    }
     return { focus: null, channelId: '', createdGroup: false, scope: [] };
   }
 
