@@ -309,6 +309,39 @@ export default function KnowledgePanel({
     setNotice('node deleted');
   };
 
+  const deleteRelatedNode = async (relation: {
+    nodeId: string | null;
+    nodeLabel: string;
+    target: string;
+  }) => {
+    if (!relation.nodeId) return;
+    if (relation.target === '?') {
+      setError('target for this node was not found');
+      return;
+    }
+    if (
+      !window.confirm(
+        `Delete knowledge node "${relation.nodeLabel}" and all of its relationships?`
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setNotice('');
+    const result = await onRemoveNode({
+      channelId: relation.target,
+      nodeId: relation.nodeId,
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error || 'could not delete related node');
+      return;
+    }
+    if (selectedId === relation.nodeId) setSelectedId(null);
+    setNotice(`deleted ${relation.nodeLabel} and its relationships`);
+  };
+
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#fafafa] dark:bg-[#0c0c0e] overflow-hidden">
       <div className="px-4 sm:px-5 py-3 border-b border-[#e5e5e5] dark:border-[#1a1a1e] flex flex-wrap items-center gap-2 shrink-0">
@@ -690,18 +723,27 @@ export default function KnowledgePanel({
               <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5 text-[13px] text-[#71717a] space-y-1">
                 <div>relations: {relations.length === 0 ? ' none' : ` ${relations.length}`}</div>
                 {relations.map((relation) => (
-                  <button
-                    key={relation.edgeId}
-                    type="button"
-                    onClick={() => {
-                      if (relation.nodeId) setSelectedId(relation.nodeId);
-                    }}
-                    className="block w-full text-left text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
-                  >
-                    {relation.direction === 'out' ? '->' : '<-'}
-                    {relation.label ? ` [${relation.label}]` : ''} {relation.target} ·{' '}
-                    {relation.nodeLabel}
-                  </button>
+                  <div key={relation.edgeId} className="flex items-start gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (relation.nodeId) setSelectedId(relation.nodeId);
+                      }}
+                      className="flex-1 min-w-0 text-left text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                    >
+                      {relation.direction === 'out' ? '->' : '<-'}
+                      {relation.label ? ` [${relation.label}]` : ''} {relation.target} ·{' '}
+                      {relation.nodeLabel}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void deleteRelatedNode(relation)}
+                      className="shrink-0 px-1 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[12px] text-[#f87171] hover:border-[#f87171] disabled:opacity-40"
+                    >
+                      delete node
+                    </button>
+                  </div>
                 ))}
               </div>
               <div className="text-[13px] text-[#71717a]">

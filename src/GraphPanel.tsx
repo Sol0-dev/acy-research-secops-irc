@@ -431,6 +431,25 @@ export default function GraphPanel({
     setSelectedId(null);
   };
 
+  const deleteRelatedNode = async (node: GraphNode) => {
+    if (
+      !window.confirm(
+        `Delete node "${node.label}" and all of its relationships?`
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError('');
+    const result = await onRemoveNode({ nodeId: node.id });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error || 'could not delete related node');
+      return;
+    }
+    if (selectedId === node.id) setSelectedId(null);
+  };
+
   const inputClass =
     'w-full bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1.5 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none focus:border-[#71717a]';
   const areaClass =
@@ -997,15 +1016,27 @@ export default function GraphPanel({
                       <div className="text-[13px] text-[#71717a]">no relations yet</div>
                     ) : (
                       selectedRelations.map((relation, index) => (
-                        <button
+                        <div
                           key={`${relation.node.id}-${index}`}
-                          type="button"
-                          onClick={() => setSelectedId(relation.node.id)}
-                          className="w-full text-left text-[13px] text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                          className="flex items-start gap-1"
                         >
-                          {relation.direction === 'out' ? '->' : '<-'} {relation.label ? `[${relation.label}] ` : ''}
-                          {relation.node.label}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedId(relation.node.id)}
+                            className="flex-1 min-w-0 text-left text-[13px] text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                          >
+                            {relation.direction === 'out' ? '->' : '<-'} {relation.label ? `[${relation.label}] ` : ''}
+                            {relation.node.label}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void deleteRelatedNode(relation.node)}
+                            className="shrink-0 px-1 py-0.5 border border-[#e5e5e5] dark:border-[#1a1a1e] text-[12px] text-[#f87171] hover:border-[#f87171] disabled:opacity-40"
+                          >
+                            delete node
+                          </button>
+                        </div>
                       ))
                     )}
                   </div>

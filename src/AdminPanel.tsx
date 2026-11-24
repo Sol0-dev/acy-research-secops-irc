@@ -156,6 +156,7 @@ export default function AdminPanel({
   const [adminTab, setAdminTab] = useState<AdminTab>('goal');
   const [adminGraphChannelId, setAdminGraphChannelId] = useState('');
   const [knowledgeSearch, setKnowledgeSearch] = useState('');
+  const [adminGraphSearch, setAdminGraphSearch] = useState('');
   const [auditActorFilter, setAuditActorFilter] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState('');
   const [auditSearch, setAuditSearch] = useState('');
@@ -319,31 +320,59 @@ export default function AdminPanel({
     : null;
 
   const knowledgeQuery = knowledgeSearch.trim().toLowerCase();
-  const knowledgeMatches = mergedNodes
-    .filter((node) => {
-      if (!knowledgeQuery) return false;
-      const intel = node.intel ?? {};
-      return [
-        node.label,
-        node.kind,
-        node.notes ?? '',
-        intel.phase ?? '',
-        intel.technique ?? '',
-        intel.commands ?? '',
-        intel.scripts ?? '',
-        intel.request ?? '',
-        intel.response ?? '',
-        intel.chain ?? '',
-        intel.lessons ?? '',
-        intel.template ?? '',
-        intel.references ?? '',
-        ...(intel.tags ?? []),
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(knowledgeQuery);
-    })
-    .slice(0, 20);
+  const knowledgeMatches = mergedNodes.filter((node) => {
+    if (!knowledgeQuery) return false;
+    const intel = node.intel ?? {};
+    return [
+      node.label,
+      node.kind,
+      node.notes ?? '',
+      node.createdBy ?? '',
+      node.updatedBy ?? '',
+      intel.phase ?? '',
+      intel.technique ?? '',
+      intel.commands ?? '',
+      intel.scripts ?? '',
+      intel.request ?? '',
+      intel.response ?? '',
+      intel.chain ?? '',
+      intel.lessons ?? '',
+      intel.template ?? '',
+      intel.references ?? '',
+      ...(intel.tags ?? []),
+    ]
+      .join(' ')
+      .toLowerCase()
+      .includes(knowledgeQuery);
+  });
+
+  const adminGraphQuery = adminGraphSearch.trim().toLowerCase();
+  const adminGraphMatches = !adminGraph || !adminGraphQuery
+    ? []
+    : adminGraph.nodes.filter((node) => {
+        const intel = node.intel ?? {};
+        return [
+          node.label,
+          node.kind,
+          node.notes ?? '',
+          node.createdBy ?? '',
+          node.updatedBy ?? '',
+          intel.phase ?? '',
+          intel.technique ?? '',
+          intel.commands ?? '',
+          intel.scripts ?? '',
+          intel.request ?? '',
+          intel.response ?? '',
+          intel.chain ?? '',
+          intel.lessons ?? '',
+          intel.template ?? '',
+          intel.references ?? '',
+          ...(intel.tags ?? []),
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(adminGraphQuery);
+      }).map((node) => node.id);
   const mergedRelations = mergedNode
     ? mergedEdges
         .filter((edge) => edge.from === mergedNode.id || edge.to === mergedNode.id)
@@ -1046,6 +1075,18 @@ export default function AdminPanel({
                   <span className="text-base text-[#71717a]">
                     {adminGraph.nodes.length} nodes · {adminGraph.edges.length} edges
                   </span>
+                  <input
+                    type="text"
+                    value={adminGraphSearch}
+                    onChange={(event) => setAdminGraphSearch(event.target.value)}
+                    placeholder="search graph, agent, technique, command..."
+                    className="flex-1 min-w-[220px] bg-[#050506] border border-[#2a2a30] px-2 py-1 text-[15px] text-[#f4f4f5]"
+                  />
+                  {adminGraphSearch && (
+                    <span className="text-[14px] text-[#f59e0b]">
+                      highlighted {adminGraphMatches.length}
+                    </span>
+                  )}
                   <div className="flex items-center gap-1 ml-auto">
                     <button
                       type="button"
@@ -1068,6 +1109,18 @@ export default function AdminPanel({
                       delete graph
                     </button>
                   </div>
+                </div>
+                <div className="h-[60vh] min-h-[420px] border border-[#2a2a30] overflow-hidden bg-[#050506]">
+                  <GraphView
+                    nodes={adminGraph.nodes}
+                    edges={adminGraph.edges}
+                    isDark
+                    selectedNodeId={selectedGraph?.nodeId ?? null}
+                    highlightedNodeIds={adminGraphMatches}
+                    onSelectNode={(nodeId) =>
+                      setSelectedGraph({ channelId: adminGraph.channelId, nodeId })
+                    }
+                  />
                 </div>
                 <div className="border-t border-[#2a2a30] pt-2 space-y-1">
                   <div className="text-[14px] uppercase tracking-wider text-[#71717a]">
@@ -1225,6 +1278,7 @@ export default function AdminPanel({
                       edges={mergedEdges}
                       isDark
                       selectedNodeId={mergedNode?.id ?? null}
+                      highlightedNodeIds={knowledgeMatches.map((node) => node.id)}
                       onSelectNode={(nodeId) =>
                         setSelectedGraph({
                           channelId: targetByNode.get(nodeId) ?? '',
@@ -1256,7 +1310,7 @@ export default function AdminPanel({
                             >
                               <span className="text-[#71717a]">
                                 {targetByNode.get(node.id) ?? '?'} · [
-                                {node.kind}]
+                                {node.kind}] · by {node.createdBy}
                               </span>{' '}
                               {node.label}
                               {node.intel?.phase ? ` - ${node.intel.phase}` : ''}

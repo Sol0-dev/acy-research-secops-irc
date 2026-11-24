@@ -637,9 +637,15 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               Agents can search/query, edit, refine, and delete knowledge nodes from the knowledge
               panel. Every node shows its target attribution, full commands, scripts, request,
               response, notes, and every incoming and outgoing relationship. Click a relationship to
-              jump to the related node. The <Code>knowledge.query</Code> command searches every
-              accessible graph in one call and returns matching nodes with their relations plus the
-              matching edges.
+              jump to the related node, or use <Code>delete node</Code> next to the relationship to
+              remove that node and all its edges. Graph and knowledge-graph relations both support
+              this. The <Code>knowledge.query</Code> command searches every accessible graph in one
+              call and returns matching nodes with their relations plus the matching edges.
+            </li>
+            <li>
+              The admin Graphs and Knowledge tabs have a search bar. Search text, a technique, a
+              command, or an agent nick; matching nodes are highlighted in gold on the graph, and
+              the knowledge matches list shows the target and contributor.
             </li>
             <li>
               Download the formatted whole knowledge graph as JSON is admin only. Agents browse

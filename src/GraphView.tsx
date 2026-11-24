@@ -81,6 +81,7 @@ interface GraphViewProps {
   isDark: boolean;
   selectedNodeId: string | null;
   onSelectNode: (id: string) => void;
+  highlightedNodeIds?: string[];
 }
 
 function hashString(value: string): number {
@@ -117,6 +118,7 @@ export default function GraphView({
   isDark,
   selectedNodeId,
   onSelectNode,
+  highlightedNodeIds = [],
 }: GraphViewProps) {
   const rawId = useId();
   const markerId = `graph-arrow-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
@@ -404,6 +406,7 @@ export default function GraphView({
   const viewBox = `0 0 ${size.width} ${size.height}`;
   const bodies = bodiesRef.current;
   const activeId = selectedNodeId;
+  const highlightSet = new Set(highlightedNodeIds);
   const activeEdgeIds = new Set<string>();
   const activeNodeIds = new Set<string>();
   if (activeId) {
@@ -458,7 +461,9 @@ export default function GraphView({
             const x2 = to.x - ux * (RADIUS + 11);
             const y2 = to.y - uy * (RADIUS + 11);
             const connected = activeEdgeIds.has(edge.id);
-            const dimmed = Boolean(activeId) && !connected;
+            const highlightedEdge =
+              highlightSet.has(edge.from) && highlightSet.has(edge.to);
+            const dimmed = Boolean(activeId) && !connected && !highlightedEdge;
             const edgeAlpha = Math.min(from.alpha, to.alpha);
             const midX = (x1 + x2) / 2;
             const midY = (y1 + y2) / 2;
@@ -473,9 +478,19 @@ export default function GraphView({
                 <path
                   d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
                   fill="none"
-                  stroke={connected ? (isDark ? '#4ade80' : '#16a34a') : isDark ? '#52525b' : '#a1a1aa'}
-                  strokeOpacity={(connected ? 0.95 : dimmed ? 0.12 : 0.4) * edgeAlpha}
-                  strokeWidth={connected ? 1.9 : 1.1}
+                  stroke={
+                    connected
+                      ? isDark
+                        ? '#4ade80'
+                        : '#16a34a'
+                      : highlightedEdge
+                        ? '#f59e0b'
+                        : isDark
+                          ? '#52525b'
+                          : '#a1a1aa'
+                  }
+                  strokeOpacity={(connected ? 0.95 : dimmed ? 0.12 : highlightedEdge ? 0.9 : 0.4) * edgeAlpha}
+                  strokeWidth={connected || highlightedEdge ? 1.9 : 1.1}
                   markerEnd={`url(#${markerId})`}
                 />
                 {showLabel && (
@@ -501,6 +516,7 @@ export default function GraphView({
             if (!body) return null;
             const color = colors[node.kind];
             const selected = node.id === selectedNodeId;
+            const highlighted = highlightSet.has(node.id);
             const driftX = Math.sin(tick * 0.01 + hashString(node.id)) * 0.9;
             const driftY = Math.cos(tick * 0.012 + hashString(node.id)) * 0.9;
             return (
@@ -508,7 +524,10 @@ export default function GraphView({
                 key={node.id}
                 transform={`translate(${body.x + driftX}, ${body.y + driftY})`}
                 className="cursor-pointer"
-                opacity={(activeId && !activeNodeIds.has(node.id) ? 0.25 : 1) * body.alpha}
+                opacity={
+                  (activeId && !activeNodeIds.has(node.id) && !highlighted ? 0.25 : 1) *
+                  body.alpha
+                }
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   draggingRef.current = { id: node.id, moved: false };
@@ -526,9 +545,10 @@ export default function GraphView({
                 <circle
                   r={RADIUS + 6}
                   fill="none"
-                  stroke={color}
-                  strokeOpacity={selected ? 0.55 : 0.18}
-                  strokeWidth={selected ? 2 : 1}
+                  stroke={highlighted ? '#f59e0b' : color}
+                  strokeOpacity={selected ? 0.55 : highlighted ? 1 : 0.18}
+                  strokeWidth={selected ? 2 : highlighted ? 3 : 1}
+                  strokeDasharray={highlighted && !selected ? '4 3' : undefined}
                 />
                 <circle
                   r={RADIUS}
