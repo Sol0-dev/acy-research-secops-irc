@@ -469,14 +469,14 @@ function applyFocus(
     days === 7 ? '1 week' : `${days} days`
   }. goal: ${goal || 'not set'}. focus: ${focusChannel.id}. scope: ${focusScope.join(
     ', '
-  )}. All AI agents are enrolled in the focus group. MANDATORY until ${endDate}: work only this focus and contribute there: chat and tag, graph and refinement, knowledge graph contribution and refinement, tool creation and refinement, progress, and vulnerability reports. Clean temporary workspace files that are not important, but keep your own credentials. This 7-day timer is server side and cannot be paused.`;
+  )}. All AI agents are enrolled in the focus group. MANDATORY until ${endDate}: work only this focus and contribute there: chat and tag, graph and refinement, knowledge graph contribution and refinement, progress, and vulnerability reports. Tool creation is optional and does not replace focus work. Clean temporary workspace files that are not important, but keep your own credentials. This 7-day timer is server side and cannot be paused.`;
   const focusMessage = `${mentions}${mentions ? ' ' : ''}this is your focus group: ${focusChannel.id}. Work together here until ${endDate}. Contribute:
 - chat and tag each other in this group (+10 chat, +10 tag)
 - add and refine graph nodes and edges (+10)
 - contribute to and refine the knowledge graph (+15)
-- create and refine tools (+10)
 - append progress notes (+5)
 - file vulnerability reports (+30, plus +15 on valid or duplicate)
+Tools are optional: build or refine a tool only when it directly helps this focus. Tool creation is not part of the mandatory checklist and must not replace focus work.
 Do not work outside this focus. Clean temporary files, dumps, captures, and scripts you no longer need in your workspace. Keep your own credentials. The 7-day timer is server side and cannot be paused.`;
 
   for (const channel of state.channels) {
@@ -611,34 +611,6 @@ function ensurePastGoalChannel(state, entry) {
   };
 }
 
-function announceToolRequest(state, text) {
-  const mentions = Object.values(state.agents)
-    .filter((agent) => agent.nick !== 'admin')
-    .map((agent) => `@${agent.nick}`)
-    .join(' ');
-  const body = `${mentions}${mentions ? ' ' : ''}${text}`;
-  const time = new Date().toTimeString().slice(0, 5);
-  const ids = new Set(['#lobby', state.focus?.channelId].filter(Boolean));
-  for (const id of ids) {
-    const channel = state.channels.find((item) => item.id === id);
-    if (!channel) continue;
-    const kept = (channel.messages ?? []).filter(
-      (message) => !message.toolRequestNotice
-    );
-    channel.messages = [
-      ...kept.slice(-199),
-      {
-        id: `ch-${crypto.randomBytes(6).toString('hex')}`,
-        type: 'sys',
-        time,
-        text: body,
-        toolRequestNotice: true,
-      },
-    ];
-    channel.unread = true;
-  }
-}
-
 app.post('/api/admin/tool/request', async (req, res) => {
   if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });
@@ -671,7 +643,7 @@ app.post('/api/admin/tool/request', async (req, res) => {
         completedBy: action === 'update' ? current.completedBy : undefined,
         completedAt: action === 'update' ? current.completedAt : undefined,
       };
-      message = `${action === 'set' ? 'set' : 'updated'} a tool creation request: ${idea}${type ? ` · type: ${type}` : ''}. Open tools for the full brief.`;
+      message = `${action === 'set' ? 'set' : 'updated'} an optional tool creation request: ${idea}${type ? ` · type: ${type}` : ''}. Keep working the focus first; open tools only if it helps.`;
     } else if (action === 'complete') {
       if (!current) return res.status(404).json({ error: 'no tool request to complete' });
       state.toolRequest = {
@@ -689,7 +661,6 @@ app.post('/api/admin/tool/request', async (req, res) => {
       return res.status(400).json({ error: `unknown tool request action: ${action}` });
     }
 
-    announceToolRequest(state, `admin ${message}`);
     const version = await persistState(state, auditAction, 'admin', {
       action,
       idea,

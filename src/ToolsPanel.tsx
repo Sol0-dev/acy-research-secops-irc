@@ -287,54 +287,48 @@ export default function ToolsPanel({
         </div>
       </div>
 
-      <div className="mx-4 sm:mx-5 mt-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-white/60 dark:bg-[#09090b] p-2.5 font-mono text-[14px] space-y-1.5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
-            tool creation request
-          </span>
-          <span
-            className={`uppercase tracking-wider ${
-              toolRequest?.status === 'completed'
-                ? 'text-[#71717a]'
-                : 'text-[#16a34a] dark:text-[#4ade80]'
-            }`}
-          >
-            {toolRequest ? toolRequest.status : 'none'}
-          </span>
-          {toolRequest && (
-            <span className="text-[#71717a]">
-              set by {toolRequest.setBy} at {new Date(toolRequest.setAt).toLocaleString()}
-            </span>
-          )}
-          {toolRequest?.completedAt && (
-            <span className="text-[#71717a]">
-              completed {new Date(toolRequest.completedAt).toLocaleString()}
-            </span>
+      <details className="mx-4 sm:mx-5 mt-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-white/60 dark:bg-[#09090b] p-2.5 font-mono text-[14px]">
+        <summary className="cursor-pointer text-[13px] uppercase tracking-wider text-[#71717a] hover:text-[#18181b] dark:hover:text-[#f4f4f5]">
+          optional tool creation request · {toolRequest ? toolRequest.status : 'none'}
+        </summary>
+        <div className="space-y-1.5 pt-2">
+          <div className="text-[13px] text-[#71717a]">
+            Optional only. The mandatory focus goal always comes first. Do not stop
+            focus work to build this.
+          </div>
+          {toolRequest ? (
+            <>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[#71717a]">
+                <span>set by {toolRequest.setBy}</span>
+                <span>{new Date(toolRequest.setAt).toLocaleString()}</span>
+                {toolRequest.completedAt && (
+                  <span>
+                    completed {new Date(toolRequest.completedAt).toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <div className="text-[15px] text-[#18181b] dark:text-[#f4f4f5] whitespace-pre-wrap break-words">
+                tool idea: {toolRequest.idea}
+              </div>
+              <div className="text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap break-words">
+                tool type: {toolRequest.type || '-'}
+              </div>
+              <div className="text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap break-words">
+                other details: {toolRequest.details || '-'}
+              </div>
+              <button
+                type="button"
+                onClick={useToolRequest}
+                className="px-2.5 py-1 border border-[#16a34a]/50 dark:border-[#4ade80]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80]"
+              >
+                use request as new tool
+              </button>
+            </>
+          ) : (
+            <div className="text-[#71717a]">no optional tool creation request set by admin</div>
           )}
         </div>
-        {toolRequest ? (
-          <>
-            <div className="text-[15px] text-[#18181b] dark:text-[#f4f4f5] whitespace-pre-wrap break-words">
-              tool idea: {toolRequest.idea}
-            </div>
-            <div className="text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap break-words">
-              tool type: {toolRequest.type || '-'}
-            </div>
-            <div className="text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap break-words">
-              other details: {toolRequest.details || '-'}
-            </div>
-            <button
-              type="button"
-              onClick={useToolRequest}
-              className="px-2.5 py-1 border border-[#16a34a]/50 dark:border-[#4ade80]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80]"
-            >
-              use request as new tool
-            </button>
-          </>
-        ) : (
-          <div className="text-[#71717a]">no tool creation request set by admin</div>
-        )}
-      </div>
+      </details>
 
       {error && (
         <div className="mx-4 sm:mx-5 mt-2 text-[14px] font-mono border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
