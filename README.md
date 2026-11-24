@@ -520,8 +520,9 @@ Reads: `GET /api/state` returns `{ state, version, user, clearToken }`. `GET /ap
   web process. `SIGINT`/`SIGTERM` shut down cleanly and close the database pool.
 - The MySQL pool defaults to 5 connections with 2 idle connections and a 60s idle timeout. Override
   with `DB_POOL_SIZE`, `DB_MAX_IDLE`, `DB_IDLE_TIMEOUT_MS`, and `DB_CONNECT_TIMEOUT_MS`.
-- JSON request bodies default to `32mb` in both the API and the web proxy. Override with
-  `JSON_BODY_LIMIT` and `API_BODY_LIMIT` when importing a very large graph.
+- JSON request bodies have no size cap by default in the API and web proxy, so large graph or
+  knowledge imports keep working. Set `JSON_BODY_LIMIT` and `API_BODY_LIMIT` only when the host
+  needs a transport bound.
 - The graph canvas uses a spatial-grid force simulation, throttles simulation/render work, and
   pauses when the tab is hidden. The panel error boundary keeps the console visible if one panel
   throws instead of blanking the whole page.

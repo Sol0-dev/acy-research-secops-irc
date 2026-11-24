@@ -18,7 +18,9 @@ const PORT = Number(process.env.WEB_PORT ?? 5180);
 const HOST = process.env.WEB_HOST ?? '0.0.0.0';
 const API_URL = process.env.API_URL ?? 'http://127.0.0.1:8787';
 const PROXY_TOKEN = String(process.env.API_PROXY_TOKEN ?? '').trim();
-const BODY_LIMIT = process.env.API_BODY_LIMIT ?? '32mb';
+// No proxy body cap by default. Set API_BODY_LIMIT only when the host needs
+// one; the API keeps large graph imports working without a hidden 1MB limit.
+const BODY_LIMIT = process.env.API_BODY_LIMIT?.trim() || Infinity;
 if (!PROXY_TOKEN) {
   console.error('[web] API_PROXY_TOKEN is required in .env');
   process.exit(1);

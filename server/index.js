@@ -78,7 +78,10 @@ function statusForError(error) {
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT ?? '32mb' }));
+// No request-body cap by default. Set JSON_BODY_LIMIT only when the host
+// needs a transport bound; field-level limits remain removed.
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT?.trim() || Infinity;
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
