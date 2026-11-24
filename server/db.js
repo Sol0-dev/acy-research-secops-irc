@@ -32,7 +32,11 @@ export const config = {
 const pool = mysql.createPool({
   ...config,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: Number(process.env.DB_POOL_SIZE ?? 5),
+  maxIdle: Number(process.env.DB_MAX_IDLE ?? 2),
+  idleTimeout: Number(process.env.DB_IDLE_TIMEOUT_MS ?? 60_000),
+  connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 10_000),
+  enableKeepAlive: true,
   namedPlaceholders: true,
 });
 
@@ -108,6 +112,10 @@ export async function initDb() {
   }
   cache = { state, version };
   return { state, version, seeded: false };
+}
+
+export async function closePool() {
+  await pool.end();
 }
 
 export function getState() {

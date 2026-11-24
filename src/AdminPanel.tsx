@@ -12,7 +12,15 @@ import GraphView from './GraphView';
 import Countdown from './Countdown';
 import type { AdminSnapshot } from './types';
 
-type AdminTab = 'goal' | 'graphs' | 'knowledge' | 'accounts' | 'duels' | 'audit' | 'irc';
+type AdminTab =
+  | 'goal'
+  | 'graphs'
+  | 'knowledge'
+  | 'tools'
+  | 'accounts'
+  | 'duels'
+  | 'audit'
+  | 'irc';
 
 const GLOBAL_DUEL = '__global__';
 
@@ -28,6 +36,10 @@ interface AdminPanelProps {
   onSetDuelTask: (duelId: string, task: string) => Promise<{ ok: boolean; error?: string }>;
   onContinueGoal: (goalId: string) => Promise<{ ok: boolean; error?: string }>;
   onCompleteGoal: (note?: string) => Promise<{ ok: boolean; error?: string }>;
+  onToolRequest: (
+    action: 'set' | 'update' | 'complete' | 'unset' | 'delete',
+    input?: { idea?: string; type?: string; details?: string }
+  ) => Promise<{ ok: boolean; error?: string }>;
   onOpenAgentPortal: () => void;
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
@@ -80,6 +92,7 @@ export default function AdminPanel({
   onSetDuelTask,
   onContinueGoal,
   onCompleteGoal,
+  onToolRequest,
   onOpenAgentPortal,
   onDeleteGraph,
   onDeleteChannel,
@@ -102,6 +115,13 @@ export default function AdminPanel({
   const [goalCompleteNotice, setGoalCompleteNotice] = useState('');
   const [goalCompleteError, setGoalCompleteError] = useState('');
   const [goalBusy, setGoalBusy] = useState(false);
+  const [toolRequestIdea, setToolRequestIdea] = useState('');
+  const [toolRequestType, setToolRequestType] = useState('');
+  const [toolRequestDetails, setToolRequestDetails] = useState('');
+  const [toolRequestEditing, setToolRequestEditing] = useState(false);
+  const [toolRequestBusy, setToolRequestBusy] = useState('');
+  const [toolRequestNotice, setToolRequestNotice] = useState('');
+  const [toolRequestError, setToolRequestError] = useState('');
   const [pendingDelete, setPendingDelete] = useState('');
   const [confirmAccountDelete, setConfirmAccountDelete] = useState<string | null>(null);
   const [accountNotice, setAccountNotice] = useState('');
@@ -169,6 +189,14 @@ export default function AdminPanel({
     setFocusNotice('');
     setFocusError('');
   }, [snapshot]);
+
+  useEffect(() => {
+    if (toolRequestEditing) return;
+    const request = snapshot?.toolRequest ?? null;
+    setToolRequestIdea(request?.idea ?? '');
+    setToolRequestType(request?.type ?? '');
+    setToolRequestDetails(request?.details ?? '');
+  }, [snapshot?.toolRequest, toolRequestEditing]);
 
   useEffect(() => {
     if (!snapshot) return;
@@ -312,6 +340,45 @@ export default function AdminPanel({
           };
         })
     : [];
+
+  const runToolRequest = (
+    action: 'set' | 'update' | 'complete' | 'unset' | 'delete',
+    input: { idea?: string; type?: string; details?: string } = {}
+  ) => {
+    setToolRequestBusy(action);
+    setToolRequestNotice('');
+    setToolRequestError('');
+    void onToolRequest(action, input).then((result) => {
+      setToolRequestBusy('');
+      if (!result.ok) {
+        setToolRequestError(result.error || 'could not update the tool request');
+        return;
+      }
+      setToolRequestEditing(false);
+      setToolRequestNotice(
+        action === 'set'
+          ? 'tool request set · agents notified'
+          : action === 'update'
+            ? 'tool request updated'
+            : action === 'complete'
+              ? 'tool request marked completed'
+              : action === 'unset'
+                ? 'tool request unset'
+                : 'tool request deleted'
+      );
+    });
+  };
+
+  const startToolRequestEdit = () => {
+    const request = snapshot?.toolRequest;
+    if (!request) return;
+    setToolRequestIdea(request.idea);
+    setToolRequestType(request.type ?? '');
+    setToolRequestDetails(request.details ?? '');
+    setToolRequestEditing(true);
+    setToolRequestNotice('');
+    setToolRequestError('');
+  };
 
   const goalEntries = snapshot?.goalHistory ?? [];
   const activeGoals = goalEntries.filter((entry) => entry.active);
@@ -494,6 +561,7 @@ export default function AdminPanel({
                 ['goal', 'Goal'],
                 ['graphs', 'Graphs'],
                 ['knowledge', 'Knowledge'],
+                ['tools', 'Tools'],
                 ['accounts', 'Accounts'],
                 ['duels', 'Duels'],
                 ['audit', 'Audit logs'],
@@ -1179,6 +1247,183 @@ export default function AdminPanel({
                       </div>
                     )}
                   </aside>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className={`space-y-3 ${adminTab === 'tools' ? '' : 'hidden'}`}>
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
+              tool creation request
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="space-y-1">
+                <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                  tool idea
+                </span>
+                <input
+                  type="text"
+                  value={toolRequestIdea}
+                  onChange={(event) => setToolRequestIdea(event.target.value)}
+                  placeholder="what should the agents build?"
+                  className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[16px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                  tool type
+                </span>
+                <input
+                  type="text"
+                  value={toolRequestType}
+                  onChange={(event) => setToolRequestType(event.target.value)}
+                  placeholder="scanner, fuzzer, parser, exploit, verifier, chain..."
+                  className="w-full bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[16px] text-[#f4f4f5] focus:outline-none focus:border-[#71717a]"
+                />
+              </label>
+            </div>
+            <label className="block space-y-1">
+              <span className="text-[14px] uppercase tracking-wider text-[#71717a]">
+                other details
+              </span>
+              <textarea
+                rows={8}
+                value={toolRequestDetails}
+                onChange={(event) => setToolRequestDetails(event.target.value)}
+                placeholder="inputs, expected outputs, pipeline, constraints, target assumptions..."
+                className="w-full min-h-[180px] bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-[16px] leading-relaxed text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
+              />
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={Boolean(toolRequestBusy) || !toolRequestIdea.trim()}
+                onClick={() =>
+                  runToolRequest('set', {
+                    idea: toolRequestIdea,
+                    type: toolRequestType,
+                    details: toolRequestDetails,
+                  })
+                }
+                className="px-3 py-1.5 border border-[#4ade80]/50 text-[15px] text-[#4ade80] hover:bg-[#4ade80]/10 disabled:opacity-40"
+              >
+                {toolRequestBusy === 'set' ? 'saving…' : 'set'}
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(toolRequestBusy) || !snapshot.toolRequest}
+                onClick={() => runToolRequest('unset')}
+                className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#71717a] hover:text-[#f87171] disabled:opacity-40"
+              >
+                {toolRequestBusy === 'unset' ? 'clearing…' : 'unset'}
+              </button>
+              {toolRequestNotice && (
+                <span className="text-[14px] text-[#4ade80]">{toolRequestNotice}</span>
+              )}
+              {toolRequestError && (
+                <span className="text-[14px] text-[#f87171]">{toolRequestError}</span>
+              )}
+            </div>
+
+            <h2 className="text-base uppercase tracking-wider text-[#71717a]">
+              latest tool creation request set by the admin
+            </h2>
+            {!snapshot.toolRequest ? (
+              <div className="text-[15px] text-[#71717a]">no tool request set</div>
+            ) : (
+              <div className="border border-[#2a2a30] bg-[#09090b] p-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px]">
+                  <span
+                    className={`uppercase tracking-wider ${
+                      snapshot.toolRequest.status === 'completed'
+                        ? 'text-[#a1a1aa]'
+                        : 'text-[#4ade80]'
+                    }`}
+                  >
+                    {snapshot.toolRequest.status}
+                  </span>
+                  <span className="text-[#71717a]">
+                    set {new Date(snapshot.toolRequest.setAt).toLocaleString()}
+                  </span>
+                  {snapshot.toolRequest.updatedAt && (
+                    <span className="text-[#71717a]">
+                      updated {new Date(snapshot.toolRequest.updatedAt).toLocaleString()}
+                    </span>
+                  )}
+                  {snapshot.toolRequest.completedAt && (
+                    <span className="text-[#71717a]">
+                      completed {new Date(snapshot.toolRequest.completedAt).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[15px] text-[#f4f4f5] whitespace-pre-wrap break-words">
+                  tool idea: {snapshot.toolRequest.idea}
+                </div>
+                <div className="text-[14px] text-[#a1a1aa] whitespace-pre-wrap break-words">
+                  tool type: {snapshot.toolRequest.type || '-'}
+                </div>
+                <div className="text-[14px] text-[#a1a1aa] whitespace-pre-wrap break-words">
+                  other details: {snapshot.toolRequest.details || '-'}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 border-t border-[#2a2a30] pt-2">
+                  <button
+                    type="button"
+                    disabled={Boolean(toolRequestBusy) || toolRequestEditing}
+                    onClick={startToolRequestEdit}
+                    className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                  >
+                    edit
+                  </button>
+                  {toolRequestEditing && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={Boolean(toolRequestBusy) || !toolRequestIdea.trim()}
+                        onClick={() =>
+                          runToolRequest('update', {
+                            idea: toolRequestIdea,
+                            type: toolRequestType,
+                            details: toolRequestDetails,
+                          })
+                        }
+                        className="px-3 py-1.5 border border-[#4ade80]/50 text-[15px] text-[#4ade80] hover:bg-[#4ade80]/10 disabled:opacity-40"
+                      >
+                        {toolRequestBusy === 'update' ? 'saving…' : 'save changes'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(toolRequestBusy)}
+                        onClick={() => setToolRequestEditing(false)}
+                        className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#71717a]"
+                      >
+                        cancel
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    disabled={
+                      Boolean(toolRequestBusy) ||
+                      snapshot.toolRequest.status === 'completed'
+                    }
+                    onClick={() => runToolRequest('complete')}
+                    className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                  >
+                    {toolRequestBusy === 'complete' ? 'completing…' : 'completed'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(toolRequestBusy)}
+                    onClick={() => {
+                      if (!window.confirm('Delete this tool creation request?')) {
+                        return;
+                      }
+                      runToolRequest('delete');
+                    }}
+                    className="px-3 py-1.5 border border-[#2a2a30] text-[15px] text-[#71717a] hover:text-[#f87171] disabled:opacity-40"
+                  >
+                    {toolRequestBusy === 'delete' ? 'deleting…' : 'delete'}
+                  </button>
                 </div>
               </div>
             )}

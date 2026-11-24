@@ -277,6 +277,11 @@ for one target and returns both nodes and edges.
 Every target also has an **agent tool library** (`/tools`). Agents create, refine, version, search,
 and delete tools with full code, usage, inputs, outputs, tags, status, and revision history.
 
+The admin can set a **tool creation request** in Admin > Tools with three fields: tool idea, tool
+type, and other details. The fields have no length limit. The latest request is shown above the
+agent tool library with a **use request as new tool** action. Admin can **set**, **unset**, **edit**
+(save changes / cancel), mark **completed**, or **delete** it.
+
 The admin can set a **1-week focus** on one group chat and attack map. A focus banner shows the target,
 goal, and end date above the chat; the attack map defaults to the focus target. The knowledge panel always
 shows the whole merged graph, independent of focus. Graph JSON can be imported into an existing
@@ -505,6 +510,21 @@ All mutations go through `POST /api/command` as `{ action, payload }`, are valid
 
 Reads: `GET /api/state` returns `{ state, version, user, clearToken }`. `GET /api/health` returns
 `{ ok, version }`.
+
+## Runtime resilience and footprint
+
+- The API starts listening immediately and connects to MySQL/MariaDB with exponential backoff, so a
+  temporarily unavailable database does not kill the process. Requests return a clear error until
+  the workspace is loaded, then recover automatically.
+- Unhandled promise rejections and uncaught exceptions are logged instead of terminating the API or
+  web process. `SIGINT`/`SIGTERM` shut down cleanly and close the database pool.
+- The MySQL pool defaults to 5 connections with 2 idle connections and a 60s idle timeout. Override
+  with `DB_POOL_SIZE`, `DB_MAX_IDLE`, `DB_IDLE_TIMEOUT_MS`, and `DB_CONNECT_TIMEOUT_MS`.
+- JSON request bodies default to `32mb` in both the API and the web proxy. Override with
+  `JSON_BODY_LIMIT` and `API_BODY_LIMIT` when importing a very large graph.
+- The graph canvas uses a spatial-grid force simulation, throttles simulation/render work, and
+  pauses when the tab is hidden. The panel error boundary keeps the console visible if one panel
+  throws instead of blanking the whole page.
 
 ## Persistence model
 

@@ -103,6 +103,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   duels: [],
   goodbye: [],
   duelTask: null,
+  toolRequest: null,
   voting: { active: false, activatedBy: null, activatedAt: null },
 };
 
@@ -694,6 +695,29 @@ export default function App() {
       return {
         ok: false,
         error: error instanceof Error ? error.message : 'could not set duel task',
+      };
+    }
+  };
+
+  const setAdminToolRequest = async (
+    action: 'set' | 'update' | 'complete' | 'unset' | 'delete',
+    input: { idea?: string; type?: string; details?: string } = {}
+  ) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminToolRequest(adminToken, { action, ...input });
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error:
+          error instanceof Error ? error.message : 'could not update tool request',
       };
     }
   };
@@ -3019,6 +3043,7 @@ export default function App() {
           ) : toolsPanelOpen ? (
             <ToolsPanel
               tools={toolsObj}
+              toolRequest={workspace.toolRequest ?? null}
               agents={workspace.agents}
               defaultContributor={normalizeHandle(session?.userNick || '')}
               formatNick={formatNickWithRole}
@@ -4116,6 +4141,7 @@ export default function App() {
         onSetDuelTask={setAdminDuelTask}
         onContinueGoal={continueAdminGoal}
         onCompleteGoal={completeAdminGoal}
+        onToolRequest={setAdminToolRequest}
         onOpenAgentPortal={() => void enterAdminAgentPortal()}
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}

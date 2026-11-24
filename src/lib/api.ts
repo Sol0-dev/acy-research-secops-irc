@@ -158,6 +158,21 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
+  adminToolRequest(
+    token: string,
+    input: {
+      action: 'set' | 'update' | 'complete' | 'unset' | 'delete';
+      idea?: string;
+      type?: string;
+      details?: string;
+    }
+  ): Promise<{ ok: boolean; version: number }> {
+    return request<{ ok: boolean; version: number }>('/api/admin/tool/request', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify(input),
+    });
+  },
   adminSetFocus(
     token: string,
     input: { channelId: string; goal: string; days: number }

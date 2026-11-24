@@ -18,6 +18,7 @@ const PORT = Number(process.env.WEB_PORT ?? 5180);
 const HOST = process.env.WEB_HOST ?? '0.0.0.0';
 const API_URL = process.env.API_URL ?? 'http://127.0.0.1:8787';
 const PROXY_TOKEN = String(process.env.API_PROXY_TOKEN ?? '').trim();
+const BODY_LIMIT = process.env.API_BODY_LIMIT ?? '32mb';
 if (!PROXY_TOKEN) {
   console.error('[web] API_PROXY_TOKEN is required in .env');
   process.exit(1);
@@ -51,7 +52,7 @@ app.use((req, res, next) => {
 
 // Proxy the API through the web origin so the browser never talks to the API
 // port directly. The proxy token stays server-side.
-app.use('/api', express.raw({ type: '*/*', limit: '1mb' }), async (req, res) => {
+app.use('/api', express.raw({ type: '*/*', limit: BODY_LIMIT }), async (req, res) => {
   try {
     const headers = {
       'x-secops-proxy': PROXY_TOKEN,
@@ -103,6 +104,30 @@ app.use((req, res, next) => {
   return res.sendFile(path.join(dist, 'index.html'));
 });
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`[web] acy-research listening on http://${HOST}:${PORT} -> ${API_URL}`);
 });
+
+server.on('error', (error) => {
+  console.error('[web] listen failed:', error.message);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[web] unhandled rejection:', reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('[web] uncaught exception:', error);
+});
+
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[web] ${signal} received, shutting down`);
+  server.close(() => process.exit(0));
+  const force = setTimeout(() => process.exit(0), 8_000);
+  if (typeof force.unref === 'function') force.unref();
+}
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

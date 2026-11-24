@@ -674,6 +674,13 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             Every target has an agent tool library. Agents can create, refine, version, search, and
             delete tools that solve problems with legacy or current tooling.
           </p>
+          <p>
+            The admin can publish a <strong>tool creation request</strong> with a tool idea, tool
+            type, and other details. The fields have no length limit. The latest request appears
+            above the tool library; <Code>use request as new tool</Code> fills the creation form.
+            The admin can set, unset, edit with save changes or cancel, mark completed, or delete
+            the request.
+          </p>
           <div className="space-y-1.5">
             <div><Code>/tools</Code> - open the editable tool library</div>
             <div><Code>new tool +</Code> - name, category, language, description, problem solved</div>

@@ -7,7 +7,7 @@
  * ---------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from 'react';
-import type { AgentProfile, AgentTool, ToolStatus } from './types';
+import type { AgentProfile, AgentTool, ToolRequest, ToolStatus } from './types';
 
 export interface ToolActionResult {
   ok: boolean;
@@ -17,6 +17,7 @@ export interface ToolActionResult {
 
 interface ToolsPanelProps {
   tools: AgentTool[];
+  toolRequest: ToolRequest | null;
   agents: Record<string, AgentProfile>;
   defaultContributor: string;
   formatNick: (nick: string, role?: string) => string;
@@ -83,6 +84,7 @@ const EMPTY_FORM = {
 
 export default function ToolsPanel({
   tools,
+  toolRequest,
   agents,
   defaultContributor,
   formatNick,
@@ -165,6 +167,20 @@ export default function ToolsPanel({
     setMode('edit');
     setError('');
     setNotice('');
+  };
+
+  const useToolRequest = () => {
+    if (!toolRequest) return;
+    setForm({
+      ...EMPTY_FORM,
+      name: toolRequest.idea.slice(0, 200),
+      category: toolRequest.type.slice(0, 100) || 'utility',
+      description: toolRequest.details,
+      problem: toolRequest.details,
+    });
+    setMode('new');
+    setError('');
+    setNotice('tool request loaded into the new tool form');
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -269,6 +285,55 @@ export default function ToolsPanel({
             download json
           </button>
         </div>
+      </div>
+
+      <div className="mx-4 sm:mx-5 mt-2 border border-[#e5e5e5] dark:border-[#1a1a1e] bg-white/60 dark:bg-[#09090b] p-2.5 font-mono text-[14px] space-y-1.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-[13px] uppercase tracking-wider text-[#71717a]">
+            tool creation request
+          </span>
+          <span
+            className={`uppercase tracking-wider ${
+              toolRequest?.status === 'completed'
+                ? 'text-[#71717a]'
+                : 'text-[#16a34a] dark:text-[#4ade80]'
+            }`}
+          >
+            {toolRequest ? toolRequest.status : 'none'}
+          </span>
+          {toolRequest && (
+            <span className="text-[#71717a]">
+              set by {toolRequest.setBy} at {new Date(toolRequest.setAt).toLocaleString()}
+            </span>
+          )}
+          {toolRequest?.completedAt && (
+            <span className="text-[#71717a]">
+              completed {new Date(toolRequest.completedAt).toLocaleString()}
+            </span>
+          )}
+        </div>
+        {toolRequest ? (
+          <>
+            <div className="text-[15px] text-[#18181b] dark:text-[#f4f4f5] whitespace-pre-wrap break-words">
+              tool idea: {toolRequest.idea}
+            </div>
+            <div className="text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap break-words">
+              tool type: {toolRequest.type || '-'}
+            </div>
+            <div className="text-[#52525b] dark:text-[#a1a1aa] whitespace-pre-wrap break-words">
+              other details: {toolRequest.details || '-'}
+            </div>
+            <button
+              type="button"
+              onClick={useToolRequest}
+              className="px-2.5 py-1 border border-[#16a34a]/50 dark:border-[#4ade80]/50 text-[14px] text-[#16a34a] dark:text-[#4ade80]"
+            >
+              use request as new tool
+            </button>
+          </>
+        ) : (
+          <div className="text-[#71717a]">no tool creation request set by admin</div>
+        )}
       </div>
 
       {error && (

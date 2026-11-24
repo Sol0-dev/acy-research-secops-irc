@@ -371,6 +371,7 @@ export function createInitialState() {
     quotaWatch: {},
     duels: [],
     duelTask: null,
+    toolRequest: null,
     goalHistory: [],
     lastWeeklyResetAt: null,
     scoreEpoch: null,
@@ -707,6 +708,7 @@ export function toPublicState(state, viewerNick = null) {
     reports,
     tools,
     duels,
+    toolRequest: state.toolRequest ?? null,
     goodbye,
     dmThreads,
   };
@@ -2191,6 +2193,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         });
       }
       return {
+        auditOnly: true,
         result: {
           access: true,
           scope: 'all-accessible-graphs',

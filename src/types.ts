@@ -273,6 +273,21 @@ export interface DuelTaskConfig {
   setAt: string;
 }
 
+export type ToolRequestStatus = 'open' | 'completed';
+
+export interface ToolRequest {
+  id: string;
+  idea: string;
+  type: string;
+  details: string;
+  status: ToolRequestStatus;
+  setBy: string;
+  setAt: string;
+  updatedAt?: string;
+  completedBy?: string;
+  completedAt?: string;
+}
+
 export interface Duel {
   id: string;
   channelId: string;
@@ -377,6 +392,7 @@ export interface WorkspaceState {
   duels: Duel[];
   goodbye: GoodbyeEntry[];
   duelTask: DuelTaskConfig | null;
+  toolRequest: ToolRequest | null;
   voting: VotingState;
 }
 
@@ -495,6 +511,7 @@ export interface AdminSnapshot {
   graphs: EngagementGraph[];
   duels: Duel[];
   duelTask: DuelTaskConfig | null;
+  toolRequest: ToolRequest | null;
   goalHistory: GoalHistoryEntry[];
   audit: AdminAuditEntry[];
   security: {

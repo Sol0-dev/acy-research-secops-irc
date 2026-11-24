@@ -12,7 +12,16 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import jwt from 'jsonwebtoken';
-import { initDb, getState, getVersion, getAudit, persistState, appendAudit, ping } from './db.js';
+import {
+  initDb,
+  getState,
+  getVersion,
+  getAudit,
+  persistState,
+  appendAudit,
+  ping,
+  closePool,
+} from './db.js';
 import { buildReportDocx, safeFilename } from './docx.js';
 import { buildLeaderboard } from './leaderboard.js';
 import {
@@ -58,10 +67,18 @@ function isAdminRequest(req) {
   }
 }
 
+function statusForError(error) {
+  if (error instanceof ApiError) return error.status;
+  if (String(error?.message ?? '').includes('database has not been initialised')) {
+    return 503;
+  }
+  return 500;
+}
+
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
-app.use(express.json({ limit: '100mb' }));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT ?? '32mb' }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -168,7 +185,7 @@ app.get('/api/health', async (_req, res) => {
     await ping();
     res.json({ ok: true, version: getVersion() });
   } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(503).json({ ok: false, error: error.message });
   }
 });
 
@@ -298,6 +315,7 @@ app.get('/api/admin', async (req, res) => {
       graphs,
       duels: state.duels ?? [],
       duelTask: state.duelTask ?? null,
+      toolRequest: state.toolRequest ?? null,
       goalHistory: state.goalHistory ?? [],
       audit,
       security: {
@@ -508,6 +526,97 @@ function recordGoal(state, { goal, focusResult }) {
   state.goalHistory = state.goalHistory.slice(-50);
   return entry;
 }
+
+function announceToolRequest(state, text) {
+  const mentions = Object.values(state.agents)
+    .filter((agent) => agent.nick !== 'admin')
+    .map((agent) => `@${agent.nick}`)
+    .join(' ');
+  const body = `${mentions}${mentions ? ' ' : ''}${text}`;
+  const time = new Date().toTimeString().slice(0, 5);
+  const ids = new Set(['#lobby', state.focus?.channelId].filter(Boolean));
+  for (const id of ids) {
+    const channel = state.channels.find((item) => item.id === id);
+    if (!channel) continue;
+    const kept = (channel.messages ?? []).filter(
+      (message) => !message.toolRequestNotice
+    );
+    channel.messages = [
+      ...kept.slice(-199),
+      {
+        id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+        type: 'sys',
+        time,
+        text: body,
+        toolRequestNotice: true,
+      },
+    ];
+    channel.unread = true;
+  }
+}
+
+app.post('/api/admin/tool/request', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const action = String(req.body?.action ?? 'set').trim().toLowerCase();
+  const idea = String(req.body?.idea ?? '').trim();
+  const type = String(req.body?.type ?? '').trim();
+  const details = String(req.body?.details ?? '').trim();
+  try {
+    const state = structuredClone(getState());
+    const now = new Date().toISOString();
+    const current = state.toolRequest ?? null;
+    let auditAction = `admin.tool.request.${action}`;
+    let message = '';
+
+    if (action === 'set' || action === 'update') {
+      if (!idea) return res.status(400).json({ error: 'tool idea is required' });
+      if (action === 'update' && !current) {
+        return res.status(404).json({ error: 'no tool request to edit' });
+      }
+      state.toolRequest = {
+        id: action === 'update' ? current.id : `tr-${crypto.randomBytes(6).toString('hex')}`,
+        idea,
+        type,
+        details,
+        status: current?.status === 'completed' && action === 'update' ? 'completed' : 'open',
+        setBy: action === 'update' ? current.setBy : 'admin',
+        setAt: action === 'update' ? current.setAt : now,
+        updatedAt: action === 'update' ? now : undefined,
+        completedBy: action === 'update' ? current.completedBy : undefined,
+        completedAt: action === 'update' ? current.completedAt : undefined,
+      };
+      message = `${action === 'set' ? 'set' : 'updated'} a tool creation request: ${idea}${type ? ` · type: ${type}` : ''}. Open tools for the full brief.`;
+    } else if (action === 'complete') {
+      if (!current) return res.status(404).json({ error: 'no tool request to complete' });
+      state.toolRequest = {
+        ...current,
+        status: 'completed',
+        completedBy: 'admin',
+        completedAt: now,
+      };
+      message = `marked the tool creation request completed: ${current.idea}.`;
+    } else if (action === 'unset' || action === 'delete') {
+      if (!current) return res.status(404).json({ error: 'no tool request to clear' });
+      state.toolRequest = null;
+      message = `${action} the tool creation request: ${current.idea}.`;
+    } else {
+      return res.status(400).json({ error: `unknown tool request action: ${action}` });
+    }
+
+    announceToolRequest(state, `admin ${message}`);
+    const version = await persistState(state, auditAction, 'admin', {
+      action,
+      idea,
+      type,
+      details,
+    });
+    return res.json({ ok: true, toolRequest: state.toolRequest ?? null, version });
+  } catch (error) {
+    return res.status(error.status ?? 500).json({ error: error.message });
+  }
+});
 
 app.post('/api/admin/goal', async (req, res) => {
   if (!isAdminRequest(req)) {
@@ -1445,7 +1554,7 @@ app.post('/api/command', (req, res) => {
   enqueue(() => handleCommand(req)).then(
     (result) => res.json(result),
     (error) => {
-      const status = error instanceof ApiError ? error.status : 500;
+      const status = statusForError(error);
       if (status >= 500) console.error('[command]', error);
       else if (status === 401 || status === 403 || status === 429) {
         console.warn(`[security] ${req.ip} ${req.body?.action ?? 'unknown'} -> ${status}`);
@@ -1461,16 +1570,13 @@ app.use('/api', (_req, res) => {
 
 app.use((error, _req, res, _next) => {
   const status =
-    error instanceof ApiError
-      ? error.status
-      : error?.type === 'entity.parse.failed'
-        ? 400
-        : 500;
+    error?.type === 'entity.parse.failed' ? 400 : statusForError(error);
   if (status >= 500) {
     console.error('[api]', error);
-    return res.status(500).json({ error: 'server error' });
   }
-  return res.status(status).json({ error: error.message ?? 'request failed' });
+  return res
+    .status(status)
+    .json({ error: status === 500 ? 'server error' : error.message ?? 'request failed' });
 });
 
 function buildGoodbyeEntry(state, nick, { points, rank, reason, weekStart, weekEnd }) {
@@ -1721,28 +1827,91 @@ async function maybeExpireAccounts() {
   }
 }
 
-async function start() {
-  const { seeded } = await initDb();
-  console.log(`[db] workspace ${seeded ? 'seeded' : 'loaded'} from ${process.env.DB_NAME ?? 'secops_irc'}`);
+let httpServer = null;
+let shuttingDown = false;
+
+function startTimers() {
   void maybeWeeklyReset();
   void maybeExpireAccounts();
   const weeklyTimer = setInterval(() => void maybeWeeklyReset(), 60_000);
   if (typeof weeklyTimer.unref === 'function') weeklyTimer.unref();
   const accountTimer = setInterval(() => void maybeExpireAccounts(), 60 * 60_000);
   if (typeof accountTimer.unref === 'function') accountTimer.unref();
+}
+
+async function connectDatabaseWithRetry() {
+  let delay = 1_000;
+  for (;;) {
+    try {
+      const { seeded } = await initDb();
+      console.log(
+        `[db] workspace ${seeded ? 'seeded' : 'loaded'} from ${process.env.DB_NAME ?? 'secops_irc'}`
+      );
+      return;
+    } catch (error) {
+      console.error(
+        `[db] connection failed: ${error.message}. Retrying in ${Math.round(delay / 1000)}s`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay = Math.min(delay * 2, 30_000);
+    }
+  }
+}
+
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[api] ${signal} received, shutting down`);
+  const finish = () => {
+    void closePool()
+      .catch((error) => console.error('[db] close failed:', error.message))
+      .finally(() => process.exit(0));
+  };
+  if (httpServer) {
+    httpServer.close(() => finish());
+  } else {
+    finish();
+  }
+  const force = setTimeout(() => process.exit(0), 8_000);
+  if (typeof force.unref === 'function') force.unref();
+}
+
+function installProcessGuards() {
+  // A single bad request or background job must not take the whole console
+  // down. State is transactional in MySQL, so logging and continuing is safe
+  // for recoverable errors; SIGTERM/SIGINT still shut down cleanly.
+  process.on('unhandledRejection', (reason) => {
+    console.error('[api] unhandled rejection:', reason);
+  });
+  process.on('uncaughtException', (error) => {
+    console.error('[api] uncaught exception:', error);
+  });
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+async function start() {
+  installProcessGuards();
+  httpServer = app.listen(PORT, HOST, () => {
+    console.log(`[api] listening on http://${HOST}:${PORT} (proxy-only)`);
+  });
+  httpServer.on('error', (error) => {
+    console.error('[api] listen failed:', error.message);
+    process.exit(1);
+  });
+  await connectDatabaseWithRetry();
+  startTimers();
   if (ADMIN_PASSWORD_GENERATED) {
     if (process.env.NODE_ENV === 'production') {
       console.error('[admin] ADMIN_PASSWORD is required in production');
       process.exit(1);
     }
-    console.log(`[admin] no ADMIN_PASSWORD set - generated credentials: ${ADMIN_USERNAME} / ${EFFECTIVE_ADMIN_PASSWORD}`);
+    console.log(
+      `[admin] no ADMIN_PASSWORD set - generated credentials: ${ADMIN_USERNAME} / ${EFFECTIVE_ADMIN_PASSWORD}`
+    );
   }
-  app.listen(PORT, HOST, () => {
-    console.log(`[api] listening on http://${HOST}:${PORT} (proxy-only)`);
-  });
 }
 
 start().catch((error) => {
   console.error('[api] failed to start:', error);
-  process.exit(1);
 });
