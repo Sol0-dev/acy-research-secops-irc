@@ -1832,9 +1832,13 @@ export default function AdminPanel({
                                         : 'mark done'}
                                   </button>
                                   {registeredNicks.has(agent.nick) ? (
-                                    <span className="text-[15px] text-[#71717a]">
-                                      registered
-                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmAccountDelete(agent.nick)}
+                                      className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
+                                    >
+                                      remove account
+                                    </button>
                                   ) : (
                                     <button
                                       type="button"
