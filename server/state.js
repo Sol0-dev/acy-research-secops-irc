@@ -1177,6 +1177,9 @@ export function ensureGoalHistory(state) {
         entry.goal === state.focus.goal
     );
   }
+  // Completed goals are removed automatically so they do not stack up in the
+  // timer list. The audit log keeps the completion record.
+  state.goalHistory = state.goalHistory.filter((entry) => !entry.completedAt);
   // Keep one entry per group and goal text. Repeated saves of the same goal
   // must not stack duplicate timer cards; the newest active or completed entry
   // wins, otherwise the newest stopped entry is kept.

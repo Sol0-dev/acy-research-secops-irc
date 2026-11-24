@@ -467,6 +467,7 @@ export interface GoalHistoryEntry {
   endsAt: string;
   days: number;
   active: boolean;
+  scope?: string[];
   paused?: boolean;
   remainingMs?: number;
   pausedAt?: string;

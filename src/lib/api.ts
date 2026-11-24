@@ -122,6 +122,19 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
+  adminDeleteGoal(
+    token: string,
+    goalId: string
+  ): Promise<{ ok: boolean; deletedGoalId: string; version: number }> {
+    return request<{ ok: boolean; deletedGoalId: string; version: number }>(
+      '/api/admin/goal/delete',
+      {
+        method: 'POST',
+        headers: { 'x-secops-admin': token },
+        body: JSON.stringify({ goalId }),
+      }
+    );
+  },
   adminContinueGoal(
     token: string,
     goalId: string

@@ -35,6 +35,7 @@ interface AdminPanelProps {
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetDuelTask: (duelId: string, task: string) => Promise<{ ok: boolean; error?: string }>;
   onContinueGoal: (goalId: string) => Promise<{ ok: boolean; error?: string }>;
+  onDeleteGoal: (goalId: string) => Promise<{ ok: boolean; error?: string }>;
   onCompleteGoal: (note?: string) => Promise<{ ok: boolean; error?: string }>;
   onToolRequest: (
     action: 'set' | 'update' | 'complete' | 'unset' | 'delete',
@@ -91,6 +92,7 @@ export default function AdminPanel({
   onSetFocus,
   onSetDuelTask,
   onContinueGoal,
+  onDeleteGoal,
   onCompleteGoal,
   onToolRequest,
   onOpenAgentPortal,
@@ -110,6 +112,9 @@ export default function AdminPanel({
   const [goalContinueBusy, setGoalContinueBusy] = useState('');
   const [goalContinueNotice, setGoalContinueNotice] = useState('');
   const [goalContinueError, setGoalContinueError] = useState('');
+  const [goalDeleteBusy, setGoalDeleteBusy] = useState('');
+  const [goalDeleteNotice, setGoalDeleteNotice] = useState('');
+  const [goalDeleteError, setGoalDeleteError] = useState('');
   const [goalCompleteNote, setGoalCompleteNote] = useState('');
   const [goalCompleteBusy, setGoalCompleteBusy] = useState(false);
   const [goalCompleteNotice, setGoalCompleteNotice] = useState('');
@@ -399,7 +404,14 @@ export default function AdminPanel({
         new Date(left.startsAt ?? left.createdAt ?? 0).getTime()
     );
 
-  const renderGoalEntry = (entry: (typeof goalEntries)[number]) => (
+  const renderGoalEntry = (entry: (typeof goalEntries)[number]) => {
+    const linkedGraph = snapshot?.graphs.find(
+      (graph) => graph.channelId === entry.channelId
+    );
+    const linkedChat = snapshot?.channels.find(
+      (channel) => channel.id === entry.channelId
+    );
+    return (
     <div
       key={entry.id}
       className="border border-[#2a2a30] bg-[#09090b] p-2.5 space-y-1.5"
@@ -423,6 +435,15 @@ export default function AdminPanel({
         <span className="text-[#d4d4d8]">
           {entry.channelId || 'no focus group'}
         </span>
+        {entry.channelId && (
+          <span className="text-[#71717a]">
+            group {linkedChat ? `${linkedChat.messages.length} messages` : 'missing'} ·
+            graph{' '}
+            {linkedGraph
+              ? `${linkedGraph.nodes.length} nodes / ${linkedGraph.edges.length} edges`
+              : 'missing'}
+          </span>
+        )}
         {entry.completedAt ? (
           <span className="text-[#71717a]">
             completed {new Date(entry.completedAt).toLocaleString()}
@@ -450,8 +471,8 @@ export default function AdminPanel({
           completion note: {entry.completionNote}
         </div>
       )}
-      {!entry.active && (
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {!entry.active && (
           <button
             type="button"
             disabled={goalContinueBusy === entry.id}
@@ -468,17 +489,45 @@ export default function AdminPanel({
                   return;
                 }
                 setGoalContinueNotice(
-                  `7-day timer restored for ${entry.channelId}`
+                  `continued in ${entry.channelId} · timer active · group and graph linked`
                 );
               });
             }}
             className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
           >
             {goalContinueBusy === entry.id
-              ? 'restoring…'
-              : entry.completedAt
-                ? 'restart 7-day goal'
-                : 'bring back 7-day timer'}
+              ? 'continuing…'
+              : 'continue past goal'}
+          </button>
+        )}
+          <button
+            type="button"
+            disabled={goalDeleteBusy === entry.id}
+            onClick={() => {
+              if (
+                !window.confirm(
+                  'Delete this goal timer only? The group chat, graph, knowledge graph, progress, tools, and reports stay.'
+                )
+              ) {
+                return;
+              }
+              setGoalDeleteBusy(entry.id);
+              setGoalDeleteNotice('');
+              setGoalDeleteError('');
+              void onDeleteGoal(entry.id).then((result) => {
+                setGoalDeleteBusy('');
+                if (!result.ok) {
+                  setGoalDeleteError(result.error || 'could not delete goal');
+                  return;
+                }
+                setGoalDeleteNotice(
+                  'goal timer deleted · graph, knowledge, chat, and reports kept'
+                );
+              });
+            }}
+            className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#71717a] hover:text-[#f87171] disabled:opacity-40"
+          >
+            {goalDeleteBusy === entry.id ? 'deleting…' : 'delete goal'}
           </button>
           {goalContinueNotice && (
             <span className="text-[13px] text-[#4ade80]">
@@ -490,10 +539,10 @@ export default function AdminPanel({
               {goalContinueError}
             </span>
           )}
-        </div>
-      )}
+      </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-[60] bg-[#050506] text-[#f4f4f5] font-mono text-lg flex flex-col">
@@ -768,7 +817,7 @@ export default function AdminPanel({
                     }
                     setGoalCompleteNote('');
                     setGoalCompleteNotice(
-                      'goal completed · focus timer stopped · all agents notified'
+                      'goal completed and removed · graph, knowledge, chat, and reports kept'
                     );
                   });
                 }}
@@ -795,6 +844,12 @@ export default function AdminPanel({
             <h2 className="text-base uppercase tracking-wider text-[#71717a]">
               goal timers - server side 7 days per goal
             </h2>
+            {goalDeleteNotice && (
+              <div className="text-[14px] text-[#4ade80]">{goalDeleteNotice}</div>
+            )}
+            {goalDeleteError && (
+              <div className="text-[14px] text-[#f87171]">{goalDeleteError}</div>
+            )}
             {primaryGoals.length === 0 ? (
               <div className="text-[15px] text-[#71717a]">
                 no active goal · the previous goal is not enforcing a timer

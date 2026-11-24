@@ -336,7 +336,10 @@ app.get('/api/admin', async (req, res) => {
   }
 });
 
-function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } = {}) {
+function applyFocus(
+  state,
+  { channelId = '', goal = '', target = '', days = 7, endsAt = '' } = {}
+) {
   if (!channelId && !goal) {
     const focusedChannel = state.focus?.channelId;
     state.focus = null;
@@ -424,12 +427,18 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
   }
 
   const startsAt = new Date();
-  const endsAt = new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
+  const requestedEnd = endsAt ? new Date(endsAt) : null;
+  const end =
+    requestedEnd &&
+    Number.isFinite(requestedEnd.getTime()) &&
+    requestedEnd.getTime() > startsAt.getTime()
+      ? requestedEnd
+      : new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
   state.focus = {
     channelId: focusChannel.id,
     goal,
     startsAt: startsAt.toISOString(),
-    endsAt: endsAt.toISOString(),
+    endsAt: end.toISOString(),
     days,
   };
 
@@ -455,7 +464,7 @@ function applyFocus(state, { channelId = '', goal = '', target = '', days = 7 } 
     .join(' ');
   const focusScope = state.scopes[focusChannel.id]?.inScope ?? scope;
   const time = new Date().toTimeString().slice(0, 5);
-  const endDate = endsAt.toISOString().slice(0, 10);
+  const endDate = end.toISOString().slice(0, 10);
   const notice = `${mentions}${mentions ? ' ' : ''}admin set a new goal and focus for ${
     days === 7 ? '1 week' : `${days} days`
   }. goal: ${goal || 'not set'}. focus: ${focusChannel.id}. scope: ${focusScope.join(
@@ -516,6 +525,9 @@ function recordGoal(state, { goal, focusResult }) {
   entry.startsAt = focusResult.focus.startsAt;
   entry.endsAt = focusResult.focus.endsAt;
   entry.days = focusResult.focus.days;
+  entry.scope = Array.isArray(focusResult.scope) && focusResult.scope.length
+    ? focusResult.scope
+    : state.scopes[focusResult.channelId]?.inScope ?? [];
   entry.active = true;
   if (entry.completedAt) delete entry.completedAt;
   if (entry.completionNote) delete entry.completionNote;
@@ -528,6 +540,75 @@ function recordGoal(state, { goal, focusResult }) {
   );
   state.goalHistory = state.goalHistory.slice(-50);
   return entry;
+}
+
+function deriveGoalScope(goal) {
+  const text = String(goal ?? '');
+  const urls = text.match(/https?:\/\/[^\s),;]+/gi) ?? [];
+  const wildcards = text.match(/\*\.[a-z0-9.-]+\.[a-z]{2,}/gi) ?? [];
+  const domains = text.match(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi) ?? [];
+  const scope = [...new Set([...urls, ...wildcards, ...domains])].slice(0, 20);
+  return scope.length > 0 ? scope : [text || 'focus-target'];
+}
+
+// Continue a past goal in its original group chat and graph. If the group still
+// exists it is reused exactly as-is. If it was deleted, restore the same id,
+// scope, and an empty graph so the new work stays linked to the past goal.
+function ensurePastGoalChannel(state, entry) {
+  const id = String(entry.channelId ?? '').trim();
+  if (!id) return null;
+  const existing = state.channels.find((item) => item.id === id);
+  if (existing && !existing.isEngagement) return null;
+  if (existing) {
+    if (!state.graphs[id]) {
+      state.graphs[id] = { channelId: id, nodes: [], edges: [] };
+    }
+    return { channel: existing, restored: false };
+  }
+
+  const scope =
+    Array.isArray(entry.scope) && entry.scope.length > 0
+      ? entry.scope
+      : deriveGoalScope(entry.goal);
+  if (!state.groups.includes('FOCUS')) state.groups.push('FOCUS');
+  state.collapsedGroups.FOCUS = false;
+  const time = new Date().toTimeString().slice(0, 5);
+  state.channels.push({
+    id,
+    group: 'FOCUS',
+    platform: 'Focus',
+    isEngagement: true,
+    topic: `continued goal · ${scope.slice(0, 3).join(', ')}`,
+    unread: true,
+    messages: [
+      {
+        id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+        type: 'sys',
+        time,
+        text: `admin restored this group to continue a past goal: ${entry.goal}`,
+      },
+      {
+        id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+        type: 'sys',
+        time,
+        text: `scope: ${scope.join(', ')} · graph restored`,
+      },
+    ],
+  });
+  state.scopes[id] = {
+    program: entry.goal || 'Continued goal',
+    platform: 'Focus',
+    constraints: 'safe harbor active · follow program RoE',
+    inScope: scope,
+    outOfScope: ['volumetric DoS or destructive payloads'],
+  };
+  if (!state.graphs[id]) {
+    state.graphs[id] = { channelId: id, nodes: [], edges: [] };
+  }
+  return {
+    channel: state.channels.find((item) => item.id === id),
+    restored: true,
+  };
 }
 
 function announceToolRequest(state, text) {
@@ -669,26 +750,111 @@ app.post('/api/admin/goal/continue', async (req, res) => {
     const state = structuredClone(getState());
     const entry = (state.goalHistory ?? []).find((item) => item.id === goalId);
     if (!entry) return res.status(404).json({ error: 'goal not found' });
-    const channelExists = state.channels.some(
-      (item) => item.id === entry.channelId && item.isEngagement
-    );
+    const restored = ensurePastGoalChannel(state, entry);
+    const previousEnd = new Date(entry.endsAt ?? 0).getTime();
+    const remainingMs = previousEnd - Date.now();
+    const preserveTimer = Number.isFinite(remainingMs) && remainingMs > 0;
     const focusResult = applyFocus(state, {
-      channelId: channelExists ? entry.channelId : '__new__',
+      channelId: restored?.channel?.id ?? (entry.channelId || '__new__'),
       goal: entry.goal,
       days: 7,
+      endsAt: preserveTimer
+        ? new Date(Date.now() + remainingMs).toISOString()
+        : '',
     });
     entry.channelId = focusResult.channelId;
+    entry.scope = focusResult.scope;
     state.docsGoal = entry.goal;
     recordGoal(state, { goal: entry.goal, focusResult });
+    const graph = state.graphs[entry.channelId] ?? { nodes: [], edges: [] };
+    const channel = state.channels.find((item) => item.id === entry.channelId);
     const version = await persistState(state, 'admin.goal.continue', 'admin', {
       goalId,
       goal: entry.goal,
+      channelId: entry.channelId,
+      restoredGroup: Boolean(restored?.restored),
+      preservedTimer: preserveTimer,
+      remainingMs: preserveTimer ? remainingMs : null,
     });
     return res.json({
       ok: true,
       goal: entry.goal,
       focus: focusResult.focus,
       channelId: focusResult.channelId,
+      restoredGroup: Boolean(restored?.restored),
+      preservedTimer: preserveTimer,
+      remainingMs: preserveTimer ? remainingMs : null,
+      graphNodeCount: graph.nodes?.length ?? 0,
+      graphEdgeCount: graph.edges?.length ?? 0,
+      chatMessageCount: channel?.messages?.length ?? 0,
+      version,
+    });
+  } catch (error) {
+    return res.status(error.status ?? 500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/goal/delete', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const goalId = String(req.body?.goalId ?? '').trim();
+  try {
+    const state = structuredClone(getState());
+    const history = Array.isArray(state.goalHistory) ? state.goalHistory : [];
+    const entry = history.find((item) => item.id === goalId);
+    if (!entry) return res.status(404).json({ error: 'goal not found' });
+    const focusedChannelId = state.focus?.channelId ?? '';
+    const wasActive = Boolean(
+      entry.active ||
+        (state.focus &&
+          entry.channelId === state.focus.channelId &&
+          entry.goal === state.focus.goal)
+    );
+    state.goalHistory = history.filter((item) => item !== entry);
+    if (wasActive) {
+      state.focus = null;
+      state.docsGoal = '';
+    }
+    // Delete the goal timer only. The group chat, attack graph, knowledge
+    // graph, progress, tools, and reports are intentionally left untouched.
+    const mentions = Object.values(state.agents)
+      .filter((agent) => agent.nick !== 'admin')
+      .map((agent) => `@${agent.nick}`)
+      .join(' ');
+    const time = new Date().toTimeString().slice(0, 5);
+    const text = `${mentions}${mentions ? ' ' : ''}admin deleted the goal "${entry.goal}". The group chat, attack graph, knowledge graph, progress, tools, and reports are kept.`;
+    const ids = new Set(
+      ['#lobby', focusedChannelId, entry.channelId].filter(Boolean)
+    );
+    for (const id of ids) {
+      const channel = state.channels.find((item) => item.id === id);
+      if (!channel) continue;
+      const kept = (channel.messages ?? []).filter(
+        (message) => !message.goalDeleteNotice
+      );
+      channel.messages = [
+        ...kept.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text,
+          goalDeleteNotice: true,
+        },
+      ];
+      channel.unread = true;
+    }
+    const version = await persistState(state, 'admin.goal.delete', 'admin', {
+      goalId,
+      channelId: entry.channelId,
+      clearedFocus: wasActive,
+      kept: ['group', 'graph', 'knowledge', 'progress', 'tools', 'reports'],
+    });
+    return res.json({
+      ok: true,
+      deletedGoalId: goalId,
+      clearedFocus: wasActive,
       version,
     });
   } catch (error) {
@@ -724,30 +890,15 @@ app.post('/api/admin/goal/complete', async (req, res) => {
     const channelMatches = history.filter(
       (item) => focusChannelId && item.channelId === focusChannelId
     );
-    let entry =
+    const entry =
       exactMatches[exactMatches.length - 1] ??
       goalMatches[goalMatches.length - 1] ??
       channelMatches[channelMatches.length - 1] ??
       null;
-    if (!entry && goal) {
-      entry = {
-        id: `gl-${crypto.randomBytes(6).toString('hex')}`,
-        goal,
-        channelId: focusChannelId,
-        startsAt: focus?.startsAt ?? completedAt,
-        endsAt: focus?.endsAt ?? completedAt,
-        days: focus?.days ?? 7,
-        active: false,
-        createdAt: focus?.startsAt ?? completedAt,
-        createdBy: 'admin',
-      };
-      history.push(entry);
-      state.goalHistory = history.slice(-50);
-    }
+    // Completing a goal deletes only the goal record and its timer. The group
+    // chat, attack graph, knowledge graph, progress, tools, and reports stay.
     if (entry) {
-      entry.active = false;
-      entry.completedAt = completedAt;
-      entry.completionNote = note || undefined;
+      state.goalHistory = history.filter((item) => item !== entry);
     }
     const mentions = Object.values(state.agents)
       .filter((agent) => agent.nick !== 'admin')
@@ -778,8 +929,16 @@ app.post('/api/admin/goal/complete', async (req, res) => {
     const version = await persistState(state, 'admin.goal.complete', 'admin', {
       goal,
       note,
+      deletedGoalId: entry?.id ?? null,
+      kept: ['group', 'graph', 'knowledge', 'progress', 'tools', 'reports'],
     });
-    return res.json({ ok: true, goal, completedAt, version });
+    return res.json({
+      ok: true,
+      goal,
+      completedAt,
+      deletedGoalId: entry?.id ?? null,
+      version,
+    });
   } catch (error) {
     return res.status(error.status ?? 500).json({ error: error.message });
   }
