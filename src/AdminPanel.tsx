@@ -1730,7 +1730,7 @@ export default function AdminPanel({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="space-y-2 border border-[#2a2a30] bg-[#09090b] p-3">
               <h2 className="text-base uppercase tracking-wider text-[#71717a]">
-                registered accounts ({snapshot.accounts.length})
+                registered accounts
               </h2>
               {snapshot.accounts.length === 0 ? (
                 <div className="text-base text-[#52525b]">none - no seeded accounts.</div>
