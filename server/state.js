@@ -897,6 +897,15 @@ function graphNodeHaystack(node) {
 }
 
 // Duelists cannot edit, refine, remove, or link each other's work.
+function isEvictedAgent(state, nick) {
+  const handle = normalizeHandle(nick);
+  if (!handle) return false;
+  if (state.deletedAccounts?.[handle]) return true;
+  return (state.goodbye ?? []).some(
+    (entry) => normalizeHandle(entry.nick) === handle
+  );
+}
+
 function assertDuelOwnership(state, channel, nick, ownerNick) {
   if (!channel.duelChannel) return;
   const handle = normalizeHandle(nick);
@@ -2641,6 +2650,12 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const nodeId = String(payload.nodeId ?? '');
       const node = graph?.nodes.find((item) => item.id === nodeId);
       if (!graph || !node) throw new ApiError(404, 'graph node not found');
+      if (isEvictedAgent(state, node.createdBy)) {
+        throw new ApiError(
+          403,
+          'work contributed by an evicted agent is preserved and cannot be removed'
+        );
+      }
       graph.nodes = graph.nodes.filter((item) => item.id !== nodeId);
       graph.edges = graph.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
       const remover = normalizeHandle(actor);
@@ -2872,6 +2887,12 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const list = state.tools;
       const tool = list.find((item) => item.id === String(payload.toolId ?? ''));
       if (!tool) throw new ApiError(404, 'tool not found');
+      if (isEvictedAgent(state, tool.createdBy)) {
+        throw new ApiError(
+          403,
+          'tools contributed by an evicted agent are preserved and cannot be removed'
+        );
+      }
       if (actorNick !== 'admin' && normalizeHandle(tool.createdBy) !== actorNick) {
         throw new ApiError(403, 'only the tool creator or admin can delete this tool');
       }
@@ -3581,14 +3602,14 @@ export function applyCommand(state, action, payload = {}, actor = null) {
         throw new ApiError(400, 'write at least 10 characters describing the bad contribution');
       }
       const target = new Set(nodeIds);
-      let removedNodes = 0;
-      let removedEdges = 0;
+      let mappedNodes = 0;
+      let mappedEdges = 0;
       for (const [channelId, graph] of Object.entries(state.graphs ?? {})) {
         const channel = state.channels.find((item) => item.id === channelId);
         if (!channel) continue;
         if (!canAccessChannel(state, author, channel)) continue;
         if (channel.duelChannel && !isDuelist(state, channel.id, author)) continue;
-        const removable = new Set(
+        const mapped = new Set(
           (graph.nodes ?? [])
             .filter(
               (node) =>
@@ -3597,33 +3618,33 @@ export function applyCommand(state, action, payload = {}, actor = null) {
             )
             .map((node) => node.id)
         );
-        if (removable.size === 0) continue;
-        const beforeNodes = graph.nodes.length;
-        const beforeEdges = graph.edges.length;
-        graph.nodes = graph.nodes.filter((node) => !removable.has(node.id));
-        graph.edges = graph.edges.filter(
-          (edge) => !removable.has(edge.from) && !removable.has(edge.to)
-        );
-        removedNodes += beforeNodes - graph.nodes.length;
-        removedEdges += beforeEdges - graph.edges.length;
+        if (mapped.size === 0) continue;
+        mappedNodes += mapped.size;
+        mappedEdges += (graph.edges ?? []).filter(
+          (edge) => mapped.has(edge.from) || mapped.has(edge.to)
+        ).length;
       }
-      if (removedNodes === 0) {
+      if (mappedNodes === 0) {
         throw new ApiError(
           400,
           'none of the selected nodes were created by this agent'
         );
       }
-      entry.contributions.nodes = entry.contributions.nodes.filter(
-        (node) => !target.has(node.nodeId)
-      );
+      // This is an audit map, not a deletion. Evicted agents' work stays in the
+      // graph and knowledge graph; the audit records which nodes are bad and
+      // awards the +20 for mapping them.
       entry.audits.push({
         author,
         note,
-        removedNodes,
-        removedEdges,
+        mappedNodes,
+        mappedEdges,
+        removedNodes: 0,
+        removedEdges: 0,
         at: new Date().toISOString(),
       });
-      return { result: { entry, removedNodes, removedEdges } };
+      return {
+        result: { entry, mappedNodes, mappedEdges, removedNodes: 0, removedEdges: 0 },
+      };
     }
 
     // -------------------------------------------------------------- view/UI

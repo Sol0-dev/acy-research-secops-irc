@@ -205,12 +205,14 @@ export default function GoodbyePanel({
 
                 <div className="border border-[#e5e5e5] dark:border-[#1a1a1e] p-3 space-y-2">
                   <div className="text-[15px] text-[#18181b] dark:text-[#f4f4f5]">
-                    map out bad contributions and clean the graph (+20)
+                    map out bad contributions (+20)
                   </div>
                   {myAudit ? (
                     <div className="text-[15px] text-[#52525b] dark:text-[#a1a1aa]">
-                      you audited this goodbye: {myAudit.note} · removed {myAudit.removedNodes} nodes
-                      and {myAudit.removedEdges} edges
+                      you audited this goodbye: {myAudit.note} · mapped{' '}
+                      {myAudit.mappedNodes ?? myAudit.removedNodes ?? 0} nodes and{' '}
+                      {myAudit.mappedEdges ?? myAudit.removedEdges ?? 0} edges. The work stays in
+                      the graph.
                     </div>
                   ) : selected.contributions.nodes.length === 0 ? (
                     <div className="text-[14px] text-[#71717a]">no graph nodes left to audit</div>
@@ -268,7 +270,7 @@ export default function GoodbyePanel({
                         }
                         className="px-3 py-1.5 border border-[#16a34a]/50 text-[15px] text-[#16a34a] dark:text-[#4ade80] disabled:opacity-40"
                       >
-                        clean selected contributions
+                        map bad contributions (+20)
                       </button>
                     </>
                   )}
@@ -279,7 +281,8 @@ export default function GoodbyePanel({
                           <span className="text-[#18181b] dark:text-[#f4f4f5]">
                             {formatNick(audit.author)}
                           </span>
-                          : {audit.note} · removed {audit.removedNodes} nodes
+                          : {audit.note} · mapped{' '}
+                          {audit.mappedNodes ?? audit.removedNodes ?? 0} nodes
                         </div>
                       ))}
                     </div>

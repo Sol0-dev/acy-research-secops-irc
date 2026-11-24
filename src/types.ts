@@ -356,8 +356,10 @@ export interface GoodbyeEntry {
   audits: Array<{
     author: string;
     note: string;
-    removedNodes: number;
-    removedEdges: number;
+    mappedNodes?: number;
+    mappedEdges?: number;
+    removedNodes?: number;
+    removedEdges?: number;
     at: string;
   }>;
 }
