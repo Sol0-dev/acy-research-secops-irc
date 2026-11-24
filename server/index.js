@@ -469,14 +469,14 @@ function applyFocus(
     days === 7 ? '1 week' : `${days} days`
   }. goal: ${goal || 'not set'}. focus: ${focusChannel.id}. scope: ${focusScope.join(
     ', '
-  )}. All AI agents are enrolled in the focus group. MANDATORY until ${endDate}: work only this focus and contribute there: chat and tag, graph and refinement, knowledge graph contribution and refinement, progress, and vulnerability reports. Tool creation is optional and does not replace focus work. Clean temporary workspace files that are not important, but keep your own credentials. This 7-day timer is server side and cannot be paused.`;
-  const focusMessage = `${mentions}${mentions ? ' ' : ''}this is your focus group: ${focusChannel.id}. Work together here until ${endDate}. Contribute:
-- chat and tag each other in this group (+10 chat, +10 tag)
-- add and refine graph nodes and edges (+10)
-- contribute to and refine the knowledge graph (+15)
-- append progress notes (+5)
-- file vulnerability reports (+30, plus +15 on valid or duplicate)
-Tools are optional: build or refine a tool only when it directly helps this focus. Tool creation is not part of the mandatory checklist and must not replace focus work.
+  )}. All AI agents are enrolled in the focus group. MANDATORY FOCUS DUTIES until ${endDate}: work only this focus and complete all four duties there every day - (1) talk and tag teammates, (2) add and refine attack-graph nodes and edges, (3) add and refine knowledge-graph nodes, (4) append progress notes and commit changed files/artifacts. File vulnerability reports when evidence proves a finding. Tool creation is an optional add-on and never replaces these duties. Clean temporary workspace files that are not important, but keep your own credentials. This 7-day timer is server side and cannot be paused.`;
+  const focusMessage = `${mentions}${mentions ? ' ' : ''}this is your focus group: ${focusChannel.id}. MANDATORY FOCUS DUTIES until ${endDate}. Every agent must complete all four:
+1. CONVERSATION & TAGGING - post in this group, ask and answer, @tag teammates, and work together as a team (+10 chat, +10 tag).
+2. ATTACK GRAPH - add and refine graph nodes and edges with evidence (+10).
+3. KNOWLEDGE GRAPH - add and refine knowledge nodes: commands, scripts, request/response, chain, lessons, templates, references (+15).
+4. PROGRESS COMMITS - append progress notes and commit changed files or artifacts (+5 progress, +5 commit).
+Also file vulnerability reports when evidence proves a finding (+30, plus +15 on valid or duplicate).
+Tools are optional add-on only: build or refine a tool only when it directly helps this focus. Tool creation never replaces the four mandatory duties.
 Do not work outside this focus. Clean temporary files, dumps, captures, and scripts you no longer need in your workspace. Keep your own credentials. The 7-day timer is server side and cannot be paused.`;
 
   for (const channel of state.channels) {
@@ -758,6 +758,82 @@ app.post('/api/admin/goal/continue', async (req, res) => {
       graphNodeCount: graph.nodes?.length ?? 0,
       graphEdgeCount: graph.edges?.length ?? 0,
       chatMessageCount: channel?.messages?.length ?? 0,
+      version,
+    });
+  } catch (error) {
+    return res.status(error.status ?? 500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/goal/edit', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const goalId = String(req.body?.goalId ?? '').trim();
+  const goal = String(req.body?.goal ?? '').trim();
+  if (!goal) return res.status(400).json({ error: 'goal text is required' });
+  try {
+    const state = structuredClone(getState());
+    const entry = (state.goalHistory ?? []).find((item) => item.id === goalId);
+    if (!entry) return res.status(404).json({ error: 'goal not found' });
+    const wasActive = Boolean(
+      entry.active ||
+        (state.focus &&
+          entry.channelId === state.focus.channelId &&
+          entry.goal === state.focus.goal)
+    );
+    const previousGoal = entry.goal;
+    entry.goal = goal;
+    if (wasActive && state.focus) {
+      // Edit only the text. The focus group, graph, knowledge graph, reports,
+      // and the existing timer/end time stay exactly as they are.
+      state.focus.goal = goal;
+      state.docsGoal = goal;
+    }
+    ensureGoalHistory(state);
+
+    const mentions = Object.values(state.agents)
+      .filter((agent) => agent.nick !== 'admin')
+      .map((agent) => `@${agent.nick}`)
+      .join(' ');
+    const time = new Date().toTimeString().slice(0, 5);
+    const text = `${mentions}${mentions ? ' ' : ''}admin edited the goal: ${goal}. Focus stays in ${
+      entry.channelId || 'the focus group'
+    } until ${new Date(state.focus?.endsAt ?? entry.endsAt).toLocaleString()}. The timer is unchanged.`;
+    const ids = new Set(
+      ['#lobby', state.focus?.channelId, entry.channelId].filter(Boolean)
+    );
+    for (const id of ids) {
+      const channel = state.channels.find((item) => item.id === id);
+      if (!channel) continue;
+      const kept = (channel.messages ?? []).filter(
+        (message) => !message.goalEditNotice
+      );
+      channel.messages = [
+        ...kept.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text,
+          goalEditNotice: true,
+        },
+      ];
+      channel.unread = true;
+    }
+    const version = await persistState(state, 'admin.goal.edit', 'admin', {
+      goalId,
+      previousGoal,
+      goal,
+      channelId: entry.channelId,
+      timerUnchanged: true,
+      kept: ['group', 'graph', 'knowledge', 'progress', 'tools', 'reports'],
+    });
+    return res.json({
+      ok: true,
+      goal,
+      focus: state.focus ?? null,
+      channelId: entry.channelId,
       version,
     });
   } catch (error) {

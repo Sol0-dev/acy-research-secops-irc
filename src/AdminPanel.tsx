@@ -35,6 +35,7 @@ interface AdminPanelProps {
   onSetFocus: (channelId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onSetDuelTask: (duelId: string, task: string) => Promise<{ ok: boolean; error?: string }>;
   onContinueGoal: (goalId: string) => Promise<{ ok: boolean; error?: string }>;
+  onEditGoal: (goalId: string, goal: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteGoal: (goalId: string) => Promise<{ ok: boolean; error?: string }>;
   onCompleteGoal: (note?: string) => Promise<{ ok: boolean; error?: string }>;
   onToolRequest: (
@@ -92,6 +93,7 @@ export default function AdminPanel({
   onSetFocus,
   onSetDuelTask,
   onContinueGoal,
+  onEditGoal,
   onDeleteGoal,
   onCompleteGoal,
   onToolRequest,
@@ -115,6 +117,11 @@ export default function AdminPanel({
   const [goalDeleteBusy, setGoalDeleteBusy] = useState('');
   const [goalDeleteNotice, setGoalDeleteNotice] = useState('');
   const [goalDeleteError, setGoalDeleteError] = useState('');
+  const [goalEditId, setGoalEditId] = useState('');
+  const [goalEditDraft, setGoalEditDraft] = useState('');
+  const [goalEditBusy, setGoalEditBusy] = useState(false);
+  const [goalEditNotice, setGoalEditNotice] = useState('');
+  const [goalEditError, setGoalEditError] = useState('');
   const [goalCompleteNote, setGoalCompleteNote] = useState('');
   const [goalCompleteBusy, setGoalCompleteBusy] = useState(false);
   const [goalCompleteNotice, setGoalCompleteNotice] = useState('');
@@ -471,6 +478,59 @@ export default function AdminPanel({
           completion note: {entry.completionNote}
         </div>
       )}
+      {entry.active && goalEditId === entry.id && (
+        <div className="border border-[#4ade80]/40 bg-[#050506] p-2 space-y-2">
+          <textarea
+            rows={10}
+            value={goalEditDraft}
+            onChange={(event) => setGoalEditDraft(event.target.value)}
+            className="w-full min-h-[220px] bg-[#050506] border border-[#2a2a30] px-2.5 py-2 text-[15px] leading-relaxed text-[#f4f4f5] focus:outline-none focus:border-[#71717a] resize-y"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={goalEditBusy || !goalEditDraft.trim()}
+              onClick={() => {
+                setGoalEditBusy(true);
+                setGoalEditNotice('');
+                setGoalEditError('');
+                void onEditGoal(entry.id, goalEditDraft).then((result) => {
+                  setGoalEditBusy(false);
+                  if (!result.ok) {
+                    setGoalEditError(result.error || 'could not edit goal');
+                    return;
+                  }
+                  setGoalEditId('');
+                  setGoalEditNotice(
+                    'goal updated · timer, group, graph, knowledge, and reports unchanged'
+                  );
+                });
+              }}
+              className="px-2.5 py-1 border border-[#4ade80]/50 text-[13px] text-[#4ade80] hover:bg-[#4ade80]/10 disabled:opacity-40"
+            >
+              {goalEditBusy ? 'saving…' : 'save changes'}
+            </button>
+            <button
+              type="button"
+              disabled={goalEditBusy}
+              onClick={() => {
+                setGoalEditId('');
+                setGoalEditDraft('');
+                setGoalEditError('');
+              }}
+              className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#71717a]"
+            >
+              cancel
+            </button>
+            {goalEditNotice && (
+              <span className="text-[13px] text-[#4ade80]">{goalEditNotice}</span>
+            )}
+            {goalEditError && (
+              <span className="text-[13px] text-[#f87171]">{goalEditError}</span>
+            )}
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {!entry.active && (
           <button
@@ -500,6 +560,21 @@ export default function AdminPanel({
               : 'continue past goal'}
           </button>
         )}
+          {entry.active && (
+            <button
+              type="button"
+              disabled={goalEditBusy || goalEditId === entry.id}
+              onClick={() => {
+                setGoalEditId(entry.id);
+                setGoalEditDraft(entry.goal);
+                setGoalEditNotice('');
+                setGoalEditError('');
+              }}
+              className="px-2.5 py-1 border border-[#2a2a30] text-[13px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+            >
+              edit goal
+            </button>
+          )}
           <button
             type="button"
             disabled={goalDeleteBusy === entry.id}

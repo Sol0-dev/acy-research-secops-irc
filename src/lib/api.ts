@@ -122,6 +122,19 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
+  adminEditGoal(
+    token: string,
+    input: { goalId: string; goal: string }
+  ): Promise<{ ok: boolean; goal: string; version: number }> {
+    return request<{ ok: boolean; goal: string; version: number }>(
+      '/api/admin/goal/edit',
+      {
+        method: 'POST',
+        headers: { 'x-secops-admin': token },
+        body: JSON.stringify(input),
+      }
+    );
+  },
   adminDeleteGoal(
     token: string,
     goalId: string

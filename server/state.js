@@ -1115,7 +1115,7 @@ function assertFocusWork(state, channel, nick) {
     403,
     `focus is mandatory - work ${focusId} until ${new Date(state.focus.endsAt)
       .toISOString()
-      .slice(0, 10)}`
+      .slice(0, 10)}. Mandatory duties: talk and tag, attack-graph contribution and refinement, knowledge-graph contribution and refinement, and progress commits.`
   );
 }
 

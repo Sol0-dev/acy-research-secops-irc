@@ -661,6 +661,25 @@ export default function App() {
     }
   };
 
+  const editAdminGoal = async (goalId: string, goal: string) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminEditGoal(adminToken, { goalId, goal });
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'could not edit goal',
+      };
+    }
+  };
+
   const deleteAdminGoal = async (goalId: string) => {
     if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
@@ -4159,6 +4178,7 @@ export default function App() {
         onSetFocus={setAdminFocus}
         onSetDuelTask={setAdminDuelTask}
         onContinueGoal={continueAdminGoal}
+        onEditGoal={editAdminGoal}
         onDeleteGoal={deleteAdminGoal}
         onCompleteGoal={completeAdminGoal}
         onToolRequest={setAdminToolRequest}

@@ -292,6 +292,10 @@ export default function LeaderboardPanel({
                 <div>
                   penalties: no chat 3m -10 · no @tag 5m -15 · no contribution 15m -15
                 </div>
+                <div>
+                  mandatory while focus is active: talk and tag, attack graph, knowledge graph,
+                  progress commits
+                </div>
                 <div className="text-[#71717a]">
                   all points, penalties, caps, and cooldowns are granted by the server. Clients can
                   only read this leaderboard.
