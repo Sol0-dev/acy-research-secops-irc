@@ -376,9 +376,17 @@ export function createInitialState() {
     lastWeeklyResetAt: null,
     scoreEpoch: null,
     deletedAccounts: {},
+    dailyDone: {},
     goodbye: [],
     voting: { active: false, activatedBy: null, activatedAt: null },
   };
+}
+
+export function localDayKey(time = Date.now()) {
+  const date = new Date(time);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate()
+  ).padStart(2, '0')}`;
 }
 
 export function redactGoalSecrets(value) {
@@ -709,6 +717,7 @@ export function toPublicState(state, viewerNick = null) {
     tools,
     duels,
     toolRequest: state.toolRequest ?? null,
+    dailyDone: state.dailyDone ?? {},
     goodbye,
     dmThreads,
   };
@@ -1040,6 +1049,7 @@ function syncAccountPrograms(state, nick) {
 function removeUserAgent(state, nick) {
   if (nick && state.agents[nick]?.isUser) {
     delete state.agents[nick];
+    if (state.dailyDone) delete state.dailyDone[nick];
     return true;
   }
   return false;
@@ -1562,6 +1572,7 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       if (state.accounts[actor]) {
         state.accounts[next] = { ...state.accounts[actor], nick: next };
         delete state.accounts[actor];
+        if (state.dailyDone) delete state.dailyDone[actor];
       }
       if (state.activeBuffers[actor]) {
         state.activeBuffers[next] = state.activeBuffers[actor];

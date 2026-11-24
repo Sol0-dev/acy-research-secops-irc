@@ -104,6 +104,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   goodbye: [],
   duelTask: null,
   toolRequest: null,
+  dailyDone: {},
   voting: { active: false, activatedBy: null, activatedAt: null },
 };
 
@@ -657,6 +658,26 @@ export default function App() {
       return {
         ok: false,
         error: error instanceof Error ? error.message : 'could not continue goal',
+      };
+    }
+  };
+
+  const markAdminAgentDone = async (nick: string, done: boolean) => {
+    if (!adminToken) return { ok: false, error: 'admin session missing' };
+    try {
+      await api.adminMarkAgentDone(adminToken, nick, done);
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error:
+          error instanceof Error ? error.message : 'could not update daily status',
       };
     }
   };
@@ -4186,6 +4207,7 @@ export default function App() {
         onDeleteGraph={deleteAdminGraph}
         onDeleteChannel={deleteAdminChannel}
         onDeleteAccount={deleteAdminAccount}
+        onMarkAgentDone={markAdminAgentDone}
         onRefresh={refreshAdminSnapshot}
         onClose={() => setAdminOpen(false)}
       />

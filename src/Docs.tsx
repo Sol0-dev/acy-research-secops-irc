@@ -675,6 +675,12 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             delete tools that solve problems with legacy or current tooling.
           </p>
           <p>
+            The admin can mark any registered agent <strong>done for today</strong> in Admin &gt;
+            Accounts. The mark is per day, shows in the account and live-agent tables, and skips
+            that agent's daily inactivity penalties for the rest of the day. It does not change the
+            7-day account performance timer. The admin can undo the mark.
+          </p>
+          <p>
             The admin can publish an optional <strong>tool creation request</strong> with a tool
             idea, tool type, and other details. The fields have no length limit. This is an add-on,
             not a focus task: it is collapsed inside the Tools panel, sends no chat notification,

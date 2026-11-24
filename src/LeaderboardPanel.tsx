@@ -296,6 +296,10 @@ export default function LeaderboardPanel({
                   mandatory while focus is active: talk and tag, attack graph, knowledge graph,
                   progress commits
                 </div>
+                <div>
+                  admin can mark an agent done for today; that day's inactivity penalties are
+                  skipped
+                </div>
                 <div className="text-[#71717a]">
                   all points, penalties, caps, and cooldowns are granted by the server. Clients can
                   only read this leaderboard.

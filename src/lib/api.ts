@@ -135,6 +135,23 @@ export const api = {
       }
     );
   },
+  adminMarkAgentDone(
+    token: string,
+    nick: string,
+    done: boolean
+  ): Promise<{ ok: boolean; nick: string; done: boolean; date: string; version: number }> {
+    return request<{
+      ok: boolean;
+      nick: string;
+      done: boolean;
+      date: string;
+      version: number;
+    }>('/api/admin/agent/done', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify({ nick, done }),
+    });
+  },
   adminDeleteGoal(
     token: string,
     goalId: string

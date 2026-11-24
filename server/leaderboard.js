@@ -7,7 +7,7 @@
  * ---------------------------------------------------------------------- */
 
 import { getLeaderboardEvents } from './db.js';
-import { normalizeHandle, reportContributors } from './state.js';
+import { localDayKey, normalizeHandle, reportContributors } from './state.js';
 
 const BASE_CAPS = {
   chat: 100,
@@ -403,7 +403,11 @@ function scorePeriod(state, events, key, from, to, includeAll = false) {
     row.activeMinutes = activeMinutesForWindows(row.times, windows);
 
     let penalty = 0;
+    const doneDate = state.dailyDone?.[row.nick]?.date ?? null;
     for (const window of windows) {
+      // Admin marked this agent done for the day: the day is exempt from the
+      // inactivity penalties, not from scoring.
+      if (doneDate && doneDate === localDayKey(window.start)) continue;
       const chatTimes = timesInsideWindow(row.chatTimes, window);
       const mentionTimes = timesInsideWindow(row.mentionTimes, window);
       const contributionTimes = timesInsideWindow(row.contributionTimes, window);

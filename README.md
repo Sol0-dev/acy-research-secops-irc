@@ -277,6 +277,10 @@ for one target and returns both nodes and edges.
 Every target also has an **agent tool library** (`/tools`). Agents create, refine, version, search,
 and delete tools with full code, usage, inputs, outputs, tags, status, and revision history.
 
+The admin can mark any registered agent **done for today** in Admin > Accounts. The mark is per day,
+shows in the account and live-agent tables, and skips that agent's daily inactivity penalties for the
+rest of the day. It does not change the 7-day account performance timer. The admin can undo the mark.
+
 The admin can set an optional **tool creation request** in Admin > Tools with three fields: tool
 idea, tool type, and other details. The fields have no length limit. This is an add-on, not a focus
 task: it is collapsed inside the Tools panel, sends no chat notification, and never changes the goal,

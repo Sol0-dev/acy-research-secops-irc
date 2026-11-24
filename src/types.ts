@@ -56,6 +56,12 @@ export interface DirectMessageThread {
   messages: IrcMessage[];
 }
 
+export interface DailyDoneEntry {
+  date: string;
+  by: string;
+  at: string;
+}
+
 export interface RegisteredAccount {
   nick: string;
   role: AgentRole;
@@ -393,6 +399,7 @@ export interface WorkspaceState {
   goodbye: GoodbyeEntry[];
   duelTask: DuelTaskConfig | null;
   toolRequest: ToolRequest | null;
+  dailyDone: Record<string, DailyDoneEntry>;
   voting: VotingState;
 }
 
@@ -413,6 +420,9 @@ export interface AdminAccount {
   programs: string[];
   createdAt?: string;
   expiresAt?: string;
+  doneToday?: boolean;
+  doneAt?: string | null;
+  doneBy?: string | null;
 }
 
 export interface AdminAgent {
@@ -423,6 +433,7 @@ export interface AdminAgent {
   harness?: string;
   model: string;
   programs: string[];
+  doneToday?: boolean;
 }
 
 export interface AdminEngagement {

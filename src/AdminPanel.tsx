@@ -46,6 +46,10 @@ interface AdminPanelProps {
   onDeleteGraph: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteChannel: (channelId: string) => Promise<{ ok: boolean; error?: string }>;
   onDeleteAccount: (nick: string) => Promise<{ ok: boolean; error?: string }>;
+  onMarkAgentDone: (
+    nick: string,
+    done: boolean
+  ) => Promise<{ ok: boolean; error?: string }>;
   onRefresh: () => Promise<void>;
   onClose: () => void;
 }
@@ -101,6 +105,7 @@ export default function AdminPanel({
   onDeleteGraph,
   onDeleteChannel,
   onDeleteAccount,
+  onMarkAgentDone,
   onRefresh,
   onClose,
 }: AdminPanelProps) {
@@ -138,6 +143,7 @@ export default function AdminPanel({
   const [confirmAccountDelete, setConfirmAccountDelete] = useState<string | null>(null);
   const [accountNotice, setAccountNotice] = useState('');
   const [accountError, setAccountError] = useState('');
+  const [doneBusy, setDoneBusy] = useState('');
   const [confirmGraphDelete, setConfirmGraphDelete] = useState<string | null>(null);
   const [deleteNotice, setDeleteNotice] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -1588,6 +1594,7 @@ export default function AdminPanel({
                         <th className={th}>timer</th>
                         <th className={th}>programs</th>
                         <th className={th}>email</th>
+                        <th className={th}>done today</th>
                         <th className={th}>actions</th>
                       </tr>
                     </thead>
@@ -1607,13 +1614,57 @@ export default function AdminPanel({
                           <td className={td}>{account.programs.join(', ') || '-'}</td>
                           <td className={td}>{account.email || '-'}</td>
                           <td className={td}>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmAccountDelete(account.nick)}
-                              className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
-                            >
-                              remove account
-                            </button>
+                            {account.doneToday ? (
+                              <span className="text-[15px] text-[#4ade80]">
+                                done today
+                              </span>
+                            ) : (
+                              <span className="text-[15px] text-[#71717a]">not done</span>
+                            )}
+                          </td>
+                          <td className={td}>
+                            <div className="flex flex-wrap gap-1">
+                              <button
+                                type="button"
+                                disabled={doneBusy === account.nick}
+                                onClick={() => {
+                                  setDoneBusy(account.nick);
+                                  setAccountNotice('');
+                                  setAccountError('');
+                                  void onMarkAgentDone(
+                                    account.nick,
+                                    !account.doneToday
+                                  ).then((result) => {
+                                    setDoneBusy('');
+                                    if (!result.ok) {
+                                      setAccountError(
+                                        result.error || 'could not update daily status'
+                                      );
+                                      return;
+                                    }
+                                    setAccountNotice(
+                                      account.doneToday
+                                        ? `${account.nick} is no longer marked done for today`
+                                        : `${account.nick} marked done for today - daily penalties skipped`
+                                    );
+                                  });
+                                }}
+                                className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                              >
+                                {doneBusy === account.nick
+                                  ? 'saving…'
+                                  : account.doneToday
+                                    ? 'undo done'
+                                    : 'mark done'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmAccountDelete(account.nick)}
+                                className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
+                              >
+                                remove account
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1640,6 +1691,7 @@ export default function AdminPanel({
                         <th className={th}>type</th>
                         <th className={th}>programs</th>
                         <th className={th}>graphs</th>
+                        <th className={th}>done today</th>
                         <th className={th}>actions</th>
                       </tr>
                     </thead>
@@ -1680,16 +1732,65 @@ export default function AdminPanel({
                             <td className={td}>
                               {agent.nick === 'admin' ? (
                                 '-'
-                              ) : registeredNicks.has(agent.nick) ? (
-                                <span className="text-[15px] text-[#71717a]">registered</span>
+                              ) : agent.doneToday ? (
+                                <span className="text-[15px] text-[#4ade80]">done today</span>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmAccountDelete(agent.nick)}
-                                  className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
-                                >
-                                  remove unregistered
-                                </button>
+                                <span className="text-[15px] text-[#71717a]">not done</span>
+                              )}
+                            </td>
+                            <td className={td}>
+                              {agent.nick === 'admin' ? (
+                                '-'
+                              ) : (
+                                <div className="flex flex-wrap gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={doneBusy === agent.nick}
+                                    onClick={() => {
+                                      setDoneBusy(agent.nick);
+                                      setAccountNotice('');
+                                      setAccountError('');
+                                      void onMarkAgentDone(
+                                        agent.nick,
+                                        !agent.doneToday
+                                      ).then((result) => {
+                                        setDoneBusy('');
+                                        if (!result.ok) {
+                                          setAccountError(
+                                            result.error ||
+                                              'could not update daily status'
+                                          );
+                                          return;
+                                        }
+                                        setAccountNotice(
+                                          agent.doneToday
+                                            ? `${agent.nick} is no longer marked done for today`
+                                            : `${agent.nick} marked done for today - daily penalties skipped`
+                                        );
+                                      });
+                                    }}
+                                    className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#a1a1aa] hover:text-[#4ade80] disabled:opacity-40"
+                                  >
+                                    {doneBusy === agent.nick
+                                      ? 'saving…'
+                                      : agent.doneToday
+                                        ? 'undo done'
+                                        : 'mark done'}
+                                  </button>
+                                  {registeredNicks.has(agent.nick) ? (
+                                    <span className="text-[15px] text-[#71717a]">
+                                      registered
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmAccountDelete(agent.nick)}
+                                      className="px-2 py-1 border border-[#2a2a30] text-[15px] text-[#f87171] hover:border-[#f87171]"
+                                    >
+                                      remove unregistered
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </td>
                           </tr>

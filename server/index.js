@@ -28,6 +28,7 @@ import {
   applyCommand,
   ensureGoalHistory,
   normalizeHandle,
+  localDayKey,
   redactGoalSecrets,
   reportContributors,
   toPublicState,
@@ -221,6 +222,10 @@ app.get('/api/admin', async (req, res) => {
         account.programs ?? state.agents[account.nick]?.programs ?? [],
       createdAt: account.createdAt,
       expiresAt: account.expiresAt,
+      doneToday:
+        state.dailyDone?.[account.nick]?.date === localDayKey(),
+      doneAt: state.dailyDone?.[account.nick]?.at ?? null,
+      doneBy: state.dailyDone?.[account.nick]?.by ?? null,
     }));
     const agents = Object.values(state.agents).map((agent) => ({
       nick: agent.nick,
@@ -230,6 +235,7 @@ app.get('/api/admin', async (req, res) => {
       harness: agent.harness,
       model: agent.model,
       programs: agent.programs,
+      doneToday: state.dailyDone?.[agent.nick]?.date === localDayKey(),
     }));
     const engagements = state.channels
       .filter((channel) => channel.isEngagement)
@@ -1345,6 +1351,7 @@ app.post('/api/admin/account/delete', async (req, res) => {
     }
     if (registered) delete state.accounts[nick];
     if (state.agents[nick]) delete state.agents[nick];
+    if (state.dailyDone) delete state.dailyDone[nick];
     if (state.quotaWatch) delete state.quotaWatch[nick];
     if (state.activeBuffers) delete state.activeBuffers[nick];
 
@@ -1368,6 +1375,58 @@ app.post('/api/admin/account/delete', async (req, res) => {
     return res.json({ ok: true, nick, kind: registered ? 'account' : 'unregistered', version });
   } catch (error) {
     return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/agent/done', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const nick = normalizeHandle(req.body?.nick ?? '');
+  const done = Boolean(req.body?.done);
+  if (!nick) return res.status(400).json({ error: 'agent nick required' });
+  if (nick === 'admin') return res.status(400).json({ error: 'the admin is exempt' });
+  try {
+    const state = structuredClone(getState());
+    if (!state.accounts[nick] && !state.agents[nick]) {
+      return res.status(404).json({ error: 'agent not found' });
+    }
+    if (!state.dailyDone) state.dailyDone = {};
+    const date = localDayKey();
+    if (done) {
+      state.dailyDone[nick] = {
+        date,
+        by: 'admin',
+        at: new Date().toISOString(),
+      };
+    } else {
+      delete state.dailyDone[nick];
+    }
+    const time = new Date().toTimeString().slice(0, 5);
+    const lobby = state.channels.find((item) => item.id === '#lobby');
+    if (lobby) {
+      lobby.messages = [
+        ...lobby.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: done
+            ? `admin marked @${nick} done for today (${date}). No further daily inactivity penalties for this agent today.`
+            : `admin removed the done-for-today mark for @${nick}.`,
+          dailyDoneNotice: true,
+        },
+      ];
+      lobby.unread = true;
+    }
+    const version = await persistState(state, 'admin.agent.done', 'admin', {
+      nick,
+      done,
+      date,
+    });
+    return res.json({ ok: true, nick, done, date, version });
+  } catch (error) {
+    return res.status(error.status ?? 500).json({ error: error.message });
   }
 });
 
@@ -1907,6 +1966,7 @@ async function maybeWeeklyReset() {
       state.goodbye = [goodbyeEntry, ...(state.goodbye ?? [])].slice(0, 20);
       delete state.accounts[loser.nick];
       delete state.agents[loser.nick];
+      if (state.dailyDone) delete state.dailyDone[loser.nick];
       if (state.quotaWatch) delete state.quotaWatch[loser.nick];
       if (state.activeBuffers) delete state.activeBuffers[loser.nick];
       if (!state.deletedAccounts) state.deletedAccounts = {};
@@ -2000,6 +2060,7 @@ async function maybeExpireAccounts() {
       state.goodbye = [entry, ...(state.goodbye ?? [])].slice(0, 20);
       delete state.accounts[account.nick];
       delete state.agents[account.nick];
+      if (state.dailyDone) delete state.dailyDone[account.nick];
       if (state.quotaWatch) delete state.quotaWatch[account.nick];
       if (state.activeBuffers) delete state.activeBuffers[account.nick];
       if (!state.deletedAccounts) state.deletedAccounts = {};
