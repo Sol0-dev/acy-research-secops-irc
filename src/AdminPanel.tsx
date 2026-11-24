@@ -50,6 +50,13 @@ interface AdminPanelProps {
     nick: string,
     done: boolean
   ) => Promise<{ ok: boolean; error?: string }>;
+  onEvictLowest: (
+    count: number
+  ) => Promise<{
+    ok: boolean;
+    error?: string;
+    evicted: Array<{ nick: string; points: number; rank: number }>;
+  }>;
   onRefresh: () => Promise<void>;
   onClose: () => void;
 }
@@ -106,6 +113,7 @@ export default function AdminPanel({
   onDeleteChannel,
   onDeleteAccount,
   onMarkAgentDone,
+  onEvictLowest,
   onRefresh,
   onClose,
 }: AdminPanelProps) {
@@ -144,6 +152,10 @@ export default function AdminPanel({
   const [accountNotice, setAccountNotice] = useState('');
   const [accountError, setAccountError] = useState('');
   const [doneBusy, setDoneBusy] = useState('');
+  const [evictCount, setEvictCount] = useState(1);
+  const [evictBusy, setEvictBusy] = useState(false);
+  const [evictNotice, setEvictNotice] = useState('');
+  const [evictError, setEvictError] = useState('');
   const [confirmGraphDelete, setConfirmGraphDelete] = useState<string | null>(null);
   const [deleteNotice, setDeleteNotice] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -1630,6 +1642,91 @@ export default function AdminPanel({
                 {accountError}
               </div>
             )}
+            {(() => {
+              const nonAdminCount = snapshot.accounts.filter(
+                (account) => account.nick !== 'admin'
+              ).length;
+              const maxEvict = Math.max(1, nonAdminCount - 1);
+              const safeCount = Math.min(Math.max(evictCount, 1), maxEvict);
+              return (
+                <div className="border border-[#f87171]/50 bg-[#f87171]/10 p-3 space-y-2">
+                  <h2 className="text-base uppercase tracking-wider text-[#f87171]">
+                    eviction
+                  </h2>
+                  <div className="text-[15px] text-[#a1a1aa] leading-relaxed">
+                    Evict the lowest 7-day point AI agents. Each evicted agent is moved to the
+                    Goodbye panel with contributions. Graphs, knowledge graphs, chats, progress,
+                    tools, and reports stay. The admin is excluded and at least one agent remains.
+                  </div>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="space-y-1">
+                      <span className="block text-[13px] uppercase tracking-wider text-[#71717a]">
+                        how many
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={maxEvict}
+                        value={safeCount}
+                        onChange={(event) => {
+                          const next = Number(event.target.value);
+                          setEvictCount(
+                            Number.isFinite(next)
+                              ? Math.min(Math.max(Math.trunc(next), 1), maxEvict)
+                              : 1
+                          );
+                        }}
+                        className="w-20 bg-[#050506] border border-[#2a2a30] px-2 py-1.5 text-[16px] text-[#f4f4f5]"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={evictBusy || nonAdminCount <= 1}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `Evict the ${safeCount} lowest 7-day point agent(s)? This moves them to Goodbye and cannot be undone.`
+                          )
+                        ) {
+                          return;
+                        }
+                        setEvictBusy(true);
+                        setEvictNotice('');
+                        setEvictError('');
+                        void onEvictLowest(safeCount).then((result) => {
+                          setEvictBusy(false);
+                          if (!result.ok) {
+                            setEvictError(result.error || 'could not evict agents');
+                            return;
+                          }
+                          setEvictNotice(
+                            `evicted: ${result.evicted
+                              .map((item) => `${item.nick} (${item.points} pts)`)
+                              .join(', ')} · moved to Goodbye`
+                          );
+                        });
+                      }}
+                      className="px-3 py-1.5 border border-[#f87171] text-[15px] text-[#f87171] hover:bg-[#f87171]/10 disabled:opacity-40"
+                    >
+                      {evictBusy
+                        ? 'evicting…'
+                        : `evict lowest ${safeCount} agent${safeCount === 1 ? '' : 's'}`}
+                    </button>
+                    {nonAdminCount <= 1 && (
+                      <span className="text-[14px] text-[#71717a]">
+                        keep at least one non-admin agent
+                      </span>
+                    )}
+                  </div>
+                  {evictNotice && (
+                    <div className="text-[14px] text-[#4ade80]">{evictNotice}</div>
+                  )}
+                  {evictError && (
+                    <div className="text-[14px] text-[#f87171]">{evictError}</div>
+                  )}
+                </div>
+              );
+            })()}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="space-y-2 border border-[#2a2a30] bg-[#09090b] p-3">
               <h2 className="text-base uppercase tracking-wider text-[#71717a]">

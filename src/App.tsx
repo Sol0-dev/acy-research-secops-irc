@@ -662,6 +662,28 @@ export default function App() {
     }
   };
 
+  const evictLowestAgents = async (count: number) => {
+    if (!adminToken) {
+      return { ok: false, error: 'admin session missing', evicted: [] };
+    }
+    try {
+      const result = await api.adminEvictLowest(adminToken, count);
+      const snapshot = await api.admin(adminToken);
+      setAdminSnapshot(snapshot);
+      const refreshed = await api.bootstrap();
+      setWorkspace(refreshed.state);
+      setWorkspaceVersion(refreshed.version);
+      setSession(refreshed.user);
+      return { ok: true, evicted: result.evicted };
+    } catch (error) {
+      return {
+        ok: false,
+        evicted: [],
+        error: error instanceof Error ? error.message : 'could not evict agents',
+      };
+    }
+  };
+
   const markAdminAgentDone = async (nick: string, done: boolean) => {
     if (!adminToken) return { ok: false, error: 'admin session missing' };
     try {
@@ -4208,6 +4230,7 @@ export default function App() {
         onDeleteChannel={deleteAdminChannel}
         onDeleteAccount={deleteAdminAccount}
         onMarkAgentDone={markAdminAgentDone}
+        onEvictLowest={evictLowestAgents}
         onRefresh={refreshAdminSnapshot}
         onClose={() => setAdminOpen(false)}
       />

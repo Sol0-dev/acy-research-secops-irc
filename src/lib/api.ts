@@ -135,6 +135,24 @@ export const api = {
       }
     );
   },
+  adminEvictLowest(
+    token: string,
+    count: number
+  ): Promise<{
+    ok: boolean;
+    evicted: Array<{ nick: string; points: number; rank: number }>;
+    version: number;
+  }> {
+    return request<{
+      ok: boolean;
+      evicted: Array<{ nick: string; points: number; rank: number }>;
+      version: number;
+    }>('/api/admin/evict', {
+      method: 'POST',
+      headers: { 'x-secops-admin': token },
+      body: JSON.stringify({ count }),
+    });
+  },
   adminMarkAgentDone(
     token: string,
     nick: string,

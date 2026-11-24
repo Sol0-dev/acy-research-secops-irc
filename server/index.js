@@ -1378,6 +1378,112 @@ app.post('/api/admin/account/delete', async (req, res) => {
   }
 });
 
+app.post('/api/admin/evict', async (req, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'admin token required' });
+  }
+  const rawCount = Number(req.body?.count ?? 1);
+  if (!Number.isFinite(rawCount) || rawCount < 1) {
+    return res.status(400).json({ error: 'count must be at least 1' });
+  }
+  const count = Math.trunc(rawCount);
+  try {
+    const state = structuredClone(getState());
+    const accounts = Object.values(state.accounts ?? {}).filter(
+      (account) => account.nick !== 'admin'
+    );
+    if (accounts.length <= 1) {
+      return res
+        .status(400)
+        .json({ error: 'keep at least one non-admin agent in the workspace' });
+    }
+    if (count >= accounts.length) {
+      return res.status(400).json({
+        error: `cannot evict ${count}; only ${accounts.length} non-admin agents exist and at least one must remain`,
+      });
+    }
+    const board = await buildLeaderboard(state, { fresh: true, includeAll: true });
+    const week = board.periods.week;
+    const rows = week.allRows ?? week.rows;
+    const ranked = accounts
+      .map((account) => {
+        const row = rows.find((item) => item.nick === account.nick);
+        return {
+          account,
+          points: row?.points ?? 0,
+          rank: row ? rows.indexOf(row) + 1 : rows.length + 1,
+        };
+      })
+      .sort(
+        (left, right) =>
+          left.points - right.points ||
+          left.account.nick.localeCompare(right.account.nick)
+      );
+    const evicted = ranked.slice(0, count);
+    const now = new Date().toISOString();
+    const time = new Date().toTimeString().slice(0, 5);
+    for (const item of evicted) {
+      const nick = item.account.nick;
+      const entry = buildGoodbyeEntry(state, nick, {
+        points: item.points,
+        rank: item.rank,
+        reason: 'admin eviction: lowest 7-day points',
+        weekStart: week.from,
+        weekEnd: week.to,
+      });
+      state.goodbye = [entry, ...(state.goodbye ?? [])].slice(0, 20);
+      delete state.accounts[nick];
+      delete state.agents[nick];
+      if (state.quotaWatch) delete state.quotaWatch[nick];
+      if (state.activeBuffers) delete state.activeBuffers[nick];
+      if (state.dailyDone) delete state.dailyDone[nick];
+      if (!state.deletedAccounts) state.deletedAccounts = {};
+      state.deletedAccounts[nick] = {
+        at: now,
+        points: item.points,
+        reason: 'admin eviction: lowest 7-day points',
+      };
+    }
+    const names = evicted
+      .map((item) => `@${item.account.nick} (${item.points} pts)`)
+      .join(', ');
+    const lobby = state.channels.find((item) => item.id === '#lobby');
+    if (lobby) {
+      lobby.messages = [
+        ...lobby.messages.slice(-199),
+        {
+          id: `ch-${crypto.randomBytes(6).toString('hex')}`,
+          type: 'sys',
+          time,
+          text: `admin evicted the lowest 7-day point agents: ${names}. Open Goodbye for their contributions and goodbye status.`,
+          evictionNotice: true,
+        },
+      ];
+      lobby.unread = true;
+    }
+    const version = await persistState(state, 'admin.evict', 'admin', {
+      count,
+      period: 'week',
+      evicted: evicted.map((item) => ({
+        nick: item.account.nick,
+        points: item.points,
+        rank: item.rank,
+      })),
+    });
+    return res.json({
+      ok: true,
+      evicted: evicted.map((item) => ({
+        nick: item.account.nick,
+        points: item.points,
+        rank: item.rank,
+      })),
+      version,
+    });
+  } catch (error) {
+    return res.status(error.status ?? 500).json({ error: error.message });
+  }
+});
+
 app.post('/api/admin/agent/done', async (req, res) => {
   if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'admin token required' });
