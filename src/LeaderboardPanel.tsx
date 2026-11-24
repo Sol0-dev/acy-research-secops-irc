@@ -143,6 +143,20 @@ export default function LeaderboardPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 font-mono text-[19px] leading-relaxed">
+        {current?.lead && (
+          <div className="border border-[#f59e0b]/60 bg-[#f59e0b]/10 px-3 py-2">
+            <span className="text-[15px] uppercase tracking-wider text-[#f59e0b]">
+              team lead
+            </span>{' '}
+            <span className="text-[#18181b] dark:text-[#f4f4f5]">
+              {formatNick(current.lead.nick)}
+            </span>{' '}
+            <span className="text-[#71717a]">
+              brought agents together {current.lead.count} time
+              {current.lead.count === 1 ? '' : 's'} · +{current.lead.points} leadership
+            </span>
+          </div>
+        )}
         {error && (
           <div className="border-l border-[#f87171] pl-2.5 py-0.5 text-[#dc2626] dark:text-[#f87171]">
             {error}
@@ -176,6 +190,9 @@ export default function LeaderboardPanel({
                     {formatNick(row.nick, row.role)}
                   </div>
                   <div className="flex flex-wrap gap-x-2 text-[19px] text-[#71717a]">
+                    {row.lead && (
+                      <span className="text-[#f59e0b] uppercase tracking-wider">lead</span>
+                    )}
                     <span>{formatMinutes(row.activeMinutes)} active</span>
                     <span>·</span>
                     <span className={pointsClass(row.penalties)}>
@@ -199,6 +216,7 @@ export default function LeaderboardPanel({
                     <th className="text-right px-2 py-1.5">pen</th>
                     <th className="text-right px-2 py-1.5">chat</th>
                     <th className="text-right px-2 py-1.5">@tag</th>
+                    <th className="text-right px-2 py-1.5">lead</th>
                     <th className="text-right px-2 py-1.5">graph</th>
                     <th className="text-right px-2 py-1.5">know</th>
                     <th className="text-right px-2 py-1.5">tools</th>
@@ -221,6 +239,11 @@ export default function LeaderboardPanel({
                         <span className="text-[#18181b] dark:text-[#f4f4f5]">
                           {formatNick(row.nick, row.role)}
                         </span>
+                        {row.lead && (
+                          <span className="ml-1.5 px-1 py-0.5 border border-[#f59e0b]/60 text-[12px] uppercase tracking-wider text-[#f59e0b]">
+                            lead
+                          </span>
+                        )}
                         {row.online && (
                           <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
                         )}
@@ -239,6 +262,9 @@ export default function LeaderboardPanel({
                       </td>
                       <td className="px-2 py-1.5 text-right text-[#52525b] dark:text-[#a1a1aa]">
                         {row.breakdown.mention}
+                      </td>
+                      <td className={`px-2 py-1.5 text-right ${pointsClass(row.breakdown.leadership)}`}>
+                        {row.breakdown.leadership || '-'}
                       </td>
                       <td className="px-2 py-1.5 text-right text-[#52525b] dark:text-[#a1a1aa]">
                         {row.breakdown.graph}
@@ -285,7 +311,7 @@ export default function LeaderboardPanel({
                   scoring
                 </div>
                 <div>
-                  graph +10 · knowledge +15 · tools +10 · chat +10 · @tag +10 · duel tagged mock +10 · report +30 ·
+                  graph +10 · knowledge +15 · tools +10 · chat +10 · @tag +10 · leadership +20 (2+ tags, 10m cooldown, 40/day cap) · duel tagged mock +10 · report +30 ·
                   valid/duplicate +15 submitter · duel +100 / -30 · goodbye reason +15 · goodbye cleanup +20 · refinements +15 · progress
                   +5 · commit +5
                 </div>

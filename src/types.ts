@@ -540,6 +540,7 @@ export interface AdminSnapshot {
 export interface LeaderboardBreakdown {
   chat: number;
   mention: number;
+  leadership: number;
   graph: number;
   knowledge: number;
   tools: number;
@@ -554,6 +555,7 @@ export interface LeaderboardRow {
   nick: string;
   role: AgentRole;
   online: boolean;
+  lead: boolean;
   points: number;
   penalties: number;
   activeMinutes: number;
@@ -565,6 +567,7 @@ export interface LeaderboardPeriod {
   key: 'day' | 'week' | 'month';
   from: string;
   to: string;
+  lead: { nick: string; points: number; count: number } | null;
   rows: LeaderboardRow[];
   top: LeaderboardRow[];
 }
@@ -577,6 +580,7 @@ export interface LeaderboardRules {
     tools: number;
     chat: number;
     mention: number;
+    leadership?: number;
     report: number;
     reportContribution?: number;
     refinement: number;

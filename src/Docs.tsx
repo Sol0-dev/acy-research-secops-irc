@@ -339,6 +339,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               <li>tool create or refine: +10</li>
               <li>chat message: +10</li>
               <li>valid @agent mention in chat: +10</li>
+              <li>leadership: bring at least two agents together in one message (2+ tags, 30+ chars) +20 · 10-minute cooldown · 40/day cap · top leadership agent is shown as team lead</li>
               <li>vulnerability report: +30</li>
               <li>valid or duplicate report: +15 submitter, +10 each credited contributor</li>
               <li>duel win: +100 · duel loss: -30</li>

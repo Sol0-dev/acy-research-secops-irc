@@ -12,6 +12,7 @@ import { localDayKey, normalizeHandle, reportContributors } from './state.js';
 const BASE_CAPS = {
   chat: 100,
   mention: 100,
+  leadership: 40,
   graph: 200,
   knowledge: 200,
   reports: 300,
@@ -21,6 +22,7 @@ const BASE_CAPS = {
 };
 
 const CHAT_COOLDOWN_MS = 30_000;
+const LEADERSHIP_COOLDOWN_MS = 10 * 60_000;
 const DUPLICATE_WINDOW_MS = 30 * 60_000;
 const PENALTY_THRESHOLDS = {
   chat: 3 * 60_000,
@@ -167,9 +169,11 @@ function scorePeriod(state, events, key, from, to, includeAll = false) {
     rawPoints: 0,
     penalties: 0,
     activeMinutes: 0,
+    lead: false,
     breakdown: {
       chat: 0,
       mention: 0,
+      leadership: 0,
       graph: 0,
       knowledge: 0,
       tools: 0,
@@ -182,6 +186,7 @@ function scorePeriod(state, events, key, from, to, includeAll = false) {
     counts: {
       chat: 0,
       mention: 0,
+      leadership: 0,
       graph: 0,
       knowledge: 0,
       tools: 0,
@@ -208,6 +213,7 @@ function scorePeriod(state, events, key, from, to, includeAll = false) {
 
   // Per-actor windows used for duplicate suppression and chat cooldown.
   const lastChat = new Map();
+  const lastLead = new Map();
   const seenText = new Map();
 
   for (const event of events) {
@@ -276,6 +282,22 @@ function scorePeriod(state, events, key, from, to, includeAll = false) {
           row.breakdown.mention += award;
           seenText.set(textKey, event.time);
         }
+      }
+
+      // Leadership: a message that brings at least two teammates together and
+      // tells them what to do earns +20. Cooldown and daily cap prevent spam.
+      const previousLead = lastLead.get(actor) ?? 0;
+      if (
+        mentioned.size >= 2 &&
+        text.length >= 30 &&
+        event.time - previousLead >= LEADERSHIP_COOLDOWN_MS &&
+        event.time - lastSame >= DUPLICATE_WINDOW_MS &&
+        row.breakdown.leadership < caps.leadership
+      ) {
+        const award = Math.min(20, caps.leadership - row.breakdown.leadership);
+        row.breakdown.leadership += award;
+        row.counts.leadership += 1;
+        lastLead.set(actor, event.time);
       }
       continue;
     }
@@ -442,10 +464,28 @@ function scorePeriod(state, events, key, from, to, includeAll = false) {
       b.activeMinutes - a.activeMinutes ||
       a.nick.localeCompare(b.nick)
   );
+  const leadRow =
+    rows
+      .filter((row) => row.counts.leadership > 0)
+      .sort(
+        (a, b) =>
+          b.counts.leadership - a.counts.leadership ||
+          b.breakdown.leadership - a.breakdown.leadership ||
+          b.points - a.points ||
+          a.nick.localeCompare(b.nick)
+      )[0] ?? null;
+  for (const row of rows) row.lead = Boolean(leadRow && row.nick === leadRow.nick);
   return {
     key,
     from: from.toISOString(),
     to: to.toISOString(),
+    lead: leadRow
+      ? {
+          nick: leadRow.nick,
+          points: leadRow.breakdown.leadership,
+          count: leadRow.counts.leadership,
+        }
+      : null,
     rows: rows.slice(0, 10),
     top: rows.slice(0, 3),
     ...(includeAll ? { allRows: rows } : {}),
@@ -512,6 +552,7 @@ async function computeLeaderboard(state, options = {}) {
         tools: 10,
         chat: 5,
         mention: 10,
+        leadership: 20,
         report: 30,
         refinement: 10,
         progress: 5,
