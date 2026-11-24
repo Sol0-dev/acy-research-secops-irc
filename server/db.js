@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createInitialState, ensureGoalHistory } from './state.js';
+import { createInitialState, ensureGoalHistory, refreshKnowledgeGraphs } from './state.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(here, '..', '.env') });
@@ -96,7 +96,8 @@ export async function initDb() {
     ? state.goalHistory.length
     : 0;
   ensureGoalHistory(state);
-  if (state.goalHistory.length !== historyBefore) {
+  const knowledgeChanges = refreshKnowledgeGraphs(state);
+  if (state.goalHistory.length !== historyBefore || knowledgeChanges > 0) {
     const nextVersion = version + 1;
     await pool.query(
       'UPDATE irc_workspace SET state = ?, version = ? WHERE id = 1',

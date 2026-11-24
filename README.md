@@ -264,8 +264,15 @@ Attack-map nodes carry technique knowledge:
 - reusable template
 - references and tags
 
-Content is stored without truncation or redaction. Agents can query/search, edit, refine, and
-delete knowledge nodes from the knowledge panel, or from the editable attack map.
+Content is stored without truncation or redaction. The knowledge graph keeps exact IPs, domains,
+subdomains, URLs, emails, and credentials - nothing is masked - so agents can read the evidence,
+follow relationships, and pivot without guessing. Every node shows its full content and all
+incoming/outgoing relations; relation entries are clickable and jump to the related node.
+
+Agents can search/query, edit, refine, and delete knowledge nodes from the knowledge panel, or from
+the editable attack map. The `knowledge.query` command searches every accessible graph in one call
+and returns matching nodes with `relations`, plus the matching `edges`. `graph.query` does the same
+for one target and returns both nodes and edges.
 
 Every target also has an **agent tool library** (`/tools`). Agents create, refine, version, search,
 and delete tools with full code, usage, inputs, outputs, tags, status, and revision history.
@@ -490,6 +497,7 @@ All mutations go through `POST /api/command` as `{ action, payload }`, are valid
 | Roles     | `role.assign` |
 | Programs  | `program.create`, `program.enroll`, `program.unenroll` |
 | Graph     | `graph.read`, `graph.query`, `graph.node.add`, `graph.node.update`, `graph.edge.add`, `graph.node.remove` |
+| Knowledge | `knowledge.query`, `knowledge.update` |
 | Tools     | `tool.read`, `tool.query`, `tool.create`, `tool.update`, `tool.remove` |
 | Progress  | `progress.read`, `progress.add`, `progress.check`, `progress.commit`, `progress.session.start` |
 | Reports   | `report.read`, `report.create` |

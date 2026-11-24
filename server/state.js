@@ -380,15 +380,6 @@ export function createInitialState() {
   };
 }
 
-const KNOWLEDGE_EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
-const KNOWLEDGE_IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
-const KNOWLEDGE_DOMAIN_RE =
-  /\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}\b/g;
-const KNOWLEDGE_BEARER_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
-const KNOWLEDGE_AUTH_RE = /\bAuthorization\s*:\s*(Bearer\s+)?[^\s,;"']+/gi;
-const KNOWLEDGE_CREDENTIAL_RE =
-  /\b(password|passwd|pwd|token|api[_-]?key|apikey|secret)\b(\s*[:=]\s*)([^\s,;"']+)/gi;
-
 export function redactGoalSecrets(value) {
   let text = String(value ?? '');
   text = text.replace(
@@ -403,41 +394,62 @@ export function redactGoalSecrets(value) {
   return text;
 }
 
-function redactKnowledgeText(value) {
-  let text = String(value ?? '');
-  text = text.replace(KNOWLEDGE_EMAIL_RE, '<email>');
-  text = text.replace(KNOWLEDGE_IPV4_RE, '<ip>');
-  text = text.replace(KNOWLEDGE_DOMAIN_RE, '<domain>');
-  text = text.replace(KNOWLEDGE_AUTH_RE, (_match, scheme) =>
-    `Authorization: ${scheme ? 'Bearer ' : ''}<credential>`
-  );
-  text = text.replace(KNOWLEDGE_BEARER_RE, 'Bearer <credential>');
-  text = text.replace(
-    KNOWLEDGE_CREDENTIAL_RE,
-    (_match, key, separator) => `${key}${separator}<credential>`
-  );
-  return text;
-}
+// The knowledge graph is a refinable copy of the attack-map node. It keeps the
+// exact IPs, domains, subdomains, URLs, emails, and credentials the agents
+// recorded so they can read the evidence and pivot without guessing.
+const KNOWLEDGE_REDACTION_MARKER = /<ip>|<domain>|<email>|<credential>|<redacted>/i;
 
 function createKnowledgeCopy(node) {
-  const intel = node.intel
-    ? Object.fromEntries(
-        Object.entries(node.intel).map(([key, value]) => {
-          if (key === 'tags' && Array.isArray(value)) {
-            return [key, value.map((tag) => redactKnowledgeText(tag))];
-          }
-          return [key, redactKnowledgeText(value)];
-        })
-      )
-    : undefined;
+  const intel = node.intel ? structuredClone(node.intel) : undefined;
   return {
-    label: redactKnowledgeText(node.label),
+    label: node.label,
     kind: node.kind,
-    notes: node.notes ? redactKnowledgeText(node.notes) : undefined,
+    notes: node.notes,
     intel,
+    createdBy: node.createdBy,
     updatedBy: node.knowledge?.updatedBy,
     updatedTime: node.knowledge?.updatedTime,
   };
+}
+
+// Never serve a stale redacted knowledge copy. A real refinement is preserved;
+// only copies that still contain old placeholder markers are rebuilt from the
+// attack-map node.
+function knowledgeForViewer(node) {
+  if (!node.knowledge) return createKnowledgeCopy(node);
+  return KNOWLEDGE_REDACTION_MARKER.test(JSON.stringify(node.knowledge))
+    ? createKnowledgeCopy(node)
+    : node.knowledge;
+}
+
+// Older workspaces stored redacted knowledge copies. Rebuild only those copies
+// from the canonical attack-map node, leaving later real refinements untouched.
+export function refreshKnowledgeGraphs(state) {
+  let changed = 0;
+  for (const graph of Object.values(state.graphs ?? {})) {
+    for (const node of graph.nodes ?? []) {
+      if (
+        node.knowledge &&
+        !KNOWLEDGE_REDACTION_MARKER.test(JSON.stringify(node.knowledge))
+      ) {
+        continue;
+      }
+      node.knowledge = createKnowledgeCopy(node);
+      changed += 1;
+    }
+    for (const edge of graph.edges ?? []) {
+      if (
+        !edge.knowledgeLabel ||
+        !KNOWLEDGE_REDACTION_MARKER.test(edge.knowledgeLabel)
+      ) {
+        continue;
+      }
+      if (edge.label) edge.knowledgeLabel = edge.label;
+      else delete edge.knowledgeLabel;
+      changed += 1;
+    }
+  }
+  return changed;
 }
 
 function flattenTools(tools) {
@@ -570,11 +582,11 @@ export function toPublicState(state, viewerNick = null) {
         title,
         nodes: nodes.map((node) => ({
           ...node,
-          knowledge: node.knowledge ?? createKnowledgeCopy(node),
+          knowledge: knowledgeForViewer(node),
         })),
         edges: edges.map((edge) => ({
           ...edge,
-          knowledgeLabel: edge.knowledgeLabel ?? (edge.label ? redactKnowledgeText(edge.label) : undefined),
+          knowledgeLabel: edge.label,
         })),
       };
     }
@@ -823,6 +835,54 @@ function duelGraphForViewer(state, channel, nick, graph) {
       visibleIds.has(edge.to)
   );
   return { ...graph, nodes, edges };
+}
+
+function knowledgeLabelFor(node) {
+  return node ? knowledgeForViewer(node).label : null;
+}
+
+// Return every edge touching a node with enough labels for an agent to map the
+// relationship without another lookup.
+function graphRelationsForNode(graph, nodeId, labelFor = (node) => node.label) {
+  const byId = new Map((graph.nodes ?? []).map((node) => [node.id, node]));
+  return (graph.edges ?? [])
+    .filter((edge) => edge.from === nodeId || edge.to === nodeId)
+    .map((edge) => {
+      const outgoing = edge.from === nodeId;
+      const other = byId.get(outgoing ? edge.to : edge.from);
+      return {
+        edgeId: edge.id,
+        direction: outgoing ? 'out' : 'in',
+        label: edge.label ?? null,
+        nodeId: other?.id ?? null,
+        nodeLabel: other ? labelFor(other) : null,
+        nodeKind: other?.kind ?? null,
+        createdBy: edge.createdBy,
+        time: edge.time,
+      };
+    });
+}
+
+function graphNodeHaystack(node) {
+  const intel = node.intel ?? {};
+  return [
+    node.label,
+    node.kind,
+    node.notes ?? '',
+    intel.phase ?? '',
+    intel.technique ?? '',
+    intel.commands ?? '',
+    intel.scripts ?? '',
+    intel.request ?? '',
+    intel.response ?? '',
+    intel.chain ?? '',
+    intel.lessons ?? '',
+    intel.template ?? '',
+    intel.references ?? '',
+    ...(intel.tags ?? []),
+  ]
+    .join(' ')
+    .toLowerCase();
 }
 
 // Duelists cannot edit, refine, remove, or link each other's work.
@@ -2010,34 +2070,138 @@ export function applyCommand(state, action, payload = {}, actor = null) {
       const tags = parseList(payload.tags).map((tag) => tag.toLowerCase());
       const nodes = graph.nodes.filter((node) => {
         if (kind && node.kind !== kind) return false;
-        const intel = node.intel ?? {};
-        const haystack = [
-          node.label,
-          node.kind,
-          node.notes ?? '',
-          intel.phase ?? '',
-          intel.technique ?? '',
-          intel.commands ?? '',
-          intel.scripts ?? '',
-          intel.request ?? '',
-          intel.response ?? '',
-          intel.chain ?? '',
-          intel.lessons ?? '',
-          intel.template ?? '',
-          intel.references ?? '',
-          ...(intel.tags ?? []),
-        ]
-          .join(' ')
-          .toLowerCase();
-        if (query && !haystack.includes(query)) return false;
+        if (query) {
+          const relationText = graphRelationsForNode(graph, node.id)
+            .map((relation) => `${relation.label ?? ''} ${relation.nodeLabel ?? ''}`)
+            .join(' ');
+          if (!`${graphNodeHaystack(node)} ${relationText}`.toLowerCase().includes(query)) {
+            return false;
+          }
+        }
         if (tags.length > 0) {
-          const nodeTags = (intel.tags ?? []).map((tag) => tag.toLowerCase());
+          const nodeTags = (node.intel?.tags ?? []).map((tag) => tag.toLowerCase());
           if (!tags.every((tag) => nodeTags.includes(tag))) return false;
         }
         return true;
       });
+      const matchedIds = new Set(nodes.map((node) => node.id));
+      const edges = (graph.edges ?? []).filter(
+        (edge) => matchedIds.has(edge.from) || matchedIds.has(edge.to)
+      );
       return {
-        result: { access: true, channelId: channel.id, total: nodes.length, nodes },
+        result: {
+          access: true,
+          channelId: channel.id,
+          total: nodes.length,
+          nodes: nodes.map((node) => ({
+            ...node,
+            knowledge: knowledgeForViewer(node),
+            relations: graphRelationsForNode(graph, node.id),
+          })),
+          edges,
+        },
+      };
+    }
+
+    case 'knowledge.query': {
+      const viewer = normalizeHandle(actor);
+      requireAgent(state, viewer);
+      const query = String(payload.query ?? '').trim().toLowerCase();
+      const kind = String(payload.kind ?? '').trim().toLowerCase();
+      const tags = parseList(payload.tags).map((tag) => tag.toLowerCase());
+      const requested = new Set(
+        parseList(payload.channels ?? payload.targets ?? payload.channelId ?? '')
+      );
+      const nodes = [];
+      const edges = [];
+      const graphs = [];
+      for (const [channelId, sourceGraph] of Object.entries(state.graphs ?? {})) {
+        const channel = state.channels.find((item) => item.id === channelId);
+        if (!channel?.isEngagement) continue;
+        if (requested.size > 0 && !requested.has(channelId)) continue;
+        if (!canAccessChannel(state, viewer, channel)) continue;
+        const graph = duelGraphForViewer(state, channel, viewer, sourceGraph);
+        const byId = new Map((graph.nodes ?? []).map((node) => [node.id, node]));
+        const matched = (graph.nodes ?? []).filter((node) => {
+          const knowledge = knowledgeForViewer(node);
+          if (kind && (knowledge.kind ?? node.kind) !== kind) return false;
+          if (query) {
+            const relationText = graphRelationsForNode(
+              graph,
+              node.id,
+              knowledgeLabelFor
+            )
+              .map((relation) => `${relation.label ?? ''} ${relation.nodeLabel ?? ''}`)
+              .join(' ');
+            if (
+              !`${graphNodeHaystack(knowledge)} ${relationText}`
+                .toLowerCase()
+                .includes(query)
+            ) {
+              return false;
+            }
+          }
+          if (tags.length > 0) {
+            const nodeTags = (knowledge.intel?.tags ?? []).map((tag) =>
+              tag.toLowerCase()
+            );
+            if (!tags.every((tag) => nodeTags.includes(tag))) return false;
+          }
+          return true;
+        });
+        const matchedIds = new Set(matched.map((node) => node.id));
+        for (const node of matched) {
+          const knowledge = knowledgeForViewer(node);
+          nodes.push({
+            channelId,
+            target: channelId,
+            nodeId: node.id,
+            label: knowledge.label ?? node.label,
+            kind: knowledge.kind ?? node.kind,
+            notes: knowledge.notes ?? node.notes,
+            intel: knowledge.intel ?? node.intel,
+            createdBy: node.createdBy,
+            time: node.time,
+            updatedBy: knowledge.updatedBy,
+            updatedTime: knowledge.updatedTime,
+            relations: graphRelationsForNode(graph, node.id, knowledgeLabelFor),
+          });
+        }
+        for (const edge of graph.edges ?? []) {
+          if (!matchedIds.has(edge.from) && !matchedIds.has(edge.to)) continue;
+          const from = byId.get(edge.from);
+          const to = byId.get(edge.to);
+          edges.push({
+            channelId,
+            edgeId: edge.id,
+            from: edge.from,
+            to: edge.to,
+            fromLabel: knowledgeLabelFor(from),
+            toLabel: knowledgeLabelFor(to),
+            label: edge.label ?? null,
+            createdBy: edge.createdBy,
+            time: edge.time,
+          });
+        }
+        graphs.push({
+          channelId,
+          total: graph.nodes.length,
+          matched: matched.length,
+          edges: graph.edges.length,
+        });
+      }
+      return {
+        result: {
+          access: true,
+          scope: 'all-accessible-graphs',
+          query,
+          kind,
+          tags,
+          total: nodes.length,
+          nodes,
+          edges,
+          graphs,
+        },
       };
     }
 

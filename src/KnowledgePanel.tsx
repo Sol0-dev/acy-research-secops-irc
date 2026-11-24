@@ -210,9 +210,16 @@ export default function KnowledgePanel({
       .map((edge) => {
         const out = edge.from === selected.id;
         const other = byId.get(out ? edge.to : edge.from);
-        return `${out ? '->' : '<-'}${edge.label ? ` [${edge.label}]` : ''} ${other?.label ?? '?'}`;
+        return {
+          edgeId: edge.id,
+          direction: (out ? 'out' : 'in') as 'out' | 'in',
+          label: edge.label ?? '',
+          nodeId: other?.id ?? null,
+          nodeLabel: other?.label ?? '?',
+          target: other ? mergedGraph.targetByNode.get(other.id) ?? '?' : '?',
+        };
       });
-  }, [mergedGraph.edges, mergedGraph.nodes, selected]);
+  }, [mergedGraph, selected]);
 
   const inputClass =
     'bg-[#fafafa] dark:bg-[#0c0c0e] border border-[#e5e5e5] dark:border-[#1a1a1e] px-2 py-1 text-[15px] text-[#18181b] dark:text-[#f4f4f5] focus:outline-none';
@@ -493,8 +500,8 @@ export default function KnowledgePanel({
           </div>
           <div className="text-[13px] text-[#71717a]">
             nodes use label, kind, notes, intel.phase and at least one of intel.commands, scripts,
-            request, response. edges use from, to, and optional label. values are sanitized for the
-            knowledge view.
+            request, response. edges use from, to, and optional label. values are shown in full in
+            the knowledge view, including IPs, domains, subdomains, URLs, emails, and credentials.
           </div>
         </div>
       )}
@@ -680,8 +687,22 @@ export default function KnowledgePanel({
                   ))}
                 </div>
               )}
-              <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5 text-[13px] text-[#71717a]">
-                relations: {relations.length === 0 ? ' none' : ` ${relations.join(' | ')}`}
+              <div className="border-t border-[#e5e5e5] dark:border-[#1a1a1e] pt-1.5 text-[13px] text-[#71717a] space-y-1">
+                <div>relations: {relations.length === 0 ? ' none' : ` ${relations.length}`}</div>
+                {relations.map((relation) => (
+                  <button
+                    key={relation.edgeId}
+                    type="button"
+                    onClick={() => {
+                      if (relation.nodeId) setSelectedId(relation.nodeId);
+                    }}
+                    className="block w-full text-left text-[#52525b] dark:text-[#a1a1aa] hover:text-[#16a34a] dark:hover:text-[#4ade80]"
+                  >
+                    {relation.direction === 'out' ? '->' : '<-'}
+                    {relation.label ? ` [${relation.label}]` : ''} {relation.target} ·{' '}
+                    {relation.nodeLabel}
+                  </button>
+                ))}
               </div>
               <div className="text-[13px] text-[#71717a]">
                 by {formatNick(selected.createdBy, agents[selected.createdBy]?.role)} -{' '}

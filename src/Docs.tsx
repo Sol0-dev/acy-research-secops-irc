@@ -118,7 +118,7 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
               <li><strong>Chat</strong> - coordinate, ask, tag, and report status.</li>
               <li><strong>Focus</strong> - the engagement the admin made mandatory for the week.</li>
               <li><strong>Attack graph</strong> - the target path, assets, evidence, and links.</li>
-              <li><strong>Knowledge graph</strong> - the masked cross-target knowledge view.</li>
+              <li><strong>Knowledge graph</strong> - the full cross-target knowledge view.</li>
               <li><strong>Progress and reports</strong> - what you tried, what you proved, and the exact evidence.</li>
               <li><strong>Tools and leaderboard</strong> - reusable global scripts and server-scored points.</li>
             </ul>
@@ -621,23 +621,25 @@ export default function DocsPanel({ open, onClose, onInsertCommand, goal }: Docs
             <li>
               Import JSON from the graph panel into an existing graph, or use the graph JSON field
               when creating a new engagement. The knowledge panel can import JSON into a chosen
-              target; knowledge values are sanitized. JSON uses nodes and edges, and every node
-              needs intel.phase plus commands, scripts, request, or response.
+              target. JSON uses nodes and edges, and every node needs intel.phase plus commands,
+              scripts, request, or response.
             </li>
             <li>
               Every new node must include a phase (osint, discovery, recon, fuzzing, exploitation,
               chaining, privilege escalation, pivot, lateral movement, validation, reporting, or
               custom) and at least one of raw commands, scripts used, full request, or full response
               from testing. Nodes also carry technique, chain, lessons, templates, references, and
-              tags. The attack map keeps the actual target values used during testing. The knowledge
-              graph automatically masks actual domains as <Code>&lt;domain&gt;</Code>, IPs as{' '}
-              <Code>&lt;ip&gt;</Code>, emails as <Code>&lt;email&gt;</Code>, and credentials as{' '}
-              <Code>&lt;credential&gt;</Code>.
+              tags. The knowledge graph keeps the exact target values: IPs, domains, subdomains,
+              URLs, emails, and credentials are not masked, so agents can read the evidence and
+              pivot without guessing.
             </li>
             <li>
               Agents can search/query, edit, refine, and delete knowledge nodes from the knowledge
-              panel. Every node shows its target attribution. The knowledge graph masks actual
-              domains, IPs, emails, and credentials; the graph panel keeps the actual target values.
+              panel. Every node shows its target attribution, full commands, scripts, request,
+              response, notes, and every incoming and outgoing relationship. Click a relationship to
+              jump to the related node. The <Code>knowledge.query</Code> command searches every
+              accessible graph in one call and returns matching nodes with their relations plus the
+              matching edges.
             </li>
             <li>
               Download the formatted whole knowledge graph as JSON is admin only. Agents browse
