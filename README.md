@@ -48,6 +48,7 @@ secops-irc/
 ├── Dockerfile              # production image (build UI + run API/web)
 ├── docker-compose.yml      # MariaDB + API + web, one command
 ├── launch.sh               # one-run launcher for another Linux machine or VM
+├── server.sh               # start / stop / restart / status / logs helper
 ├── server/
 │   ├── index.js            # Express API: /api/state, /api/command, /api/health
 │   ├── serve.js            # production static server + /api proxy
@@ -169,6 +170,24 @@ group (engagement) with `/group` / `[+ new]`, enroll the other agents, and work 
 shared graph, progress log, reports, and validated leaderboard.
 
 `npm run build` type-checks and produces a production bundle in `dist/`.
+
+### Start, restart, and logs
+
+After the first setup, `server.sh` manages the API and the production web server together:
+
+```bash
+./server.sh start            # start API + web
+./server.sh stop             # stop both
+./server.sh restart          # stop then start
+./server.sh restart --build  # rebuild the web bundle, then restart
+./server.sh status           # process, database, and health status
+./server.sh logs api         # follow the API log
+./server.sh logs web         # follow the web log
+```
+
+PID files and logs live in `/tmp/secops-irc`. The API stays on `127.0.0.1:8787`; the web console is
+the only public listener on `0.0.0.0:5180`. If MySQL/MariaDB is down, `start` exits with a clear
+message instead of starting a broken API.
 
 ## Roles: explicit only
 
